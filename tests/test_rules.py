@@ -155,6 +155,18 @@ def test_auto_cool_grid_usage_can_reduce_to_dry():
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
 
 
+def test_auto_cool_grid_usage_aggressive_still_allows_dry():
+    state = CachedState()
+    home = default_input(
+        aggressive_cooling=True,
+        aircon_mode=AirconMode.COOL,
+        grid_usage=0.1,
+        generation=TEST_PARAMS.generation_dry_threshold,
+        auto=True,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+
+
 def test_auto_cool_grid_usage_tolerates_then_off():
     state = CachedState()
     home = default_input(
@@ -177,10 +189,42 @@ def test_auto_cool_no_solar_tolerates_then_off():
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.OFF
 
 
+def test_auto_cool_power_free_humidity_rises_downgrade_to_dry():
+    state = CachedState()
+    home = default_input(
+        aircon_mode=AirconMode.COOL,
+        auto=True,
+        generation=TEST_PARAMS.generation_cool_threshold,
+        humidity=TEST_PARAMS.humidity_threshold + 1,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+
+
+def test_auto_cool_generation_above_cool_threshold_but_grid_usage_turns_on_dry():
+    state = CachedState()
+    home = default_input(
+        aircon_mode=AirconMode.COOL,
+        auto=True,
+        grid_usage=0.1,
+        generation=TEST_PARAMS.generation_cool_threshold,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+
+
 def test_auto_cool_power_free_but_between_thresholds_downgrade_to_dry():
     state = CachedState()
     home = default_input(aircon_mode=AirconMode.COOL, auto=True, generation=TEST_PARAMS.generation_dry_threshold)
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+
+
+def test_auto_dry_no_grid_usage_no_change():
+    state = CachedState()
+    home = default_input(
+        generation=TEST_PARAMS.generation_cool_threshold - 1,
+        aircon_mode=AirconMode.DRY,
+        auto=True,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
 
 
 def test_auto_dry_upgrade_to_cool_when_generation_allows_and_not_humid():
@@ -205,9 +249,44 @@ def test_auto_dry_stays_dry_when_humid():
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
 
 
+def test_auto_dry_aggressive_upgrades_to_cool_even_if_humid():
+    state = CachedState()
+    home = default_input(
+        aggressive_cooling=True,
+        aircon_mode=AirconMode.DRY,
+        auto=True,
+        generation=TEST_PARAMS.generation_cool_threshold,
+        humidity=TEST_PARAMS.humidity_threshold + 1,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.COOL
+
+
+def test_auto_dry_aggressive_will_not_switch_to_dry_when_power_free():
+    state = CachedState()
+    home = default_input(
+        aggressive_cooling=True,
+        aircon_mode=AirconMode.DRY,
+        auto=True,
+        generation=TEST_PARAMS.generation_dry_threshold,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+
+def test_manual_cool_no_change_if_no_grid_usage():
+    state = CachedState()
+    home = default_input(generation=TEST_PARAMS.generation_cool_threshold, aircon_mode=AirconMode.COOL)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+
 def test_manual_cool_grid_usage_sets_timer():
     state = CachedState()
     home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.TIMER
+
+
+def test_manual_cool_no_solar_sets_timer():
+    state = CachedState()
+    home = default_input(aircon_mode=AirconMode.COOL, have_solar=False)
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.TIMER
 
 
@@ -215,6 +294,129 @@ def test_manual_cool_grid_usage_with_timer_active_no_change():
     state = CachedState()
     home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1, timer=True)
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+
+def test_when_off_and_timer_active_do_not_reset():
+    state = CachedState(last=HomeOutput.TIMER)
+    home = default_input(timer=True)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+
+def test_scenario_interrupt_automations_from_house():
+    state = CachedState()
+    home = default_input(generation=TEST_PARAMS.generation_cool_threshold)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.COOL
+    assert state.tolerated == 0
+    assert state.reactivate_delay == 0
+
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=1, auto=True)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+    assert state.tolerated == 1
+    assert state.reactivate_delay == 0
+
+
+def test_scenario_grid_usage_when_dry_above_dry_threshold_turns_off_after_delay():
+    state = CachedState()
+    home = HomeInput(
+        aircon_mode=AirconMode.DRY,
+        have_solar=True,
+        auto=True,
+        aggressive_cooling=False,
+        generation=TEST_PARAMS.generation_dry_threshold,
+        grid_usage=0.1,
+        humidity=TEST_PARAMS.humidity_threshold - 1,
+        enabled=True,
+        cooling_enabled=True,
+        temperature=TEST_PARAMS.temperature_threshold,
+        timer=False,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+    assert state.tolerated == 1
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.OFF
+    assert state.tolerated == 0
+    assert state.reactivate_delay == TEST_PARAMS.reactivate_delay
+
+
+def test_manual_heat_cool_grid_usage_sets_timer():
+    state = CachedState()
+    home = default_input(aircon_mode=AirconMode.HEAT_COOL, grid_usage=0.1)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.TIMER
+
+
+def test_auto_heat_cool_with_grid_usage_tolerate_then_turn_off():
+    state = CachedState()
+    home = default_input(aircon_mode=AirconMode.HEAT_COOL, auto=True, grid_usage=0.1)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+    assert state.tolerated == 1
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.OFF
+    assert state.tolerated == 0
+    assert state.reactivate_delay == TEST_PARAMS.reactivate_delay
+
+
+def test_scenario_morning_ramp_up_off_to_dry_to_cool():
+    state = CachedState()
+    home = default_input(generation=TEST_PARAMS.generation_dry_threshold - 1)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+    home = default_input(generation=TEST_PARAMS.generation_dry_threshold)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+
+    home = default_input(aircon_mode=AirconMode.DRY, auto=True, generation=TEST_PARAMS.generation_cool_threshold)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.COOL
+
+
+def test_scenario_cloud_passing_cool_downgrades_then_recovers():
+    state = CachedState()
+    home = default_input(aircon_mode=AirconMode.COOL, auto=True, generation=TEST_PARAMS.generation_cool_threshold)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+    home = default_input(
+        aircon_mode=AirconMode.COOL,
+        auto=True,
+        generation=TEST_PARAMS.generation_cool_threshold,
+        grid_usage=0.1,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+    assert state.tolerated == 0
+
+    home = default_input(aircon_mode=AirconMode.DRY, auto=True, generation=TEST_PARAMS.generation_cool_threshold)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.COOL
+
+
+def test_scenario_timer_lifecycle_manual_to_timer_to_reset():
+    state = CachedState()
+
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.TIMER
+    assert apply_adjustment(state, HomeOutput.COOL, HomeOutput.TIMER)
+
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1, timer=True)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+    home = default_input(timer=False)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.RESET
+
+
+def test_scenario_aggressive_cooling_deactivates_when_grid_appears():
+    state = CachedState()
+
+    home = default_input(
+        aggressive_cooling=True,
+        aircon_mode=AirconMode.COOL,
+        auto=True,
+        generation=TEST_PARAMS.generation_cool_threshold,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
+
+    home = default_input(
+        aggressive_cooling=True,
+        aircon_mode=AirconMode.COOL,
+        auto=True,
+        generation=TEST_PARAMS.generation_dry_threshold,
+        grid_usage=0.1,
+    )
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.DRY
+    assert state.tolerated == 0
 
 
 def test_unknown_mode_returns_no_change():
@@ -238,6 +440,7 @@ def test_current_state_mapping():
     assert current_state(default_input(aircon_mode=AirconMode.DRY)) is HomeOutput.DRY
     assert current_state(default_input(aircon_mode=AirconMode.HEAT_COOL)) is HomeOutput.COOL
     assert current_state(default_input(aircon_mode=AirconMode.UNKNOWN)) is HomeOutput.OFF
+    assert current_state(default_input(timer=True, aircon_mode=AirconMode.OFF)) is HomeOutput.OFF
 
 
 def test_apply_adjustment_behavior():
