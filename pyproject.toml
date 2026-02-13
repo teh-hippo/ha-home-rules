@@ -1,0 +1,44 @@
+[project]
+name = "ha-home-rules"
+version = "0.1.0"
+description = "Home Assistant custom integration for solar-aware aircon automation"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = [
+    "homeassistant.*",
+    "pytest_homeassistant_custom_component.*",
+]
+ignore_missing_imports = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = [
+    "custom_components/home_rules/manifest.json:version",
+]
+build_command = ""
+commit_message = "chore(release): {version}"
+tag_format = "v{version}"
+
+[tool.semantic_release.branches.master]
+match = "master"
+prerelease = false
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.remote]
+type = "github"
+token = { env = "GITHUB_TOKEN" }

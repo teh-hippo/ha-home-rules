@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    branches: [ master ]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python Semantic Release
+        uses: python-semantic-release/python-semantic-release@v9.15.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

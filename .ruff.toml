@@ -1,0 +1,20 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = [
+    "B",
+    "E",
+    "F",
+    "I",
+    "N",
+    "S",
+    "UP",
+    "W",
+]
+ignore = [
+    "S101",
+]
+
+[lint.isort]
+known-first-party = ["custom_components.home_rules"]
