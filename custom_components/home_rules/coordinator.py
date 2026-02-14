@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import asdict, dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
@@ -44,6 +44,7 @@ from .const import (
     DOMAIN,
     EVENT_EVALUATION,
     ISSUE_ENTITY_MISSING,
+    ISSUE_ENTITY_UNAVAILABLE,
     ISSUE_INVALID_UNIT,
     ISSUE_NOTIFICATION_SERVICE,
     ISSUE_RUNTIME,
@@ -195,7 +196,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:
             now = dt_util.utcnow().isoformat()
-            home = self._build_home_input()
+            home, had_unavailable = self._build_home_input()
             current = current_state(home)
 
             if self._session.last is None:
@@ -241,6 +242,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._clear_issue(ISSUE_RUNTIME)
             self._clear_issue(ISSUE_ENTITY_MISSING)
             self._clear_issue(ISSUE_INVALID_UNIT)
+            if not had_unavailable:
+                self._clear_issue(ISSUE_ENTITY_UNAVAILABLE)
 
             return CoordinatorData(
                 mode=self._session.last or current,
@@ -295,23 +298,63 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 {"service": f"{service} ({err})"},
             )
 
-    def _build_home_input(self) -> HomeInput:
+    def _build_home_input(self) -> tuple[HomeInput, bool]:
+        had_unavailable = False
         climate_state = self._get_state(self.config_entry.data[CONF_CLIMATE_ENTITY_ID], "climate")
         timer_state = self._get_state(self.config_entry.data[CONF_TIMER_ENTITY_ID], "timer")
         inverter_entity = self.config_entry.data.get(CONF_INVERTER_ENTITY_ID)
-        inverter_state = self._get_state(inverter_entity, "inverter") if inverter_entity else None
+        inverter_state = (
+            self._get_state(inverter_entity, "inverter", allow_unavailable=True) if inverter_entity else None
+        )
+        if inverter_entity and inverter_state is None:
+            had_unavailable = True
 
-        generation_state = self._get_state(self.config_entry.data[CONF_GENERATION_ENTITY_ID], "generation")
-        grid_state = self._get_state(self.config_entry.data[CONF_GRID_ENTITY_ID], "grid")
-        temp_state = self._get_state(self.config_entry.data[CONF_TEMPERATURE_ENTITY_ID], "temperature")
-        humidity_state = self._get_state(self.config_entry.data[CONF_HUMIDITY_ENTITY_ID], "humidity")
+        generation_state = self._get_state(
+            self.config_entry.data[CONF_GENERATION_ENTITY_ID],
+            "generation",
+            allow_unavailable=True,
+        )
+        if generation_state is None:
+            had_unavailable = True
 
-        have_solar = self._state_to_bool(inverter_state) if inverter_state else True
+        grid_state = self._get_state(
+            self.config_entry.data[CONF_GRID_ENTITY_ID],
+            "grid",
+            allow_unavailable=True,
+        )
+        if grid_state is None:
+            had_unavailable = True
 
-        generation = self._normalized_power(generation_state, "generation") if have_solar else 0.0
-        grid_usage = self._normalized_power(grid_state, "grid") if have_solar else 0.0
-        temperature = self._normalized_temperature(temp_state)
-        humidity = self._state_to_float(humidity_state, "humidity")
+        temp_state = self._get_state(
+            self.config_entry.data[CONF_TEMPERATURE_ENTITY_ID],
+            "temperature",
+            allow_unavailable=True,
+        )
+        if temp_state is None:
+            had_unavailable = True
+
+        humidity_state = self._get_state(
+            self.config_entry.data[CONF_HUMIDITY_ENTITY_ID],
+            "humidity",
+            allow_unavailable=True,
+        )
+        if humidity_state is None:
+            had_unavailable = True
+
+        have_solar = self._state_to_bool(inverter_state) if inverter_state else not inverter_entity
+
+        generation = (
+            self._normalized_power(generation_state, "generation") if (have_solar and generation_state) else 0.0
+        )
+        grid_usage = self._normalized_power(grid_state, "grid") if (have_solar and grid_state) else 0.0
+        temperature = (
+            self._normalized_temperature(temp_state) if temp_state else self.parameters.temperature_threshold - 0.1
+        )
+        humidity = (
+            self._state_to_float(humidity_state, "humidity")
+            if humidity_state
+            else self.parameters.humidity_threshold + 1.0
+        )
 
         mode_raw = str(climate_state.state).lower().strip()
         try:
@@ -321,18 +364,21 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         timer_active = str(timer_state.state).lower() not in {"idle", "cancelled"}
 
-        return HomeInput(
-            aircon_mode=mode,
-            have_solar=have_solar,
-            generation=generation,
-            grid_usage=grid_usage,
-            timer=timer_active,
-            temperature=temperature,
-            humidity=humidity,
-            auto=self._auto_mode,
-            aggressive_cooling=self._controls.aggressive_cooling,
-            enabled=self._controls.enabled,
-            cooling_enabled=self._controls.cooling_enabled,
+        return (
+            HomeInput(
+                aircon_mode=mode,
+                have_solar=have_solar,
+                generation=generation,
+                grid_usage=grid_usage,
+                timer=timer_active,
+                temperature=temperature,
+                humidity=humidity,
+                auto=self._auto_mode,
+                aggressive_cooling=self._controls.aggressive_cooling,
+                enabled=self._controls.enabled,
+                cooling_enabled=self._controls.cooling_enabled,
+            ),
+            had_unavailable,
         )
 
     async def _execute_adjustment(self, adjustment: HomeOutput) -> None:
@@ -385,7 +431,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         except ServiceValidationError as err:
             raise RuntimeError(f"service call failed: {err}") from err
 
-    def _get_state(self, entity_id: str, label: str) -> State:
+    @overload
+    def _get_state(self, entity_id: str, label: str, *, allow_unavailable: Literal[False] = False) -> State: ...
+
+    @overload
+    def _get_state(self, entity_id: str, label: str, *, allow_unavailable: Literal[True]) -> State | None: ...
+
+    def _get_state(self, entity_id: str, label: str, *, allow_unavailable: bool = False) -> State | None:
         state = self.hass.states.get(entity_id)
         if state is None:
             self._create_issue(
@@ -395,6 +447,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             )
             raise ValueError(f"missing entity: {entity_id}")
         if str(state.state).lower() in {"unknown", "unavailable"}:
+            self._create_issue(
+                ISSUE_ENTITY_UNAVAILABLE,
+                "entity_unavailable",
+                {"entity_id": entity_id, "label": label},
+            )
+            if allow_unavailable:
+                return None
             raise ValueError(f"entity unavailable: {entity_id}")
         return state
 

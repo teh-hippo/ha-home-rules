@@ -55,6 +55,10 @@
       "title": "Required entity missing",
       "description": "Home Rules input entity is missing: **{entity_id}** ({label})."
     },
+    "entity_unavailable": {
+      "title": "Required entity unavailable",
+      "description": "Home Rules input entity is unavailable: **{entity_id}** ({label})."
+    },
     "invalid_unit": {
       "title": "Unsupported sensor unit",
       "description": "Home Rules cannot use unit **{unit}** on **{entity_id}**."
