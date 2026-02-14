@@ -490,7 +490,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 {"entity_id": entity_id, "label": label},
             )
             raise ValueError(f"missing entity: {entity_id}")
-        if str(state.state).lower() in {"unknown", "unavailable"}:
+
+        raw = str(state.state).lower()
+        if raw == "unavailable":
             self._create_issue(
                 ISSUE_ENTITY_UNAVAILABLE,
                 "entity_unavailable",
@@ -498,6 +500,35 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             )
             if allow_unavailable:
                 return None
+            raise ValueError(f"entity unavailable: {entity_id}")
+
+        if raw == "unknown" and allow_unavailable:
+            # Many sensors report unknown during startup or when a value is not available
+            # (e.g., solar power at night). Treat as a safe default without raising Repairs.
+            if label in {"generation", "grid"}:
+                return State(entity_id, "0", state.attributes)
+            if label == "temperature":
+                return State(
+                    entity_id,
+                    str(self.parameters.temperature_threshold - 0.1),
+                    state.attributes,
+                )
+            if label == "humidity":
+                return State(
+                    entity_id,
+                    str(self.parameters.humidity_threshold + 1.0),
+                    state.attributes,
+                )
+            if label == "inverter":
+                return State(entity_id, "off-line", state.attributes)
+            return None
+
+        if raw == "unknown":
+            self._create_issue(
+                ISSUE_ENTITY_UNAVAILABLE,
+                "entity_unavailable",
+                {"entity_id": entity_id, "label": label},
+            )
             raise ValueError(f"entity unavailable: {entity_id}")
         return state
 
