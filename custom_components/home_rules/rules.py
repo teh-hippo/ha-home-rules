@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 ALLOWED_FAILURES = 3
 
 
-class AirconMode(str, Enum):
+class AirconMode(StrEnum):
     """Known aircon modes."""
 
     DRY = "dry"
@@ -20,7 +20,7 @@ class AirconMode(str, Enum):
     UNKNOWN = "unknown"
 
 
-class HomeOutput(str, Enum):
+class HomeOutput(StrEnum):
     """Decision engine output modes."""
 
     NO_CHANGE = "NoChange"

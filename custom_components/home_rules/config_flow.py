@@ -85,7 +85,7 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_TEMPERATURE_ENTITY_ID: "temperature",
             CONF_HUMIDITY_ENTITY_ID: "humidity",
         }
-        for key, label in required.items():
+        for key, _label in required.items():
             entity_id = user_input[key]
             state = self.hass.states.get(entity_id)
             if state is None:
@@ -113,7 +113,12 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_inverter_entity"
                 return errors
 
-            if key in (CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID, CONF_TEMPERATURE_ENTITY_ID, CONF_HUMIDITY_ENTITY_ID):
+            if key in (
+                CONF_GENERATION_ENTITY_ID,
+                CONF_GRID_ENTITY_ID,
+                CONF_TEMPERATURE_ENTITY_ID,
+                CONF_HUMIDITY_ENTITY_ID,
+            ):
                 if not entity_id.startswith("sensor."):
                     errors["base"] = "invalid_sensor_entity"
                     return errors
@@ -164,9 +169,10 @@ class HomeRulesOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_EVAL_INTERVAL, default=current.get(CONF_EVAL_INTERVAL, DEFAULT_EVAL_INTERVAL)): vol.All(
-                        vol.Coerce(int), vol.Range(min=60)
-                    ),
+                    vol.Required(
+                        CONF_EVAL_INTERVAL,
+                        default=current.get(CONF_EVAL_INTERVAL, DEFAULT_EVAL_INTERVAL),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=60)),
                     vol.Required(
                         CONF_GENERATION_COOL_THRESHOLD,
                         default=current.get(CONF_GENERATION_COOL_THRESHOLD, DEFAULT_GENERATION_COOL_THRESHOLD),

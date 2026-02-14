@@ -8,7 +8,7 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_UNIT_OF_MEASUREMENT
+from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
@@ -27,7 +27,6 @@ from .const import (
     CONF_HUMIDITY_ENTITY_ID,
     CONF_HUMIDITY_THRESHOLD,
     CONF_INVERTER_ENTITY_ID,
-    CONF_NOTIFICATION_TARGET,
     CONF_REACTIVATE_DELAY,
     CONF_TEMPERATURE_COOL,
     CONF_TEMPERATURE_ENTITY_ID,
@@ -51,7 +50,16 @@ from .const import (
     STORAGE_KEY_TEMPLATE,
     STORAGE_VERSION,
 )
-from .rules import AirconMode, CachedState, HomeInput, HomeOutput, RuleParameters, adjust, apply_adjustment, current_state
+from .rules import (
+    AirconMode,
+    CachedState,
+    HomeInput,
+    HomeOutput,
+    RuleParameters,
+    adjust,
+    apply_adjustment,
+    current_state,
+)
 
 
 @dataclass
@@ -127,7 +135,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             temperature_threshold=float(
                 self.config_entry.options.get(CONF_TEMPERATURE_THRESHOLD, DEFAULT_TEMPERATURE_THRESHOLD)
             ),
-            humidity_threshold=float(self.config_entry.options.get(CONF_HUMIDITY_THRESHOLD, DEFAULT_HUMIDITY_THRESHOLD)),
+            humidity_threshold=float(
+                self.config_entry.options.get(CONF_HUMIDITY_THRESHOLD, DEFAULT_HUMIDITY_THRESHOLD)
+            ),
             grid_usage_delay=int(self.config_entry.options.get(CONF_GRID_USAGE_DELAY, DEFAULT_GRID_USAGE_DELAY)),
             reactivate_delay=int(self.config_entry.options.get(CONF_REACTIVATE_DELAY, DEFAULT_REACTIVATE_DELAY)),
             temperature_cool=float(self.config_entry.options.get(CONF_TEMPERATURE_COOL, DEFAULT_TEMPERATURE_COOL)),

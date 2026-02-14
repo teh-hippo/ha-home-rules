@@ -6,7 +6,6 @@ Locally, you may not have the HA pytest plugin installed, so keep fixtures optio
 
 import pytest
 
-
 try:
     import pytest_homeassistant_custom_component  # noqa: F401
 except ModuleNotFoundError:

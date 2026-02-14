@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import HomeRulesCoordinator
 
-
 type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
 
 
@@ -46,7 +45,12 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator, description: SensorDescription) -> None:
+    def __init__(
+        self,
+        entry: HomeRulesConfigEntry,
+        coordinator: HomeRulesCoordinator,
+        description: SensorDescription,
+    ) -> None:
         super().__init__(coordinator)
         self._description = description
         self._attr_name = description.name
@@ -56,7 +60,8 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> str | float:
-        value = getattr(self.coordinator.data, self._description.key)
+        value: object = getattr(self.coordinator.data, self._description.key)
         if self._description.key == "mode":
-            return value.value
-        return float(value)
+            # Coordinator stores a HomeOutput enum for mode
+            return str(value)
+        return float(value)  # type: ignore[arg-type]

@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import HomeRulesCoordinator
 
-
 type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
 
 
@@ -45,7 +44,12 @@ class HomeRulesControlSwitch(CoordinatorEntity[HomeRulesCoordinator], SwitchEnti
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator, description: ControlDescription) -> None:
+    def __init__(
+        self,
+        entry: HomeRulesConfigEntry,
+        coordinator: HomeRulesCoordinator,
+        description: ControlDescription,
+    ) -> None:
         super().__init__(coordinator)
         self._entry = entry
         self._description = description

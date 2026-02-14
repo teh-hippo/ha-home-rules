@@ -12,7 +12,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import HomeRulesCoordinator
 
-
 type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
 
 
@@ -42,7 +41,12 @@ class HomeRulesBinarySensor(CoordinatorEntity[HomeRulesCoordinator], BinarySenso
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator, description: BinaryDescription) -> None:
+    def __init__(
+        self,
+        entry: HomeRulesConfigEntry,
+        coordinator: HomeRulesCoordinator,
+        description: BinaryDescription,
+    ) -> None:
         super().__init__(coordinator)
         self._description = description
         self._attr_name = description.name
