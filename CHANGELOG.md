@@ -1,6 +1,16 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-02-14)
+
+### Features
+
+- Expose automation-focused sensors
+  ([`49ece02`](https://github.com/teh-hippo/ha-home-rules/commit/49ece025d1d74ea5ae3c231536ca85927ece15ee))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v0.2.1 (2026-02-14)
 
 ### Bug Fixes
@@ -16,6 +26,9 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
   ([`7c01890`](https://github.com/teh-hippo/ha-home-rules/commit/7c0189072592c9e97c0ce03b69a5715539b4d5e6))
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+- **release**: 0.2.1
+  ([`05fd42d`](https://github.com/teh-hippo/ha-home-rules/commit/05fd42d6b535cea8f6d22493e0715f6b2d659014))
 
 
 ## v0.2.0 (2026-02-14)
