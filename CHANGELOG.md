@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.0.2 (2026-02-14)
+
+### Bug Fixes
+
+- Ignore unknown sensor states
+  ([`4a6f571`](https://github.com/teh-hippo/ha-home-rules/commit/4a6f57157e8569a7a95df3e06c87c4326bca7d50))
+
+Treat unknown power sensors as safe defaults (0W) and avoid raising Repairs issues; only page users
+  when sensors are truly unavailable.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.0.1 (2026-02-14)
 
 ### Bug Fixes
@@ -9,6 +22,11 @@
   ([`9d103fe`](https://github.com/teh-hippo/ha-home-rules/commit/9d103fe352ec60cf65c3a12ebd14ab28fa4ecf87))
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Chores
+
+- **release**: 1.0.1
+  ([`c040ac7`](https://github.com/teh-hippo/ha-home-rules/commit/c040ac7c504f5441d6f883bd33dbf881c84cda64))
 
 
 ## v1.0.0 (2026-02-14)
