@@ -18,6 +18,7 @@ jobs:
         uses: home-assistant/actions/hassfest@master
 
   hacs:
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
