@@ -27,6 +27,7 @@ from .const import (
     CONF_HUMIDITY_ENTITY_ID,
     CONF_HUMIDITY_THRESHOLD,
     CONF_INVERTER_ENTITY_ID,
+    CONF_NOTIFICATION_SERVICE,
     CONF_REACTIVATE_DELAY,
     CONF_TEMPERATURE_COOL,
     CONF_TEMPERATURE_ENTITY_ID,
@@ -44,6 +45,7 @@ from .const import (
     EVENT_EVALUATION,
     ISSUE_ENTITY_MISSING,
     ISSUE_INVALID_UNIT,
+    ISSUE_NOTIFICATION_SERVICE,
     ISSUE_RUNTIME,
     LOGGER,
     MAX_RECENT_EVALUATIONS,
@@ -69,6 +71,7 @@ class ControlState:
     enabled: bool = True
     cooling_enabled: bool = True
     aggressive_cooling: bool = False
+    notifications_enabled: bool = False
     # Safety default: start in dry-run until explicitly disabled.
     dry_run: bool = True
 
@@ -160,6 +163,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             enabled=bool(controls.get("enabled", True)),
             cooling_enabled=bool(controls.get("cooling_enabled", True)),
             aggressive_cooling=bool(controls.get("aggressive_cooling", False)),
+            notifications_enabled=bool(controls.get("notifications_enabled", False)),
             dry_run=bool(controls.get("dry_run", True)),
         )
         self._session = CachedState(
@@ -212,6 +216,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
             if previous != self._session.last:
                 self._last_changed = now
+                await self._maybe_notify(previous, current, adjustment)
 
             record = {
                 "time": now,
@@ -249,6 +254,45 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 last_evaluated=now,
                 last_changed=self._last_changed,
                 recent_evaluations=list(self._recent),
+            )
+
+    async def _maybe_notify(self, previous: HomeOutput, current: HomeOutput, adjustment: HomeOutput) -> None:
+        if not self._controls.notifications_enabled:
+            self._clear_issue(ISSUE_NOTIFICATION_SERVICE)
+            return
+
+        service = str(self.config_entry.options.get(CONF_NOTIFICATION_SERVICE, "")).strip()
+        if not service:
+            self._create_issue(ISSUE_NOTIFICATION_SERVICE, ISSUE_NOTIFICATION_SERVICE, {"service": "(none)"})
+            return
+
+        domain, name = ("notify", service)
+        if "." in service:
+            domain, name = service.split(".", 1)
+
+        if not self.hass.services.has_service(domain, name):
+            self._create_issue(ISSUE_NOTIFICATION_SERVICE, ISSUE_NOTIFICATION_SERVICE, {"service": service})
+            return
+
+        self._clear_issue(ISSUE_NOTIFICATION_SERVICE)
+        new_mode = (self._session.last or current).value
+        message = (
+            f"Mode changed: {previous.value} -> {new_mode} "
+            f"(current={current.value}, action={adjustment.value}, dry_run={self._controls.dry_run})"
+        )
+
+        try:
+            await self.hass.services.async_call(
+                domain,
+                name,
+                {"title": "Home Rules", "message": message},
+                blocking=False,
+            )
+        except ServiceValidationError as err:
+            self._create_issue(
+                ISSUE_NOTIFICATION_SERVICE,
+                ISSUE_NOTIFICATION_SERVICE,
+                {"service": f"{service} ({err})"},
             )
 
     def _build_home_input(self) -> HomeInput:

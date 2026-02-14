@@ -33,6 +33,7 @@ CONF_GRID_USAGE_DELAY = "grid_usage_delay"
 CONF_REACTIVATE_DELAY = "reactivate_delay"
 CONF_TEMPERATURE_COOL = "temperature_cool"
 CONF_EVAL_INTERVAL = "eval_interval"
+CONF_NOTIFICATION_SERVICE = "notification_service"
 
 DEFAULT_GENERATION_COOL_THRESHOLD = 5500.0
 DEFAULT_GENERATION_DRY_THRESHOLD = 3500.0
@@ -53,3 +54,4 @@ EVENT_EVALUATION = "home_rules_evaluation"
 ISSUE_RUNTIME = "runtime_error"
 ISSUE_ENTITY_MISSING = "entity_missing"
 ISSUE_INVALID_UNIT = "invalid_unit"
+ISSUE_NOTIFICATION_SERVICE = "notification_service"

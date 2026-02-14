@@ -19,6 +19,7 @@ from .const import (
     CONF_HUMIDITY_ENTITY_ID,
     CONF_HUMIDITY_THRESHOLD,
     CONF_INVERTER_ENTITY_ID,
+    CONF_NOTIFICATION_SERVICE,
     CONF_REACTIVATE_DELAY,
     CONF_TEMPERATURE_COOL,
     CONF_TEMPERATURE_ENTITY_ID,
@@ -169,11 +170,16 @@ class HomeRulesOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
         self._config_entry = config_entry
 
+    def _notify_service_options(self) -> list[str]:
+        services = self.hass.services.async_services().get("notify", {})
+        return [f"notify.{name}" for name in sorted(services)]
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
         current = self._config_entry.options
+        notify_options = self._notify_service_options()
 
         return self.async_show_form(
             step_id="init",
@@ -211,6 +217,12 @@ class HomeRulesOptionsFlow(OptionsFlow):
                         CONF_REACTIVATE_DELAY,
                         default=current.get(CONF_REACTIVATE_DELAY, DEFAULT_REACTIVATE_DELAY),
                     ): vol.All(vol.Coerce(int), vol.Range(min=0, max=5)),
+                    vol.Optional(
+                        CONF_NOTIFICATION_SERVICE,
+                        default=current.get(CONF_NOTIFICATION_SERVICE, ""),
+                    ): selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
+                    if notify_options
+                    else str,
                 }
             ),
         )

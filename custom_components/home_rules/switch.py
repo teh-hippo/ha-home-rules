@@ -28,6 +28,7 @@ CONTROLS = (
     ControlDescription("enabled", "Enabled"),
     ControlDescription("cooling_enabled", "Cooling Enabled"),
     ControlDescription("aggressive_cooling", "Aggressive Cooling"),
+    ControlDescription("notifications_enabled", "Notifications"),
     ControlDescription("dry_run", "Dry Run"),
 )
 

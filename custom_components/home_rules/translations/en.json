@@ -40,7 +40,8 @@
           "temperature_threshold": "Temperature threshold (°C)",
           "temperature_cool": "Cool setpoint (°C)",
           "grid_usage_delay": "Grid usage delay (ticks)",
-          "reactivate_delay": "Reactivation delay (ticks)"
+          "reactivate_delay": "Reactivation delay (ticks)",
+          "notification_service": "Notification service (optional)"
         }
       }
     }
@@ -57,6 +58,10 @@
     "invalid_unit": {
       "title": "Unsupported sensor unit",
       "description": "Home Rules cannot use unit **{unit}** on **{entity_id}**."
+    },
+    "notification_service": {
+      "title": "Notifications misconfigured",
+      "description": "Notifications are enabled, but notify service **{service}** is not available. Select a valid notification service in Home Rules options."
     }
   }
 }
