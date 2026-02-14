@@ -201,7 +201,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             await self._execute_adjustment(adjustment)
 
             previous = self._session.last
-            if not apply_adjustment(self._session, current, adjustment):
+            applied = apply_adjustment(self._session, current, adjustment)
+            if self._controls.dry_run:
+                # In dry-run we intentionally avoid service calls; never treat repeated
+                # adjustments as a runtime failure.
+                self._session.failed_to_change = 0
+                applied = True
+            if not applied:
                 raise RuntimeError("failed to apply adjustment")
 
             if previous != self._session.last:
