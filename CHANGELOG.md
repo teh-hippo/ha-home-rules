@@ -1,7 +1,22 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-02-14)
+
+### Bug Fixes
+
+- Stable sensor object ids
+  ([`bdd1cc5`](https://github.com/teh-hippo/ha-home-rules/commit/bdd1cc5a3ad6b0a7987ea1e714037d13407efc8a))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v0.3.0 (2026-02-14)
+
+### Chores
+
+- **release**: 0.3.0
+  ([`e35b718`](https://github.com/teh-hippo/ha-home-rules/commit/e35b718f43aeaac155eb53884a005873fe2bb665))
 
 ### Features
 
