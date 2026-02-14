@@ -1,7 +1,6 @@
 {
   "domain": "home_rules",
   "name": "Home Rules",
-  "icon": "mdi:home-lightning-bolt",
   "codeowners": ["@teh-hippo"],
   "config_flow": true,
   "documentation": "https://github.com/teh-hippo/ha-home-rules",
