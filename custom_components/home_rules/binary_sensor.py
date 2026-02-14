@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -21,11 +22,23 @@ type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
 class BinaryDescription:
     key: str
     name: str
+    icon: str | None = None
+    entity_category: EntityCategory | None = None
 
 
 BINARY_SENSORS = (
-    BinaryDescription("solar_available", "Solar Available"),
-    BinaryDescription("auto_mode", "Auto Mode"),
+    BinaryDescription(
+        "solar_available",
+        "Solar Available",
+        icon="mdi:white-balance-sunny",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    BinaryDescription(
+        "auto_mode",
+        "Auto Mode",
+        icon="mdi:autorenew",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 
@@ -58,6 +71,8 @@ class HomeRulesBinarySensor(CoordinatorEntity[HomeRulesCoordinator], BinarySenso
             identifiers={(DOMAIN, entry.entry_id)},
             name="Home Rules",
         )
+        self._attr_icon = description.icon
+        self._attr_entity_category = description.entity_category
 
     @property
     def is_on(self) -> bool:

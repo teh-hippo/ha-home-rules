@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Rules from a config entry."""
+    from homeassistant.helpers import entity_registry as er
+
     from .const import LOGGER, PLATFORMS
     from .coordinator import HomeRulesCoordinator
 
@@ -22,6 +24,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
+
+    # Clean up legacy entities that were replaced by the control-mode select.
+    registry = er.async_get(hass)
+    legacy_unique_ids = {
+        f"{entry.entry_id}_enabled",
+        f"{entry.entry_id}_aggressive_cooling",
+        f"{entry.entry_id}_dry_run",
+        f"{entry.entry_id}_notifications_enabled",
+    }
+    for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity_entry.unique_id in legacy_unique_ids:
+            registry.async_remove(entity_entry.entity_id)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 

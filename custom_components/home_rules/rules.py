@@ -187,3 +187,85 @@ def apply_adjustment(session: CachedState, current: HomeOutput, adjustment: Home
 
     session.failed_to_change += 1
     return session.failed_to_change <= ALLOWED_FAILURES
+
+
+def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
+    """Return a short, human-readable explanation for the next adjustment.
+
+    This function is pure (does not mutate ``state``) and is intended for HA UI/history.
+    """
+
+    def turn_on_reason() -> str:
+        if not home.have_solar:
+            return "No solar available"
+
+        aggressive_cooling_active = home.aggressive_cooling and home.grid_usage == 0
+
+        if home.generation >= config.generation_cool_threshold and (
+            aggressive_cooling_active or home.humidity <= config.humidity_threshold
+        ):
+            if home.aircon_mode != AirconMode.COOL:
+                return "Solar above cool threshold"
+            if home.grid_usage == 0:
+                return "Already cooling on solar"
+
+        if aggressive_cooling_active:
+            return "Aggressive cooling hold"
+
+        if home.generation >= config.generation_dry_threshold:
+            if home.aircon_mode != AirconMode.DRY:
+                return "Solar above dry threshold"
+            if home.grid_usage == 0:
+                return "Already drying on solar"
+
+        return "Insufficient solar"
+
+    if not home.enabled:
+        return "Disabled"
+
+    if home.aircon_mode == AirconMode.UNKNOWN:
+        return "Unknown aircon mode"
+
+    if state.reactivate_delay > 0:
+        return "Waiting reactivate delay"
+
+    if home.aircon_mode == AirconMode.OFF:
+        if not home.cooling_enabled:
+            return "Cooling disabled"
+        if home.temperature < config.temperature_threshold:
+            return "Temperature below threshold"
+
+        reason = turn_on_reason()
+        if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
+            return reason
+
+        if home.auto:
+            return "Auto idle"
+
+        if state.last is HomeOutput.TIMER and not home.timer:
+            return "Timer cleared (reset)"
+
+        return "No change"
+
+    # Aircon running (or timer/manual states).
+    if not home.have_solar or home.grid_usage > 0:
+        if home.auto:
+            reason = turn_on_reason()
+            if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
+                return reason
+
+            if (state.tolerated + 1) < config.grid_usage_delay:
+                return "Grid usage tolerated"
+            return "Grid usage too high (turn off)"
+
+        if not home.timer:
+            return "Manual mode (start timer)"
+
+        return "No change"
+
+    if home.auto:
+        reason = turn_on_reason()
+        if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
+            return reason
+
+    return "No change"

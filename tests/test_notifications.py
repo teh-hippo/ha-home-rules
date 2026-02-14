@@ -47,7 +47,7 @@ async def test_notifications_fire_on_mode_change(hass) -> None:
 
     coordinator = HomeRulesCoordinator(hass, entry)
     await coordinator.async_initialize()
-    await coordinator.async_set_control("notifications_enabled", True)
+    await coordinator._evaluate("manual")
 
     assert len(calls) == 1
 

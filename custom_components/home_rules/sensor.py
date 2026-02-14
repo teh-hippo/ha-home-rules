@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -25,23 +27,36 @@ class SensorDescription:
     name: str
     device_class: SensorDeviceClass | None = None
     object_id: str | None = None
+    entity_category: EntityCategory | None = None
+    icon: str | None = None
 
 
 SENSORS = (
-    SensorDescription("mode", "Mode", object_id=f"{DOMAIN}_mode"),
-    SensorDescription("current", "Current State", object_id=f"{DOMAIN}_current_state"),
-    SensorDescription("adjustment", "Action", object_id=f"{DOMAIN}_action"),
+    SensorDescription("mode", "Mode", object_id=f"{DOMAIN}_mode", icon="mdi:home-automation"),
+    SensorDescription("current", "Current State", object_id=f"{DOMAIN}_current_state", icon="mdi:information-outline"),
+    SensorDescription("adjustment", "Action", object_id=f"{DOMAIN}_action", icon="mdi:flash"),
+    SensorDescription(
+        "decision",
+        "Decision",
+        object_id=f"{DOMAIN}_decision",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:comment-question-outline",
+    ),
     SensorDescription(
         "last_evaluated",
         "Last Evaluated",
         SensorDeviceClass.TIMESTAMP,
         object_id=f"{DOMAIN}_last_evaluated",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:clock-outline",
     ),
     SensorDescription(
         "last_changed",
         "Last Changed",
         SensorDeviceClass.TIMESTAMP,
         object_id=f"{DOMAIN}_last_changed",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:clock-check-outline",
     ),
 )
 
@@ -76,6 +91,8 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
             name="Home Rules",
         )
         self._attr_device_class = description.device_class
+        self._attr_entity_category = description.entity_category
+        self._attr_icon = description.icon
 
     @property
     def native_value(self) -> str | datetime | None:
@@ -90,3 +107,27 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
         if hasattr(value, "value"):
             return str(value.value)
         return str(value)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        if self._description.key != "decision":
+            return None
+
+        recent = list(self.coordinator.data.recent_evaluations)[:10]
+        return {
+            "reason": self.coordinator.data.reason,
+            "control_mode": self.coordinator.control_mode.value,
+            "current": self.coordinator.data.current.value,
+            "adjustment": self.coordinator.data.adjustment.value,
+            "mode": self.coordinator.data.mode.value,
+            "solar_online": self.coordinator.data.solar_online,
+            "solar_generation_w": self.coordinator.data.solar_generation_w,
+            "grid_usage_w": self.coordinator.data.grid_usage_w,
+            "temperature_c": self.coordinator.data.temperature_c,
+            "humidity_percent": self.coordinator.data.humidity_percent,
+            "tolerated": self.coordinator.data.tolerated,
+            "reactivate_delay": self.coordinator.data.reactivate_delay,
+            "auto_mode": self.coordinator.data.auto_mode,
+            "dry_run": self.coordinator.data.dry_run,
+            "recent": recent,
+        }

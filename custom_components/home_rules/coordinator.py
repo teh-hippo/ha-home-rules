@@ -52,6 +52,7 @@ from .const import (
     MAX_RECENT_EVALUATIONS,
     STORAGE_KEY_TEMPLATE,
     STORAGE_VERSION,
+    ControlMode,
 )
 from .rules import (
     AirconMode,
@@ -62,6 +63,7 @@ from .rules import (
     adjust,
     apply_adjustment,
     current_state,
+    explain,
 )
 
 
@@ -72,7 +74,6 @@ class ControlState:
     enabled: bool = True
     cooling_enabled: bool = True
     aggressive_cooling: bool = False
-    notifications_enabled: bool = False
     # Safety default: start in dry-run until explicitly disabled.
     dry_run: bool = True
 
@@ -84,9 +85,16 @@ class CoordinatorData:
     mode: HomeOutput = HomeOutput.OFF
     current: HomeOutput = HomeOutput.OFF
     adjustment: HomeOutput = HomeOutput.NO_CHANGE
+    decision: str = ""
+    reason: str = ""
     solar_available: bool = False
+    solar_online: bool = False
     solar_generation_w: float = 0.0
     grid_usage_w: float = 0.0
+    temperature_c: float = 0.0
+    humidity_percent: float = 0.0
+    tolerated: int = 0
+    reactivate_delay: int = 0
     auto_mode: bool = False
     dry_run: bool = False
     last_evaluated: str | None = None
@@ -164,7 +172,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             enabled=bool(controls.get("enabled", True)),
             cooling_enabled=bool(controls.get("cooling_enabled", True)),
             aggressive_cooling=bool(controls.get("aggressive_cooling", False)),
-            notifications_enabled=bool(controls.get("notifications_enabled", False)),
             dry_run=bool(controls.get("dry_run", True)),
         )
         self._session = CachedState(
@@ -181,6 +188,24 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         setattr(self._controls, key, value)
         await self._save_state()
         await self.async_run_evaluation("control")
+
+    @property
+    def control_mode(self) -> ControlMode:
+        if not self._controls.enabled:
+            return ControlMode.DISABLED
+        if self._controls.dry_run:
+            return ControlMode.DRY_RUN
+        if self._controls.aggressive_cooling:
+            return ControlMode.AGGRESSIVE
+        return ControlMode.LIVE
+
+    async def async_set_mode(self, mode: ControlMode) -> None:
+        """Set operational mode (enabled/dry-run/aggressive) in one action."""
+        self._controls.enabled = mode is not ControlMode.DISABLED
+        self._controls.dry_run = mode is ControlMode.DRY_RUN
+        self._controls.aggressive_cooling = mode is ControlMode.AGGRESSIVE
+        await self._save_state()
+        await self.async_run_evaluation("control_mode")
 
     async def async_run_evaluation(self, trigger: str = "manual") -> None:
         data = await self._evaluate(trigger)
@@ -202,6 +227,15 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if self._session.last is None:
                 self._session.last = current
 
+            # Compute an explanation against an immutable snapshot (adjust() mutates state).
+            session_snapshot = CachedState(
+                reactivate_delay=self._session.reactivate_delay,
+                tolerated=self._session.tolerated,
+                last=self._session.last,
+                failed_to_change=self._session.failed_to_change,
+            )
+            reason = explain(self.parameters, home, session_snapshot)
+
             adjustment = adjust(self.parameters, home, self._session)
             await self._execute_adjustment(adjustment)
 
@@ -219,11 +253,16 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 self._last_changed = now
                 await self._maybe_notify(previous, current, adjustment)
 
+            mode = self._session.last or current
+            decision = f"{mode.value} - {reason}"
+
             record = {
                 "time": now,
                 "trigger": trigger,
                 "current": current.value,
                 "adjustment": adjustment.value,
+                "mode": (self._session.last or current).value,
+                "reason": reason,
                 "generation": home.generation,
                 "grid_usage": home.grid_usage,
                 "temperature": home.temperature,
@@ -231,6 +270,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 "have_solar": home.have_solar,
                 "auto": home.auto,
                 "dry_run": self._controls.dry_run,
+                "tolerated": self._session.tolerated,
+                "reactivate_delay": self._session.reactivate_delay,
             }
             self._recent.insert(0, record)
             self._recent = self._recent[:MAX_RECENT_EVALUATIONS]
@@ -246,12 +287,19 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 self._clear_issue(ISSUE_ENTITY_UNAVAILABLE)
 
             return CoordinatorData(
-                mode=self._session.last or current,
+                mode=mode,
                 current=current,
                 adjustment=adjustment,
+                decision=decision,
+                reason=reason,
                 solar_available=home.have_solar and home.generation > 0.0,
+                solar_online=home.have_solar,
                 solar_generation_w=home.generation,
                 grid_usage_w=home.grid_usage,
+                temperature_c=home.temperature,
+                humidity_percent=home.humidity,
+                tolerated=self._session.tolerated,
+                reactivate_delay=self._session.reactivate_delay,
                 auto_mode=self._auto_mode,
                 dry_run=self._controls.dry_run,
                 last_evaluated=now,
@@ -260,13 +308,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             )
 
     async def _maybe_notify(self, previous: HomeOutput, current: HomeOutput, adjustment: HomeOutput) -> None:
-        if not self._controls.notifications_enabled:
-            self._clear_issue(ISSUE_NOTIFICATION_SERVICE)
-            return
-
         service = str(self.config_entry.options.get(CONF_NOTIFICATION_SERVICE, "")).strip()
         if not service:
-            self._create_issue(ISSUE_NOTIFICATION_SERVICE, ISSUE_NOTIFICATION_SERVICE, {"service": "(none)"})
+            self._clear_issue(ISSUE_NOTIFICATION_SERVICE)
             return
 
         domain, name = ("notify", service)

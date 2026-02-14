@@ -3,13 +3,25 @@
     "step": {
       "user": {
         "title": "Home Rules Setup",
-        "description": "Select the Home Assistant entities used for solar-aware aircon automation.",
+        "description": "Select the entities Home Rules controls.",
         "data": {
           "climate_entity_id": "Climate entity",
-          "timer_entity_id": "Timer entity",
+          "timer_entity_id": "Timer entity"
+        }
+      },
+      "solar": {
+        "title": "Solar Inputs",
+        "description": "Select sensors used for solar availability and power flow.",
+        "data": {
           "inverter_entity_id": "Solar online entity (optional)",
           "generation_entity_id": "Generation sensor",
-          "grid_entity_id": "Grid usage sensor",
+          "grid_entity_id": "Grid usage sensor"
+        }
+      },
+      "comfort": {
+        "title": "Comfort Inputs",
+        "description": "Select sensors used for comfort decisions.",
+        "data": {
           "temperature_entity_id": "Temperature sensor",
           "humidity_entity_id": "Humidity sensor"
         }
@@ -65,7 +77,7 @@
     },
     "notification_service": {
       "title": "Notifications misconfigured",
-      "description": "Notifications are enabled, but notify service **{service}** is not available. Select a valid notification service in Home Rules options."
+      "description": "Notify service **{service}** is not available. Select a valid notification service in Home Rules options."
     }
   }
 }

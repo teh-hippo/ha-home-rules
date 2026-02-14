@@ -43,6 +43,9 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {}
+
     @staticmethod
     def async_get_options_flow(config_entry: ConfigEntry) -> HomeRulesOptionsFlow:
         """Get options flow handler."""
@@ -55,11 +58,40 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._validate_entities(user_input)
+            errors = self._validate_entities(user_input, required_keys=[CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID])
             if not errors:
+                self._data.update(user_input)
+                return await self.async_step_solar()
+
+        return self.async_show_form(step_id="user", data_schema=self._step_user_schema(), errors=errors)
+
+    async def async_step_solar(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Configure solar inputs."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_entities(
+                user_input,
+                required_keys=[CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID],
+                allow_inverter=True,
+            )
+            if not errors:
+                self._data.update(user_input)
+                return await self.async_step_comfort()
+
+        return self.async_show_form(step_id="solar", data_schema=self._step_solar_schema(), errors=errors)
+
+    async def async_step_comfort(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Configure comfort inputs and complete setup."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_entities(
+                user_input, required_keys=[CONF_TEMPERATURE_ENTITY_ID, CONF_HUMIDITY_ENTITY_ID]
+            )
+            if not errors:
+                self._data.update(user_input)
                 return self.async_create_entry(
                     title="Home Rules",
-                    data=user_input,
+                    data=self._data,
                     options={
                         CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
                         CONF_GENERATION_COOL_THRESHOLD: DEFAULT_GENERATION_COOL_THRESHOLD,
@@ -72,25 +104,34 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                     },
                 )
 
-        return self.async_show_form(step_id="user", data_schema=self._step_user_schema(), errors=errors)
+        return self.async_show_form(
+            step_id="comfort",
+            data_schema=self._step_comfort_schema(),
+            errors=errors,
+        )
 
-    def _validate_entities(self, user_input: dict[str, Any]) -> dict[str, str]:
+    def _validate_entities(
+        self,
+        user_input: dict[str, Any],
+        *,
+        required_keys: list[str],
+        allow_inverter: bool = False,
+    ) -> dict[str, str]:
         errors: dict[str, str] = {}
-        required = {
-            CONF_CLIMATE_ENTITY_ID: "climate",
-            CONF_TIMER_ENTITY_ID: "timer",
-            CONF_GENERATION_ENTITY_ID: "generation",
-            CONF_GRID_ENTITY_ID: "grid",
-            CONF_TEMPERATURE_ENTITY_ID: "temperature",
-            CONF_HUMIDITY_ENTITY_ID: "humidity",
-        }
-        for key, _label in required.items():
-            entity_id = user_input[key]
+        home_rules_prefixes = (
+            "switch.home_rules_",
+            "select.home_rules_",
+            "sensor.home_rules_",
+            "binary_sensor.home_rules_",
+            "button.home_rules_",
+        )
+        for key in required_keys:
+            entity_id = str(user_input[key])
             state = self.hass.states.get(entity_id)
             if state is None:
                 errors["base"] = "entity_not_found"
                 return errors
-            if entity_id.startswith(("switch.home_rules_", "sensor.home_rules_", "binary_sensor.home_rules_")):
+            if entity_id.startswith(home_rules_prefixes):
                 errors["base"] = "invalid_entity_selection"
                 return errors
 
@@ -108,10 +149,6 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_climate_entity"
                 return errors
 
-            if key == CONF_INVERTER_ENTITY_ID and not entity_id.startswith(("sensor.", "binary_sensor.")):
-                errors["base"] = "invalid_inverter_entity"
-                return errors
-
             if key in (
                 CONF_GENERATION_ENTITY_ID,
                 CONF_GRID_ENTITY_ID,
@@ -120,20 +157,21 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
             ):
                 if not entity_id.startswith("sensor."):
                     errors["base"] = "invalid_sensor_entity"
-                return errors
+                    return errors
 
-        inverter_entity = user_input.get(CONF_INVERTER_ENTITY_ID)
-        if inverter_entity:
-            state = self.hass.states.get(inverter_entity)
-            if state is None:
-                errors["base"] = "entity_not_found"
-                return errors
-            if inverter_entity.startswith(("switch.home_rules_", "sensor.home_rules_", "binary_sensor.home_rules_")):
-                errors["base"] = "invalid_entity_selection"
-                return errors
-            if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
-                errors["base"] = "invalid_inverter_entity"
-                return errors
+        if allow_inverter:
+            inverter_entity = str(user_input.get(CONF_INVERTER_ENTITY_ID, "")).strip()
+            if inverter_entity:
+                state = self.hass.states.get(inverter_entity)
+                if state is None:
+                    errors["base"] = "entity_not_found"
+                    return errors
+                if inverter_entity.startswith(home_rules_prefixes):
+                    errors["base"] = "invalid_entity_selection"
+                    return errors
+                if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
+                    errors["base"] = "invalid_inverter_entity"
+                    return errors
 
         return errors
 
@@ -146,6 +184,12 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_TIMER_ENTITY_ID): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="timer")
                 ),
+            }
+        )
+
+    def _step_solar_schema(self) -> vol.Schema:
+        return vol.Schema(
+            {
                 vol.Optional(CONF_INVERTER_ENTITY_ID): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])
                 ),
@@ -155,6 +199,12 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_GRID_ENTITY_ID): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor", device_class="power")
                 ),
+            }
+        )
+
+    def _step_comfort_schema(self) -> vol.Schema:
+        return vol.Schema(
+            {
                 vol.Required(CONF_TEMPERATURE_ENTITY_ID): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
                 ),

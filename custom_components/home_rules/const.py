@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from logging import Logger, getLogger
 
 from homeassistant.const import Platform
@@ -10,8 +11,19 @@ LOGGER: Logger = getLogger(__package__)
 
 DOMAIN = "home_rules"
 
+
+class ControlMode(StrEnum):
+    """User-facing operational mode."""
+
+    DISABLED = "Disabled"
+    DRY_RUN = "Dry Run"
+    LIVE = "Live"
+    AGGRESSIVE = "Aggressive"
+
+
 PLATFORMS: list[Platform] = [
     Platform.SWITCH,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
