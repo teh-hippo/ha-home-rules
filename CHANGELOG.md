@@ -1,7 +1,22 @@
 # CHANGELOG
 
 
+## v1.0.1 (2026-02-14)
+
+### Bug Fixes
+
+- Satisfy hassfest manifest schema
+  ([`9d103fe`](https://github.com/teh-hippo/ha-home-rules/commit/9d103fe352ec60cf65c3a12ebd14ab28fa4ecf87))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.0.0 (2026-02-14)
+
+### Chores
+
+- **release**: 1.0.0
+  ([`b21a793`](https://github.com/teh-hippo/ha-home-rules/commit/b21a793e7867f06c432085964f0974d6eda75c40))
 
 ### Features
 

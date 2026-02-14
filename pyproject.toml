@@ -1,6 +1,6 @@
 [project]
 name = "ha-home-rules"
-version = "1.0.0"
+version = "1.0.1"
 description = "Home Assistant custom integration for solar-aware aircon automation"
 readme = "README.md"
 license = { text = "MIT" }
