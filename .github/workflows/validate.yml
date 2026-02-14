@@ -26,7 +26,7 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          ignore: "brands issues"
+          ignore: "brands issues hacsjson integration_manifest"
 
   test:
     runs-on: ubuntu-latest
