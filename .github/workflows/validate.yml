@@ -25,7 +25,7 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          ignore: "brands repository"
+          ignore: "brands issues"
 
   test:
     runs-on: ubuntu-latest
