@@ -7,7 +7,7 @@
         "data": {
           "climate_entity_id": "Climate entity",
           "timer_entity_id": "Timer entity",
-          "inverter_entity_id": "Inverter status entity",
+          "inverter_entity_id": "Solar online entity (optional)",
           "generation_entity_id": "Generation sensor",
           "grid_entity_id": "Grid usage sensor",
           "temperature_entity_id": "Temperature sensor",
@@ -40,8 +40,7 @@
           "temperature_threshold": "Temperature threshold (°C)",
           "temperature_cool": "Cool setpoint (°C)",
           "grid_usage_delay": "Grid usage delay (ticks)",
-          "reactivate_delay": "Reactivation delay (ticks)",
-          "notification_target": "Notification target"
+          "reactivate_delay": "Reactivation delay (ticks)"
         }
       }
     }

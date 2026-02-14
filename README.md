@@ -26,7 +26,7 @@ Copy `custom_components/home_rules/` into your HA config at `config/custom_compo
 2. Select the entities used as inputs:
    - Climate entity (your aircon)
    - Timer entity (aircon timer)
-   - Inverter/solar online status entity
+   - Solar online status entity (optional)
    - Generation sensor
    - Grid usage sensor
    - Temperature sensor
@@ -34,7 +34,7 @@ Copy `custom_components/home_rules/` into your HA config at `config/custom_compo
 3. (Optional) Configure thresholds and delays via the integration **Options**.
 
 ## Dry-run mode
-Turn on `switch.home_rules_dry_run` to evaluate and emit events without calling climate/timer services.
+`switch.home_rules_dry_run` is **ON by default** to ensure safe initial setup. Turn it off once you're happy with decisions to allow service calls.
 
 ## Diagnostics
 Settings → Devices → Home Rules → **Download diagnostics** will include:

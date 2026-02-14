@@ -69,7 +69,8 @@ class ControlState:
     enabled: bool = True
     cooling_enabled: bool = True
     aggressive_cooling: bool = False
-    dry_run: bool = False
+    # Safety default: start in dry-run until explicitly disabled.
+    dry_run: bool = True
 
 
 @dataclass
@@ -159,7 +160,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             enabled=bool(controls.get("enabled", True)),
             cooling_enabled=bool(controls.get("cooling_enabled", True)),
             aggressive_cooling=bool(controls.get("aggressive_cooling", False)),
-            dry_run=bool(controls.get("dry_run", False)),
+            dry_run=bool(controls.get("dry_run", True)),
         )
         self._session = CachedState(
             reactivate_delay=int(session.get("reactivate_delay", 0)),
@@ -234,7 +235,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 mode=self._session.last or current,
                 current=current,
                 adjustment=adjustment,
-                solar_available=home.have_solar,
+                solar_available=home.have_solar and home.generation > 0.0,
                 solar_generation_w=home.generation,
                 grid_usage_w=home.grid_usage,
                 auto_mode=self._auto_mode,
@@ -247,14 +248,15 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _build_home_input(self) -> HomeInput:
         climate_state = self._get_state(self.config_entry.data[CONF_CLIMATE_ENTITY_ID], "climate")
         timer_state = self._get_state(self.config_entry.data[CONF_TIMER_ENTITY_ID], "timer")
-        inverter_state = self._get_state(self.config_entry.data[CONF_INVERTER_ENTITY_ID], "inverter")
+        inverter_entity = self.config_entry.data.get(CONF_INVERTER_ENTITY_ID)
+        inverter_state = self._get_state(inverter_entity, "inverter") if inverter_entity else None
 
         generation_state = self._get_state(self.config_entry.data[CONF_GENERATION_ENTITY_ID], "generation")
         grid_state = self._get_state(self.config_entry.data[CONF_GRID_ENTITY_ID], "grid")
         temp_state = self._get_state(self.config_entry.data[CONF_TEMPERATURE_ENTITY_ID], "temperature")
         humidity_state = self._get_state(self.config_entry.data[CONF_HUMIDITY_ENTITY_ID], "humidity")
 
-        have_solar = self._state_to_bool(inverter_state)
+        have_solar = self._state_to_bool(inverter_state) if inverter_state else True
 
         generation = self._normalized_power(generation_state, "generation") if have_solar else 0.0
         grid_usage = self._normalized_power(grid_state, "grid") if have_solar else 0.0
@@ -360,11 +362,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         value = self._state_to_float(state, label)
         unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip().lower()
         if unit in {"", "w", "watt", "watts"}:
-            return value
+            return max(0.0, value)
         if unit in {"kw", "kilowatt", "kilowatts"}:
-            return value * 1000
+            return max(0.0, value * 1000)
         if unit in {"mw"}:
-            return value * 1_000_000
+            return max(0.0, value * 1_000_000)
 
         self._create_issue(
             ISSUE_INVALID_UNIT,

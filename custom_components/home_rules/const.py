@@ -24,7 +24,6 @@ CONF_GENERATION_ENTITY_ID = "generation_entity_id"
 CONF_GRID_ENTITY_ID = "grid_entity_id"
 CONF_TEMPERATURE_ENTITY_ID = "temperature_entity_id"
 CONF_HUMIDITY_ENTITY_ID = "humidity_entity_id"
-CONF_NOTIFICATION_TARGET = "notification_target"
 
 CONF_GENERATION_COOL_THRESHOLD = "generation_cool_threshold"
 CONF_GENERATION_DRY_THRESHOLD = "generation_dry_threshold"

@@ -19,7 +19,6 @@ from .const import (
     CONF_HUMIDITY_ENTITY_ID,
     CONF_HUMIDITY_THRESHOLD,
     CONF_INVERTER_ENTITY_ID,
-    CONF_NOTIFICATION_TARGET,
     CONF_REACTIVATE_DELAY,
     CONF_TEMPERATURE_COOL,
     CONF_TEMPERATURE_ENTITY_ID,
@@ -68,7 +67,6 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_TEMPERATURE_COOL: DEFAULT_TEMPERATURE_COOL,
                         CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
                         CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
-                        CONF_NOTIFICATION_TARGET: "",
                     },
                 )
 
@@ -79,7 +77,6 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
         required = {
             CONF_CLIMATE_ENTITY_ID: "climate",
             CONF_TIMER_ENTITY_ID: "timer",
-            CONF_INVERTER_ENTITY_ID: "inverter",
             CONF_GENERATION_ENTITY_ID: "generation",
             CONF_GRID_ENTITY_ID: "grid",
             CONF_TEMPERATURE_ENTITY_ID: "temperature",
@@ -121,7 +118,20 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
             ):
                 if not entity_id.startswith("sensor."):
                     errors["base"] = "invalid_sensor_entity"
-                    return errors
+                return errors
+
+        inverter_entity = user_input.get(CONF_INVERTER_ENTITY_ID)
+        if inverter_entity:
+            state = self.hass.states.get(inverter_entity)
+            if state is None:
+                errors["base"] = "entity_not_found"
+                return errors
+            if inverter_entity.startswith(("switch.home_rules_", "sensor.home_rules_", "binary_sensor.home_rules_")):
+                errors["base"] = "invalid_entity_selection"
+                return errors
+            if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
+                errors["base"] = "invalid_inverter_entity"
+                return errors
 
         return errors
 
@@ -134,20 +144,20 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_TIMER_ENTITY_ID): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="timer")
                 ),
-                vol.Required(CONF_INVERTER_ENTITY_ID): selector.EntitySelector(
+                vol.Optional(CONF_INVERTER_ENTITY_ID): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])
                 ),
                 vol.Required(CONF_GENERATION_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(domain="sensor", device_class="power")
                 ),
                 vol.Required(CONF_GRID_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(domain="sensor", device_class="power")
                 ),
                 vol.Required(CONF_TEMPERATURE_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
                 ),
                 vol.Required(CONF_HUMIDITY_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
                 ),
             }
         )
@@ -201,10 +211,6 @@ class HomeRulesOptionsFlow(OptionsFlow):
                         CONF_REACTIVATE_DELAY,
                         default=current.get(CONF_REACTIVATE_DELAY, DEFAULT_REACTIVATE_DELAY),
                     ): vol.All(vol.Coerce(int), vol.Range(min=0, max=5)),
-                    vol.Optional(
-                        CONF_NOTIFICATION_TARGET,
-                        default=current.get(CONF_NOTIFICATION_TARGET, ""),
-                    ): str,
                 }
             ),
         )
