@@ -24,14 +24,25 @@ class SensorDescription:
     key: str
     name: str
     device_class: SensorDeviceClass | None = None
+    object_id: str | None = None
 
 
 SENSORS = (
-    SensorDescription("mode", "Mode"),
-    SensorDescription("current", "Current State"),
-    SensorDescription("adjustment", "Action"),
-    SensorDescription("last_evaluated", "Last Evaluated", SensorDeviceClass.TIMESTAMP),
-    SensorDescription("last_changed", "Last Changed", SensorDeviceClass.TIMESTAMP),
+    SensorDescription("mode", "Mode", object_id=f"{DOMAIN}_mode"),
+    SensorDescription("current", "Current State", object_id=f"{DOMAIN}_current_state"),
+    SensorDescription("adjustment", "Action", object_id=f"{DOMAIN}_action"),
+    SensorDescription(
+        "last_evaluated",
+        "Last Evaluated",
+        SensorDeviceClass.TIMESTAMP,
+        object_id=f"{DOMAIN}_last_evaluated",
+    ),
+    SensorDescription(
+        "last_changed",
+        "Last Changed",
+        SensorDeviceClass.TIMESTAMP,
+        object_id=f"{DOMAIN}_last_changed",
+    ),
 )
 
 
@@ -59,7 +70,7 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
         self._description = description
         self._attr_name = description.name
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_suggested_object_id = f"{DOMAIN}_{description.key}"
+        self._attr_suggested_object_id = description.object_id or f"{DOMAIN}_{description.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name="Home Rules",
