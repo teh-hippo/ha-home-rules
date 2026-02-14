@@ -1,6 +1,16 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-02-14)
+
+### Bug Fixes
+
+- Handle unavailable input entities
+  ([`5a7895f`](https://github.com/teh-hippo/ha-home-rules/commit/5a7895fbbf619ceaf48421e7cd87ec87b4fd0dca))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v0.4.0 (2026-02-14)
 
 ### Bug Fixes
@@ -9,6 +19,11 @@
   ([`06096d6`](https://github.com/teh-hippo/ha-home-rules/commit/06096d61b0fcdc9dbba009eb8249901286f904ec))
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Chores
+
+- **release**: 0.4.0
+  ([`18c4e9e`](https://github.com/teh-hippo/ha-home-rules/commit/18c4e9e2a44b79883df866ca6fcf63ef3de0d8d2))
 
 ### Features
 
