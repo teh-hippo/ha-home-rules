@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.0.3 (2026-02-14)
+
+### Bug Fixes
+
+- Avoid Repairs for unknown sensors
+  ([`f7eb9d9`](https://github.com/teh-hippo/ha-home-rules/commit/f7eb9d922a2fab4b4a3b43232cc178753f4c7766))
+
+Treat unknown/unavailable states for optional input sensors as safe defaults and clear stale
+  entity_unavailable Repairs.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.0.2 (2026-02-14)
 
 ### Bug Fixes
@@ -12,6 +25,11 @@ Treat unknown power sensors as safe defaults (0W) and avoid raising Repairs issu
   when sensors are truly unavailable.
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Chores
+
+- **release**: 1.0.2
+  ([`8fd73aa`](https://github.com/teh-hippo/ha-home-rules/commit/8fd73aa20206bad267890a05517175c9166d15eb))
 
 
 ## v1.0.1 (2026-02-14)
