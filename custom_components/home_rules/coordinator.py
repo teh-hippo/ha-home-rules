@@ -221,6 +221,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:
             now = dt_util.utcnow().isoformat()
+            # Don't keep stale "unavailable" Repairs around; if inputs are still unavailable,
+            # they'll be re-created during this evaluation.
+            self._clear_issue(ISSUE_ENTITY_UNAVAILABLE)
             home, had_unavailable = self._build_home_input()
             current = current_state(home)
 
@@ -492,19 +495,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             raise ValueError(f"missing entity: {entity_id}")
 
         raw = str(state.state).lower()
-        if raw == "unavailable":
-            self._create_issue(
-                ISSUE_ENTITY_UNAVAILABLE,
-                "entity_unavailable",
-                {"entity_id": entity_id, "label": label},
-            )
-            if allow_unavailable:
-                return None
-            raise ValueError(f"entity unavailable: {entity_id}")
 
-        if raw == "unknown" and allow_unavailable:
+        if raw in {"unknown", "unavailable"} and allow_unavailable:
             # Many sensors report unknown during startup or when a value is not available
-            # (e.g., solar power at night). Treat as a safe default without raising Repairs.
+            # (e.g., solar power at night) or temporarily unavailable. Treat as a safe default
+            # without raising Repairs issues.
             if label in {"generation", "grid"}:
                 return State(entity_id, "0", state.attributes)
             if label == "temperature":
@@ -523,7 +518,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 return State(entity_id, "off-line", state.attributes)
             return None
 
-        if raw == "unknown":
+        if raw in {"unknown", "unavailable"}:
             self._create_issue(
                 ISSUE_ENTITY_UNAVAILABLE,
                 "entity_unavailable",

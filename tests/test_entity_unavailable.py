@@ -49,7 +49,7 @@ async def test_unavailable_generation_does_not_fail_evaluation(hass) -> None:
     await coordinator._evaluate("poll")
 
     registry = ir.async_get(hass)
-    assert registry.async_get_issue(DOMAIN, f"{entry.entry_id}_entity_unavailable") is not None
+    assert registry.async_get_issue(DOMAIN, f"{entry.entry_id}_entity_unavailable") is None
 
 
 async def test_unknown_power_sensors_do_not_raise_repairs_issue(hass) -> None:
