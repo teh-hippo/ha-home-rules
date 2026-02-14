@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.2.1 (2026-02-14)
+
+### Bug Fixes
+
+- Stable entity ids
+  ([`3eebbe8`](https://github.com/teh-hippo/ha-home-rules/commit/3eebbe8aa74df1e297bbfb472ff24c1cb6827ae7))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Chores
+
+- Add @2x branding assets
+  ([`7c01890`](https://github.com/teh-hippo/ha-home-rules/commit/7c0189072592c9e97c0ce03b69a5715539b4d5e6))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v0.2.0 (2026-02-14)
 
 ### Chores
@@ -14,6 +31,9 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
   ([`bc8077a`](https://github.com/teh-hippo/ha-home-rules/commit/bc8077aa0ea2307aba5c1d3011c3a0fc34c713a9))
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+- **release**: 0.2.0
+  ([`1502356`](https://github.com/teh-hippo/ha-home-rules/commit/1502356ebd4228438fb8ead82e67df2574686ba0))
 
 ### Continuous Integration
 
