@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-02-14)
+
+### Bug Fixes
+
+- Prevent dry-run evaluation failure
+  ([`06096d6`](https://github.com/teh-hippo/ha-home-rules/commit/06096d61b0fcdc9dbba009eb8249901286f904ec))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Features
+
+- Add optional notifications
+  ([`9255906`](https://github.com/teh-hippo/ha-home-rules/commit/92559061c9f5ef090b1725b2fa9d71050bd15d04))
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v0.3.1 (2026-02-14)
 
 ### Bug Fixes
@@ -9,6 +26,11 @@
   ([`bdd1cc5`](https://github.com/teh-hippo/ha-home-rules/commit/bdd1cc5a3ad6b0a7987ea1e714037d13407efc8a))
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Chores
+
+- **release**: 0.3.1
+  ([`5bfdf91`](https://github.com/teh-hippo/ha-home-rules/commit/5bfdf91413c9941e1ec7a3928a07648b4d79b46c))
 
 
 ## v0.3.0 (2026-02-14)
