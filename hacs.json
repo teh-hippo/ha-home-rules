@@ -1,5 +1,4 @@
 {
   "name": "Home Rules",
-  "homeassistant": "2026.2.0",
-  "hacs": "2.0.0"
+  "content_in_root": false
 }
