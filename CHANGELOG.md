@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-02-14)
+
+### Features
+
+- Improve options UX\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+  ([`5b792bc`](https://github.com/teh-hippo/ha-home-rules/commit/5b792bcb250bdfa6b0898b73fd99b9e15d9aabcb))
+
+- Improve UI and history
+  ([`9abe7f2`](https://github.com/teh-hippo/ha-home-rules/commit/9abe7f2b65d1003f91a29288d4faf4fc05fd8428))
+
+- Add control-mode select and remove legacy control/notification switches - Add Decision sensor with
+  reason + recent history - Make config flow multi-step - Fix README/logo rendering and add Lovelace
+  snippet
+
+BREAKING CHANGE: Replaced the enabled/aggressive/dry-run/notifications switches with
+  select.home_rules_control_mode and options-based notifications.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### BREAKING CHANGES
+
+- Replaced the enabled/aggressive/dry-run/notifications switches with select.home_rules_control_mode
+  and options-based notifications.
+
+
 ## v0.4.1 (2026-02-14)
 
 ### Bug Fixes
@@ -9,6 +34,11 @@
   ([`5a7895f`](https://github.com/teh-hippo/ha-home-rules/commit/5a7895fbbf619ceaf48421e7cd87ec87b4fd0dca))
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### Chores
+
+- **release**: 0.4.1
+  ([`a03fe32`](https://github.com/teh-hippo/ha-home-rules/commit/a03fe328e431503ff4ad01a9948fcf7d0080a481))
 
 
 ## v0.4.0 (2026-02-14)
