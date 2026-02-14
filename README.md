@@ -40,7 +40,7 @@ Copy `custom_components/home_rules/` into your HA config at `config/custom_compo
 Settings → Devices → Home Rules → **Download diagnostics** will include:
 - Config + options
 - Control flags (enabled/cooling/aggressive/dry-run)
-- Current normalized readings used by the engine
+- Current normalized readings used by the engine (from your existing sensors)
 - Session counters (tolerated/reactivateDelay/failedToChange/last)
 - Recent evaluation history
 
