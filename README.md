@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Home Rules" width="420" />
+</p>
+
 # Home Rules
 
 Solar-aware aircon automation as a Home Assistant custom integration.

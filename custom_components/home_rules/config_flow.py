@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.helpers import selector
+from homeassistant.helpers.selector import SelectOptionDict
 
 from .const import (
     CONF_CLIMATE_ENTITY_ID,
@@ -179,7 +180,12 @@ class HomeRulesOptionsFlow(OptionsFlow):
             return self.async_create_entry(data=user_input)
 
         current = self._config_entry.options
-        notify_options = self._notify_service_options()
+        notify_services = self._notify_service_options()
+        notify_options: list[SelectOptionDict] = cast(
+            list[SelectOptionDict],
+            [{"label": "Disabled", "value": ""}]
+            + [{"label": service, "value": service} for service in notify_services],
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -188,41 +194,101 @@ class HomeRulesOptionsFlow(OptionsFlow):
                     vol.Required(
                         CONF_EVAL_INTERVAL,
                         default=current.get(CONF_EVAL_INTERVAL, DEFAULT_EVAL_INTERVAL),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=60)),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=60,
+                            max=3600,
+                            step=60,
+                            unit_of_measurement="s",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_GENERATION_COOL_THRESHOLD,
                         default=current.get(CONF_GENERATION_COOL_THRESHOLD, DEFAULT_GENERATION_COOL_THRESHOLD),
-                    ): vol.Coerce(float),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=20000,
+                            step=100,
+                            unit_of_measurement="W",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_GENERATION_DRY_THRESHOLD,
                         default=current.get(CONF_GENERATION_DRY_THRESHOLD, DEFAULT_GENERATION_DRY_THRESHOLD),
-                    ): vol.Coerce(float),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=20000,
+                            step=100,
+                            unit_of_measurement="W",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_HUMIDITY_THRESHOLD,
                         default=current.get(CONF_HUMIDITY_THRESHOLD, DEFAULT_HUMIDITY_THRESHOLD),
-                    ): vol.Coerce(float),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=100,
+                            step=1,
+                            unit_of_measurement="%",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_TEMPERATURE_THRESHOLD,
                         default=current.get(CONF_TEMPERATURE_THRESHOLD, DEFAULT_TEMPERATURE_THRESHOLD),
-                    ): vol.Coerce(float),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=40,
+                            step=0.5,
+                            unit_of_measurement="C",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_TEMPERATURE_COOL,
                         default=current.get(CONF_TEMPERATURE_COOL, DEFAULT_TEMPERATURE_COOL),
-                    ): vol.Coerce(float),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=40,
+                            step=0.5,
+                            unit_of_measurement="C",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_GRID_USAGE_DELAY,
                         default=current.get(CONF_GRID_USAGE_DELAY, DEFAULT_GRID_USAGE_DELAY),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=5)),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=5,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Required(
                         CONF_REACTIVATE_DELAY,
                         default=current.get(CONF_REACTIVATE_DELAY, DEFAULT_REACTIVATE_DELAY),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=5)),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=5,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
                     vol.Optional(
                         CONF_NOTIFICATION_SERVICE,
                         default=current.get(CONF_NOTIFICATION_SERVICE, ""),
-                    ): selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
-                    if notify_options
-                    else str,
+                    ): selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options)),
                 }
             ),
         )
