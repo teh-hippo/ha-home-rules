@@ -67,3 +67,5 @@ ruff format --check .
 mypy custom_components tests
 pytest tests -v
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for CI-matching checks and token-based GitHub auth guidance.

@@ -6,7 +6,6 @@
   "documentation": "https://github.com/teh-hippo/ha-home-rules",
   "integration_type": "service",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/teh-hippo/ha-home-rules/issues",
   "requirements": [],
   "version": "0.1.0"
 }

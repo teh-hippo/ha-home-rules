@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Hassfest
-        uses: frenck/action-hassfest@v1
+        uses: home-assistant/actions/hassfest@master
 
   hacs:
     runs-on: ubuntu-latest
@@ -25,7 +25,7 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          ignore: brands
+          ignore: brands,repository
 
   test:
     runs-on: ubuntu-latest
