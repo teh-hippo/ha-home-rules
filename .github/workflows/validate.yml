@@ -22,11 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: HACS Validation
-        continue-on-error: true
         uses: hacs/action@main
         with:
           category: integration
-          ignore: "brands issues hacsjson integration_manifest"
+          # `brands` requires a PR to home-assistant/brands; keep as the only ignore while pending.
+          ignore: "brands"
 
   test:
     runs-on: ubuntu-latest
