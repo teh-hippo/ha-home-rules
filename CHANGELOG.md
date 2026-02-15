@@ -1,17 +1,39 @@
 # CHANGELOG
 
 
+## v1.0.4 (2026-02-15)
+
+### Build System
+
+- **deps**: Bump actions/checkout from 4 to 6
+  ([`92ff773`](https://github.com/teh-hippo/ha-home-rules/commit/92ff7732b7499d394654d5f8caf95e925bbb97a8))
+
+- **deps**: Bump actions/setup-python from 5 to 6
+  ([`6a77c3e`](https://github.com/teh-hippo/ha-home-rules/commit/6a77c3e83e8c84df8b55a15c711af9c40c7e337d))
+
+- **deps**: Bump github/codeql-action from 3 to 4
+  ([`1162128`](https://github.com/teh-hippo/ha-home-rules/commit/11621286740a50d1011c2a1e6fedd638ed63cc3a))
+
+- **deps**: Bump python-semantic-release/python-semantic-release
+  ([`f2f961f`](https://github.com/teh-hippo/ha-home-rules/commit/f2f961f2bb2bb2cf8237a8bf196db5ca11149f00))
+
+### Continuous Integration
+
+- Improve dependabot release flow
+  ([`3f889bc`](https://github.com/teh-hippo/ha-home-rules/commit/3f889bcf7e1a38b6d0a0a8b18a8ae71674b6f9e7))
+
+### Documentation
+
+- Simplify README
+  ([`6c80995`](https://github.com/teh-hippo/ha-home-rules/commit/6c80995a84e7fdc7be5990fff7ca28378c941d59))
+
+
 ## v1.0.3 (2026-02-14)
 
 ### Bug Fixes
 
 - Avoid Repairs for unknown sensors
   ([`f7eb9d9`](https://github.com/teh-hippo/ha-home-rules/commit/f7eb9d922a2fab4b4a3b43232cc178753f4c7766))
-
-Treat unknown/unavailable states for optional input sensors as safe defaults and clear stale
-  entity_unavailable Repairs.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 
 ## v1.0.2 (2026-02-14)
@@ -21,16 +43,6 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Ignore unknown sensor states
   ([`4a6f571`](https://github.com/teh-hippo/ha-home-rules/commit/4a6f57157e8569a7a95df3e06c87c4326bca7d50))
 
-Treat unknown power sensors as safe defaults (0W) and avoid raising Repairs issues; only page users
-  when sensors are truly unavailable.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-### Chores
-
-- **release**: 1.0.2
-  ([`8fd73aa`](https://github.com/teh-hippo/ha-home-rules/commit/8fd73aa20206bad267890a05517175c9166d15eb))
-
 
 ## v1.0.1 (2026-02-14)
 
@@ -39,20 +51,8 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Satisfy hassfest manifest schema
   ([`9d103fe`](https://github.com/teh-hippo/ha-home-rules/commit/9d103fe352ec60cf65c3a12ebd14ab28fa4ecf87))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-### Chores
-
-- **release**: 1.0.1
-  ([`c040ac7`](https://github.com/teh-hippo/ha-home-rules/commit/c040ac7c504f5441d6f883bd33dbf881c84cda64))
-
 
 ## v1.0.0 (2026-02-14)
-
-### Chores
-
-- **release**: 1.0.0
-  ([`b21a793`](https://github.com/teh-hippo/ha-home-rules/commit/b21a793e7867f06c432085964f0974d6eda75c40))
 
 ### Features
 
@@ -62,16 +62,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Improve UI and history
   ([`9abe7f2`](https://github.com/teh-hippo/ha-home-rules/commit/9abe7f2b65d1003f91a29288d4faf4fc05fd8428))
 
-- Add control-mode select and remove legacy control/notification switches - Add Decision sensor with
-  reason + recent history - Make config flow multi-step - Fix README/logo rendering and add Lovelace
-  snippet
-
-BREAKING CHANGE: Replaced the enabled/aggressive/dry-run/notifications switches with
-  select.home_rules_control_mode and options-based notifications.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-### BREAKING CHANGES
+### Breaking Changes
 
 - Replaced the enabled/aggressive/dry-run/notifications switches with select.home_rules_control_mode
   and options-based notifications.
@@ -84,13 +75,6 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Handle unavailable input entities
   ([`5a7895f`](https://github.com/teh-hippo/ha-home-rules/commit/5a7895fbbf619ceaf48421e7cd87ec87b4fd0dca))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-### Chores
-
-- **release**: 0.4.1
-  ([`a03fe32`](https://github.com/teh-hippo/ha-home-rules/commit/a03fe328e431503ff4ad01a9948fcf7d0080a481))
-
 
 ## v0.4.0 (2026-02-14)
 
@@ -99,19 +83,10 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Prevent dry-run evaluation failure
   ([`06096d6`](https://github.com/teh-hippo/ha-home-rules/commit/06096d61b0fcdc9dbba009eb8249901286f904ec))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-### Chores
-
-- **release**: 0.4.0
-  ([`18c4e9e`](https://github.com/teh-hippo/ha-home-rules/commit/18c4e9e2a44b79883df866ca6fcf63ef3de0d8d2))
-
 ### Features
 
 - Add optional notifications
   ([`9255906`](https://github.com/teh-hippo/ha-home-rules/commit/92559061c9f5ef090b1725b2fa9d71050bd15d04))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 
 ## v0.3.1 (2026-02-14)
@@ -121,27 +96,13 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Stable sensor object ids
   ([`bdd1cc5`](https://github.com/teh-hippo/ha-home-rules/commit/bdd1cc5a3ad6b0a7987ea1e714037d13407efc8a))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-### Chores
-
-- **release**: 0.3.1
-  ([`5bfdf91`](https://github.com/teh-hippo/ha-home-rules/commit/5bfdf91413c9941e1ec7a3928a07648b4d79b46c))
-
 
 ## v0.3.0 (2026-02-14)
-
-### Chores
-
-- **release**: 0.3.0
-  ([`e35b718`](https://github.com/teh-hippo/ha-home-rules/commit/e35b718f43aeaac155eb53884a005873fe2bb665))
 
 ### Features
 
 - Expose automation-focused sensors
   ([`49ece02`](https://github.com/teh-hippo/ha-home-rules/commit/49ece025d1d74ea5ae3c231536ca85927ece15ee))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 
 ## v0.2.1 (2026-02-14)
@@ -151,17 +112,10 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Stable entity ids
   ([`3eebbe8`](https://github.com/teh-hippo/ha-home-rules/commit/3eebbe8aa74df1e297bbfb472ff24c1cb6827ae7))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 ### Chores
 
 - Add @2x branding assets
   ([`7c01890`](https://github.com/teh-hippo/ha-home-rules/commit/7c0189072592c9e97c0ce03b69a5715539b4d5e6))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-- **release**: 0.2.1
-  ([`05fd42d`](https://github.com/teh-hippo/ha-home-rules/commit/05fd42d6b535cea8f6d22493e0715f6b2d659014))
 
 
 ## v0.2.0 (2026-02-14)
@@ -171,66 +125,41 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 - Improve HACS and docs
   ([`c4f69ee`](https://github.com/teh-hippo/ha-home-rules/commit/c4f69eea467daf1bcc870113b5fcea673cc98c81))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 - Make CI green
   ([`bc8077a`](https://github.com/teh-hippo/ha-home-rules/commit/bc8077aa0ea2307aba5c1d3011c3a0fc34c713a9))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
-- **release**: 0.2.0
-  ([`1502356`](https://github.com/teh-hippo/ha-home-rules/commit/1502356ebd4228438fb8ead82e67df2574686ba0))
 
 ### Continuous Integration
 
 - Enforce HACS validation
   ([`ca28fa0`](https://github.com/teh-hippo/ha-home-rules/commit/ca28fa012819b07787a21289befb7892e9a71f0b))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 - Fix HACS validation
   ([`bace038`](https://github.com/teh-hippo/ha-home-rules/commit/bace0381c547e270df44c75b58020ad63c5b2639))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 - Fix hassfest and hacs ignore
   ([`9a8ad5a`](https://github.com/teh-hippo/ha-home-rules/commit/9a8ad5aa66ba34d80b8912ca59575cfac6e776db))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 - Make HACS informational
   ([`497b55b`](https://github.com/teh-hippo/ha-home-rules/commit/497b55b439c3552876ebf19c925512310f970b02))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 - Make HACS non-blocking
   ([`ef66122`](https://github.com/teh-hippo/ha-home-rules/commit/ef66122ecb55d4c3612ccb643c5bc519c700eafd))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 - Silence unfixable HACS checks
   ([`7e3d465`](https://github.com/teh-hippo/ha-home-rules/commit/7e3d465ff1725b9a9ce29eacfde4df80f5c0d7c1))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 - Stabilize HACS validation
   ([`e02969b`](https://github.com/teh-hippo/ha-home-rules/commit/e02969bea32f0bf1784a349769dd77b7f8157879))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 ### Documentation
 
 - Add install and migration steps
   ([`532e1cc`](https://github.com/teh-hippo/ha-home-rules/commit/532e1ccd6593610f6e5dad125b1ac43e3d6f4f3d))
 
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-
 ### Features
 
 - Safer setup UX
   ([`e3360ed`](https://github.com/teh-hippo/ha-home-rules/commit/e3360eddb49dfc3d0e1386bd750e032bec443b9f))
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 ### Testing
 
@@ -240,12 +169,4 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 ## v0.1.0 (2026-02-13)
 
-### Chores
-
-- **release**: 0.1.0
-  ([`c551cd4`](https://github.com/teh-hippo/ha-home-rules/commit/c551cd48663cd34cdd646a73afd148829df2841b))
-
-### Features
-
-- Initial Home Rules integration
-  ([`d8a8df6`](https://github.com/teh-hippo/ha-home-rules/commit/d8a8df689a8d62b43b5a9cfdf97a73bcaf052aeb))
+- Initial Release

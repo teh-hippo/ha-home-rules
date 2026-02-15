@@ -50,6 +50,11 @@ other_allowed_tags = ["chore", "ci", "docs", "style", "refactor", "test"]
 match = "master"
 prerelease = false
 
+[tool.semantic_release.changelog]
+# PSR v10 defaults to `mode="update"` which requires an insertion flag in the changelog.
+# Keep the changelog fully generated on each release for predictable results.
+mode = "init"
+
 [tool.semantic_release.changelog.default_templates]
 changelog_file = "CHANGELOG.md"
 
