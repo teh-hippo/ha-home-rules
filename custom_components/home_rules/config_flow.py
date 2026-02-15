@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 from homeassistant.helpers.selector import SelectOptionDict
 
@@ -37,6 +38,73 @@ from .const import (
     DOMAIN,
 )
 
+_HOME_RULES_PREFIXES = (
+    "switch.home_rules_",
+    "select.home_rules_",
+    "sensor.home_rules_",
+    "binary_sensor.home_rules_",
+    "button.home_rules_",
+)
+
+_VALID_POWER_UNITS = {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}
+
+_DOMAIN_CHECKS: dict[str, tuple[str, str]] = {
+    CONF_TIMER_ENTITY_ID: ("timer.", "invalid_timer_entity"),
+    CONF_CLIMATE_ENTITY_ID: ("climate.", "invalid_climate_entity"),
+}
+
+_SENSOR_KEYS = {
+    CONF_GENERATION_ENTITY_ID,
+    CONF_GRID_ENTITY_ID,
+    CONF_TEMPERATURE_ENTITY_ID,
+    CONF_HUMIDITY_ENTITY_ID,
+}
+
+
+def _validate_entities(
+    hass: HomeAssistant,
+    user_input: dict[str, Any],
+    *,
+    required_keys: list[str],
+    allow_inverter: bool = False,
+    check_domains: bool = True,
+) -> dict[str, str]:
+    """Validate entity selections shared by config and options flows."""
+    errors: dict[str, str] = {}
+    for key in required_keys:
+        entity_id = str(user_input[key])
+        state = hass.states.get(entity_id)
+        if state is None:
+            return {"base": "entity_not_found"}
+        if entity_id.startswith(_HOME_RULES_PREFIXES):
+            return {"base": "invalid_entity_selection"}
+
+        if key in (CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID):
+            unit = str(state.attributes.get("unit_of_measurement", "")).lower()
+            if unit not in _VALID_POWER_UNITS:
+                return {"base": "invalid_power_unit"}
+
+        if check_domains:
+            domain_check = _DOMAIN_CHECKS.get(key)
+            if domain_check and not entity_id.startswith(domain_check[0]):
+                return {"base": domain_check[1]}
+
+            if key in _SENSOR_KEYS and not entity_id.startswith("sensor."):
+                return {"base": "invalid_sensor_entity"}
+
+    if allow_inverter:
+        inverter_entity = str(user_input.get(CONF_INVERTER_ENTITY_ID, "")).strip()
+        if inverter_entity:
+            state = hass.states.get(inverter_entity)
+            if state is None:
+                return {"base": "entity_not_found"}
+            if inverter_entity.startswith(_HOME_RULES_PREFIXES):
+                return {"base": "invalid_entity_selection"}
+            if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
+                return {"base": "invalid_inverter_entity"}
+
+    return errors
+
 
 class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle config flow."""
@@ -58,7 +126,9 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._validate_entities(user_input, required_keys=[CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID])
+            errors = _validate_entities(
+                self.hass, user_input, required_keys=[CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID]
+            )
             if not errors:
                 self._data.update(user_input)
                 return await self.async_step_solar()
@@ -69,7 +139,8 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
         """Configure solar inputs."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._validate_entities(
+            errors = _validate_entities(
+                self.hass,
                 user_input,
                 required_keys=[CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID],
                 allow_inverter=True,
@@ -84,8 +155,8 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
         """Configure comfort inputs and complete setup."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._validate_entities(
-                user_input, required_keys=[CONF_TEMPERATURE_ENTITY_ID, CONF_HUMIDITY_ENTITY_ID]
+            errors = _validate_entities(
+                self.hass, user_input, required_keys=[CONF_TEMPERATURE_ENTITY_ID, CONF_HUMIDITY_ENTITY_ID]
             )
             if not errors:
                 self._data.update(user_input)
@@ -109,71 +180,6 @@ class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self._step_comfort_schema(),
             errors=errors,
         )
-
-    def _validate_entities(
-        self,
-        user_input: dict[str, Any],
-        *,
-        required_keys: list[str],
-        allow_inverter: bool = False,
-    ) -> dict[str, str]:
-        errors: dict[str, str] = {}
-        home_rules_prefixes = (
-            "switch.home_rules_",
-            "select.home_rules_",
-            "sensor.home_rules_",
-            "binary_sensor.home_rules_",
-            "button.home_rules_",
-        )
-        for key in required_keys:
-            entity_id = str(user_input[key])
-            state = self.hass.states.get(entity_id)
-            if state is None:
-                errors["base"] = "entity_not_found"
-                return errors
-            if entity_id.startswith(home_rules_prefixes):
-                errors["base"] = "invalid_entity_selection"
-                return errors
-
-            if key in (CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID):
-                unit = str(state.attributes.get("unit_of_measurement", "")).lower()
-                if unit not in {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}:
-                    errors["base"] = "invalid_power_unit"
-                    return errors
-
-            if key == CONF_TIMER_ENTITY_ID and not entity_id.startswith("timer."):
-                errors["base"] = "invalid_timer_entity"
-                return errors
-
-            if key == CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("climate."):
-                errors["base"] = "invalid_climate_entity"
-                return errors
-
-            if key in (
-                CONF_GENERATION_ENTITY_ID,
-                CONF_GRID_ENTITY_ID,
-                CONF_TEMPERATURE_ENTITY_ID,
-                CONF_HUMIDITY_ENTITY_ID,
-            ):
-                if not entity_id.startswith("sensor."):
-                    errors["base"] = "invalid_sensor_entity"
-                    return errors
-
-        if allow_inverter:
-            inverter_entity = str(user_input.get(CONF_INVERTER_ENTITY_ID, "")).strip()
-            if inverter_entity:
-                state = self.hass.states.get(inverter_entity)
-                if state is None:
-                    errors["base"] = "entity_not_found"
-                    return errors
-                if inverter_entity.startswith(home_rules_prefixes):
-                    errors["base"] = "invalid_entity_selection"
-                    return errors
-                if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
-                    errors["base"] = "invalid_inverter_entity"
-                    return errors
-
-        return errors
 
     def _step_user_schema(self) -> vol.Schema:
         return vol.Schema(
@@ -221,53 +227,6 @@ class HomeRulesOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
         self._config_entry = config_entry
 
-    def _validate_entities(
-        self,
-        user_input: dict[str, Any],
-        *,
-        required_keys: list[str],
-        allow_inverter: bool = False,
-    ) -> dict[str, str]:
-        errors: dict[str, str] = {}
-        home_rules_prefixes = (
-            "switch.home_rules_",
-            "select.home_rules_",
-            "sensor.home_rules_",
-            "binary_sensor.home_rules_",
-            "button.home_rules_",
-        )
-        for key in required_keys:
-            entity_id = str(user_input[key])
-            state = self.hass.states.get(entity_id)
-            if state is None:
-                errors["base"] = "entity_not_found"
-                return errors
-            if entity_id.startswith(home_rules_prefixes):
-                errors["base"] = "invalid_entity_selection"
-                return errors
-
-            if key in (CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID):
-                unit = str(state.attributes.get("unit_of_measurement", "")).lower()
-                if unit not in {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}:
-                    errors["base"] = "invalid_power_unit"
-                    return errors
-
-        if allow_inverter:
-            inverter_entity = str(user_input.get(CONF_INVERTER_ENTITY_ID, "")).strip()
-            if inverter_entity:
-                state = self.hass.states.get(inverter_entity)
-                if state is None:
-                    errors["base"] = "entity_not_found"
-                    return errors
-                if inverter_entity.startswith(home_rules_prefixes):
-                    errors["base"] = "invalid_entity_selection"
-                    return errors
-                if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
-                    errors["base"] = "invalid_inverter_entity"
-                    return errors
-
-        return errors
-
     def _notify_service_options(self) -> list[str]:
         services = self.hass.services.async_services().get("notify", {})
         return [f"notify.{name}" for name in sorted(services)]
@@ -275,7 +234,8 @@ class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._validate_entities(
+            errors = _validate_entities(
+                self.hass,
                 user_input,
                 required_keys=[
                     CONF_CLIMATE_ENTITY_ID,

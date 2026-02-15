@@ -339,18 +339,12 @@ def test_scenario_interrupt_automations_from_house():
 
 def test_scenario_grid_usage_when_dry_above_dry_threshold_turns_off_after_delay():
     state = CachedState()
-    home = HomeInput(
+    home = default_input(
         aircon_mode=AirconMode.DRY,
-        have_solar=True,
         auto=True,
-        aggressive_cooling=False,
         generation=TEST_PARAMS.generation_dry_threshold,
         grid_usage=0.1,
         humidity=TEST_PARAMS.humidity_threshold - 1,
-        enabled=True,
-        cooling_enabled=True,
-        temperature=TEST_PARAMS.temperature_threshold,
-        timer=False,
     )
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.NO_CHANGE
     assert state.tolerated == 1

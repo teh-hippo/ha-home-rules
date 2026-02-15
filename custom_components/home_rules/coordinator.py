@@ -345,36 +345,23 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 {"service": f"{service} ({err})"},
             )
 
+    def _entity_id(self, key: str) -> str:
+        """Resolve an entity ID from options (preferred) or data."""
+        return str(self.config_entry.options.get(key) or self.config_entry.data[key])
+
+    def _optional_entity_id(self, key: str) -> str | None:
+        """Resolve an optional entity ID, returning None if blank."""
+        return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip() or None
+
     def _build_home_input(self) -> tuple[HomeInput, bool]:
         had_unavailable = False
-        climate_entity = str(
-            self.config_entry.options.get(CONF_CLIMATE_ENTITY_ID) or self.config_entry.data[CONF_CLIMATE_ENTITY_ID]
-        )
-        timer_entity = str(
-            self.config_entry.options.get(CONF_TIMER_ENTITY_ID) or self.config_entry.data[CONF_TIMER_ENTITY_ID]
-        )
-        inverter_entity = (
-            str(
-                self.config_entry.options.get(
-                    CONF_INVERTER_ENTITY_ID, self.config_entry.data.get(CONF_INVERTER_ENTITY_ID, "")
-                )
-            ).strip()
-            or None
-        )
-        generation_entity = str(
-            self.config_entry.options.get(CONF_GENERATION_ENTITY_ID)
-            or self.config_entry.data[CONF_GENERATION_ENTITY_ID]
-        )
-        grid_entity = str(
-            self.config_entry.options.get(CONF_GRID_ENTITY_ID) or self.config_entry.data[CONF_GRID_ENTITY_ID]
-        )
-        temperature_entity = str(
-            self.config_entry.options.get(CONF_TEMPERATURE_ENTITY_ID)
-            or self.config_entry.data[CONF_TEMPERATURE_ENTITY_ID]
-        )
-        humidity_entity = str(
-            self.config_entry.options.get(CONF_HUMIDITY_ENTITY_ID) or self.config_entry.data[CONF_HUMIDITY_ENTITY_ID]
-        )
+        climate_entity = self._entity_id(CONF_CLIMATE_ENTITY_ID)
+        timer_entity = self._entity_id(CONF_TIMER_ENTITY_ID)
+        inverter_entity = self._optional_entity_id(CONF_INVERTER_ENTITY_ID)
+        generation_entity = self._entity_id(CONF_GENERATION_ENTITY_ID)
+        grid_entity = self._entity_id(CONF_GRID_ENTITY_ID)
+        temperature_entity = self._entity_id(CONF_TEMPERATURE_ENTITY_ID)
+        humidity_entity = self._entity_id(CONF_HUMIDITY_ENTITY_ID)
 
         climate_state = self._get_state(climate_entity, "climate")
         timer_state = self._get_state(timer_entity, "timer")
@@ -460,12 +447,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if adjustment in (HomeOutput.NO_CHANGE, HomeOutput.RESET, HomeOutput.DISABLED):
             return
 
-        climate_entity = str(
-            self.config_entry.options.get(CONF_CLIMATE_ENTITY_ID) or self.config_entry.data[CONF_CLIMATE_ENTITY_ID]
-        )
-        timer_entity = str(
-            self.config_entry.options.get(CONF_TIMER_ENTITY_ID) or self.config_entry.data[CONF_TIMER_ENTITY_ID]
-        )
+        climate_entity = self._entity_id(CONF_CLIMATE_ENTITY_ID)
+        timer_entity = self._entity_id(CONF_TIMER_ENTITY_ID)
 
         if self._controls.dry_run:
             LOGGER.info("DRY RUN: would apply adjustment %s", adjustment.value)
