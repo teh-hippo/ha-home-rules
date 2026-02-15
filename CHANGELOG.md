@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.6 (2026-02-15)
+
+### Bug Fixes
+
+- **options**: Align entity settings
+  ([`3bf0904`](https://github.com/teh-hippo/ha-home-rules/commit/3bf090469672f1aa7e15c96def670846c8751a80))
+
+
 ## v1.0.5 (2026-02-15)
 
 ### Bug Fixes
