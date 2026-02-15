@@ -13,6 +13,8 @@ class AirconMode(StrEnum):
 
     DRY = "dry"
     COOL = "cool"
+    # Some climate integrations report HVAC "auto" (heat/cool) as `auto` instead of `heat_cool`.
+    AUTO = "auto"
     HEAT = "heat"
     HEAT_COOL = "heat_cool"
     FAN_ONLY = "fan_only"

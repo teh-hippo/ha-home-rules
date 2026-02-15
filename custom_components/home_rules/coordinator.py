@@ -445,12 +445,18 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         try:
             if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
+                hvac_mode = adjustment.value.lower()
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_hvac_mode",
+                    {"entity_id": climate_entity, "hvac_mode": hvac_mode},
+                    blocking=True,
+                )
                 await self.hass.services.async_call(
                     "climate",
                     "set_temperature",
                     {
                         "entity_id": climate_entity,
-                        "hvac_mode": adjustment.value.lower(),
                         "temperature": self.parameters.temperature_cool,
                     },
                     blocking=True,

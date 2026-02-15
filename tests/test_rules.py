@@ -365,6 +365,12 @@ def test_manual_heat_cool_grid_usage_sets_timer():
     assert adjust(TEST_PARAMS, home, state) is HomeOutput.TIMER
 
 
+def test_manual_auto_grid_usage_sets_timer():
+    state = CachedState()
+    home = default_input(aircon_mode=AirconMode.AUTO, grid_usage=0.1)
+    assert adjust(TEST_PARAMS, home, state) is HomeOutput.TIMER
+
+
 def test_auto_heat_cool_with_grid_usage_tolerate_then_turn_off():
     state = CachedState()
     home = default_input(aircon_mode=AirconMode.HEAT_COOL, auto=True, grid_usage=0.1)
@@ -461,6 +467,7 @@ def test_current_state_mapping():
     assert current_state(default_input(aircon_mode=AirconMode.COOL)) is HomeOutput.COOL
     assert current_state(default_input(aircon_mode=AirconMode.DRY)) is HomeOutput.DRY
     assert current_state(default_input(aircon_mode=AirconMode.HEAT_COOL)) is HomeOutput.COOL
+    assert current_state(default_input(aircon_mode=AirconMode.AUTO)) is HomeOutput.COOL
     assert current_state(default_input(aircon_mode=AirconMode.HEAT)) is HomeOutput.COOL
     assert current_state(default_input(aircon_mode=AirconMode.FAN_ONLY)) is HomeOutput.COOL
     assert current_state(default_input(aircon_mode=AirconMode.UNKNOWN)) is HomeOutput.OFF
