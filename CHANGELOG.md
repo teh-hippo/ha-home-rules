@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.0.7 (2026-02-15)
+
+### Bug Fixes
+
+- Trigger semantic release for integration updates
+  ([`ee3c758`](https://github.com/teh-hippo/ha-home-rules/commit/ee3c75838f8990b88c25e9af06d77dce97da2afb))
+
+### Refactoring
+
+- Deduplicate validation, remove dead code
+  ([`875afa6`](https://github.com/teh-hippo/ha-home-rules/commit/875afa64ec6ff8aab0d42051fc80bb5e9e1b0812))
+
+- Humanize no-change action output
+  ([`0156252`](https://github.com/teh-hippo/ha-home-rules/commit/0156252f19bdab9ef3a8288912f2b1f3be0d84c4))
+
+
 ## v1.0.6 (2026-02-15)
 
 ### Bug Fixes
