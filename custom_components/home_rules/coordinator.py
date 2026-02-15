@@ -347,9 +347,37 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _build_home_input(self) -> tuple[HomeInput, bool]:
         had_unavailable = False
-        climate_state = self._get_state(self.config_entry.data[CONF_CLIMATE_ENTITY_ID], "climate")
-        timer_state = self._get_state(self.config_entry.data[CONF_TIMER_ENTITY_ID], "timer")
-        inverter_entity = self.config_entry.data.get(CONF_INVERTER_ENTITY_ID)
+        climate_entity = str(
+            self.config_entry.options.get(CONF_CLIMATE_ENTITY_ID) or self.config_entry.data[CONF_CLIMATE_ENTITY_ID]
+        )
+        timer_entity = str(
+            self.config_entry.options.get(CONF_TIMER_ENTITY_ID) or self.config_entry.data[CONF_TIMER_ENTITY_ID]
+        )
+        inverter_entity = (
+            str(
+                self.config_entry.options.get(
+                    CONF_INVERTER_ENTITY_ID, self.config_entry.data.get(CONF_INVERTER_ENTITY_ID, "")
+                )
+            ).strip()
+            or None
+        )
+        generation_entity = str(
+            self.config_entry.options.get(CONF_GENERATION_ENTITY_ID)
+            or self.config_entry.data[CONF_GENERATION_ENTITY_ID]
+        )
+        grid_entity = str(
+            self.config_entry.options.get(CONF_GRID_ENTITY_ID) or self.config_entry.data[CONF_GRID_ENTITY_ID]
+        )
+        temperature_entity = str(
+            self.config_entry.options.get(CONF_TEMPERATURE_ENTITY_ID)
+            or self.config_entry.data[CONF_TEMPERATURE_ENTITY_ID]
+        )
+        humidity_entity = str(
+            self.config_entry.options.get(CONF_HUMIDITY_ENTITY_ID) or self.config_entry.data[CONF_HUMIDITY_ENTITY_ID]
+        )
+
+        climate_state = self._get_state(climate_entity, "climate")
+        timer_state = self._get_state(timer_entity, "timer")
         inverter_state = (
             self._get_state(inverter_entity, "inverter", allow_unavailable=True) if inverter_entity else None
         )
@@ -357,7 +385,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             had_unavailable = True
 
         generation_state = self._get_state(
-            self.config_entry.data[CONF_GENERATION_ENTITY_ID],
+            generation_entity,
             "generation",
             allow_unavailable=True,
         )
@@ -365,7 +393,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             had_unavailable = True
 
         grid_state = self._get_state(
-            self.config_entry.data[CONF_GRID_ENTITY_ID],
+            grid_entity,
             "grid",
             allow_unavailable=True,
         )
@@ -373,7 +401,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             had_unavailable = True
 
         temp_state = self._get_state(
-            self.config_entry.data[CONF_TEMPERATURE_ENTITY_ID],
+            temperature_entity,
             "temperature",
             allow_unavailable=True,
         )
@@ -381,7 +409,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             had_unavailable = True
 
         humidity_state = self._get_state(
-            self.config_entry.data[CONF_HUMIDITY_ENTITY_ID],
+            humidity_entity,
             "humidity",
             allow_unavailable=True,
         )
@@ -432,8 +460,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if adjustment in (HomeOutput.NO_CHANGE, HomeOutput.RESET, HomeOutput.DISABLED):
             return
 
-        climate_entity = self.config_entry.data[CONF_CLIMATE_ENTITY_ID]
-        timer_entity = self.config_entry.data[CONF_TIMER_ENTITY_ID]
+        climate_entity = str(
+            self.config_entry.options.get(CONF_CLIMATE_ENTITY_ID) or self.config_entry.data[CONF_CLIMATE_ENTITY_ID]
+        )
+        timer_entity = str(
+            self.config_entry.options.get(CONF_TIMER_ENTITY_ID) or self.config_entry.data[CONF_TIMER_ENTITY_ID]
+        )
 
         if self._controls.dry_run:
             LOGGER.info("DRY RUN: would apply adjustment %s", adjustment.value)

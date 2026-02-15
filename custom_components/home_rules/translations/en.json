@@ -45,6 +45,13 @@
       "init": {
         "title": "Home Rules Options",
         "data": {
+          "climate_entity_id": "Climate entity",
+          "timer_entity_id": "Timer entity",
+          "inverter_entity_id": "Solar online entity (optional)",
+          "generation_entity_id": "Generation sensor",
+          "grid_entity_id": "Grid usage sensor",
+          "temperature_entity_id": "Temperature sensor",
+          "humidity_entity_id": "Humidity sensor",
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",

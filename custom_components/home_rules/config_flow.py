@@ -221,13 +221,76 @@ class HomeRulesOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
         self._config_entry = config_entry
 
+    def _validate_entities(
+        self,
+        user_input: dict[str, Any],
+        *,
+        required_keys: list[str],
+        allow_inverter: bool = False,
+    ) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        home_rules_prefixes = (
+            "switch.home_rules_",
+            "select.home_rules_",
+            "sensor.home_rules_",
+            "binary_sensor.home_rules_",
+            "button.home_rules_",
+        )
+        for key in required_keys:
+            entity_id = str(user_input[key])
+            state = self.hass.states.get(entity_id)
+            if state is None:
+                errors["base"] = "entity_not_found"
+                return errors
+            if entity_id.startswith(home_rules_prefixes):
+                errors["base"] = "invalid_entity_selection"
+                return errors
+
+            if key in (CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID):
+                unit = str(state.attributes.get("unit_of_measurement", "")).lower()
+                if unit not in {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}:
+                    errors["base"] = "invalid_power_unit"
+                    return errors
+
+        if allow_inverter:
+            inverter_entity = str(user_input.get(CONF_INVERTER_ENTITY_ID, "")).strip()
+            if inverter_entity:
+                state = self.hass.states.get(inverter_entity)
+                if state is None:
+                    errors["base"] = "entity_not_found"
+                    return errors
+                if inverter_entity.startswith(home_rules_prefixes):
+                    errors["base"] = "invalid_entity_selection"
+                    return errors
+                if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
+                    errors["base"] = "invalid_inverter_entity"
+                    return errors
+
+        return errors
+
     def _notify_service_options(self) -> list[str]:
         services = self.hass.services.async_services().get("notify", {})
         return [f"notify.{name}" for name in sorted(services)]
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            errors = self._validate_entities(
+                user_input,
+                required_keys=[
+                    CONF_CLIMATE_ENTITY_ID,
+                    CONF_TIMER_ENTITY_ID,
+                    CONF_GENERATION_ENTITY_ID,
+                    CONF_GRID_ENTITY_ID,
+                    CONF_TEMPERATURE_ENTITY_ID,
+                    CONF_HUMIDITY_ENTITY_ID,
+                ],
+                allow_inverter=True,
+            )
+            if not errors:
+                data = dict(self._config_entry.options)
+                data.update(user_input)
+                return self.async_create_entry(data=data)
 
         current = self._config_entry.options
         notify_services = self._notify_service_options()
@@ -241,6 +304,51 @@ class HomeRulesOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Required(
+                        CONF_CLIMATE_ENTITY_ID,
+                        default=current.get(
+                            CONF_CLIMATE_ENTITY_ID,
+                            self._config_entry.data.get(CONF_CLIMATE_ENTITY_ID),
+                        ),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="climate")),
+                    vol.Required(
+                        CONF_TIMER_ENTITY_ID,
+                        default=current.get(CONF_TIMER_ENTITY_ID, self._config_entry.data.get(CONF_TIMER_ENTITY_ID)),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="timer")),
+                    vol.Optional(
+                        CONF_INVERTER_ENTITY_ID,
+                        default=current.get(
+                            CONF_INVERTER_ENTITY_ID,
+                            self._config_entry.data.get(CONF_INVERTER_ENTITY_ID, ""),
+                        ),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])),
+                    vol.Required(
+                        CONF_GENERATION_ENTITY_ID,
+                        default=current.get(
+                            CONF_GENERATION_ENTITY_ID,
+                            self._config_entry.data.get(CONF_GENERATION_ENTITY_ID),
+                        ),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="power")),
+                    vol.Required(
+                        CONF_GRID_ENTITY_ID,
+                        default=current.get(CONF_GRID_ENTITY_ID, self._config_entry.data.get(CONF_GRID_ENTITY_ID)),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="power")),
+                    vol.Required(
+                        CONF_TEMPERATURE_ENTITY_ID,
+                        default=current.get(
+                            CONF_TEMPERATURE_ENTITY_ID,
+                            self._config_entry.data.get(CONF_TEMPERATURE_ENTITY_ID),
+                        ),
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+                    ),
+                    vol.Required(
+                        CONF_HUMIDITY_ENTITY_ID,
+                        default=current.get(
+                            CONF_HUMIDITY_ENTITY_ID,
+                            self._config_entry.data.get(CONF_HUMIDITY_ENTITY_ID),
+                        ),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="humidity")),
                     vol.Required(
                         CONF_EVAL_INTERVAL,
                         default=current.get(CONF_EVAL_INTERVAL, DEFAULT_EVAL_INTERVAL),
@@ -341,4 +449,5 @@ class HomeRulesOptionsFlow(OptionsFlow):
                     ): selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options)),
                 }
             ),
+            errors=errors,
         )
