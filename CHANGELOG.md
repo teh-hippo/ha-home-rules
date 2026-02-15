@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.0.5 (2026-02-15)
+
+### Bug Fixes
+
+- **climate**: Never set auto mode
+  ([`d151bf7`](https://github.com/teh-hippo/ha-home-rules/commit/d151bf7ae598c1b16dcd41869eeb6d00108e5f26))
+
+### Chores
+
+- Fix changelog generation
+  ([`8bd6120`](https://github.com/teh-hippo/ha-home-rules/commit/8bd6120275fad34192db40c09ba50ee7f9069ddb))
+
+
 ## v1.0.4 (2026-02-15)
 
 ### Build System
