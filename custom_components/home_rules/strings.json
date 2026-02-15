@@ -58,8 +58,8 @@
           "humidity_threshold": "Humidity threshold (%)",
           "temperature_threshold": "Temperature threshold (°C)",
           "temperature_cool": "Cool setpoint (°C)",
-          "grid_usage_delay": "Grid usage delay (ticks)",
-          "reactivate_delay": "Reactivation delay (ticks)",
+          "grid_usage_delay": "Grid usage delay (evaluations)",
+          "reactivate_delay": "Reactivation delay (evaluations)",
           "notification_service": "Notification service (optional)"
         }
       }

@@ -25,7 +25,7 @@ class AirconMode(StrEnum):
 class HomeOutput(StrEnum):
     """Decision engine output modes."""
 
-    NO_CHANGE = "NoChange"
+    NO_CHANGE = "No Change"
     OFF = "Off"
     COOL = "Cool"
     DRY = "Dry"

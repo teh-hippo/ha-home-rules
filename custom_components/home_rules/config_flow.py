@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
@@ -254,11 +254,8 @@ class HomeRulesOptionsFlow(OptionsFlow):
 
         current = self._config_entry.options
         notify_services = self._notify_service_options()
-        notify_options: list[SelectOptionDict] = cast(
-            list[SelectOptionDict],
-            [{"label": "Disabled", "value": ""}]
-            + [{"label": service, "value": service} for service in notify_services],
-        )
+        notify_options: list[SelectOptionDict] = [{"label": "Disabled", "value": ""}]
+        notify_options.extend({"label": service, "value": service} for service in notify_services)
 
         return self.async_show_form(
             step_id="init",

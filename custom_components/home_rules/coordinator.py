@@ -174,10 +174,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             aggressive_cooling=bool(controls.get("aggressive_cooling", False)),
             dry_run=bool(controls.get("dry_run", True)),
         )
+        last = session.get("last")
+        if last == "NoChange":
+            last = HomeOutput.NO_CHANGE.value
         self._session = CachedState(
             reactivate_delay=int(session.get("reactivate_delay", 0)),
             tolerated=int(session.get("tolerated", 0)),
-            last=HomeOutput(session["last"]) if session.get("last") else None,
+            last=HomeOutput(last) if last else None,
             failed_to_change=int(session.get("failed_to_change", 0)),
         )
         self._auto_mode = bool(stored.get("auto_mode", False))
@@ -221,8 +224,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:
             now = dt_util.utcnow().isoformat()
-            # Don't keep stale "unavailable" Repairs around; if inputs are still unavailable,
-            # they'll be re-created during this evaluation.
             self._clear_issue(ISSUE_ENTITY_UNAVAILABLE)
             home, had_unavailable = self._build_home_input()
             current = current_state(home)
@@ -230,7 +231,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if self._session.last is None:
                 self._session.last = current
 
-            # Compute an explanation against an immutable snapshot (adjust() mutates state).
             session_snapshot = CachedState(
                 reactivate_delay=self._session.reactivate_delay,
                 tolerated=self._session.tolerated,
@@ -245,8 +245,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             previous = self._session.last
             applied = apply_adjustment(self._session, current, adjustment)
             if self._controls.dry_run:
-                # In dry-run we intentionally avoid service calls; never treat repeated
-                # adjustments as a runtime failure.
                 self._session.failed_to_change = 0
                 applied = True
             if not applied:
@@ -536,7 +534,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     state.attributes,
                 )
             if label == "inverter":
-                return State(entity_id, "off-line", state.attributes)
+                return State(entity_id, "offline", state.attributes)
             return None
 
         if raw in {"unknown", "unavailable"}:
@@ -549,8 +547,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         return state
 
     def _state_to_bool(self, state: State) -> bool:
-        value = str(state.state).lower().strip()
-        return value in {"on", "true", "1", "online", "on-line"}
+        value = str(state.state).lower().strip().replace("-", "").replace("_", "")
+        return value in {"on", "true", "1", "online"}
 
     def _state_to_float(self, state: State, label: str) -> float:
         try:

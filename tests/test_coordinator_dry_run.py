@@ -55,3 +55,8 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass) -> None:
     for _ in range(10):
         data = await coordinator._evaluate("poll")
         assert data.adjustment is HomeOutput.COOL
+
+    await coordinator._store.async_save({"session": {"last": "NoChange"}})
+    reloaded = HomeRulesCoordinator(hass, entry)
+    await reloaded.async_initialize()
+    assert reloaded._session.last is HomeOutput.NO_CHANGE
