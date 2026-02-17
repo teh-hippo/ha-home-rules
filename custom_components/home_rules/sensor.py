@@ -58,6 +58,13 @@ SENSORS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:clock-check-outline",
     ),
+    SensorDescription(
+        "timer_countdown",
+        "Timer Countdown",
+        object_id=f"{DOMAIN}_timer_countdown",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:timer-outline",
+    ),
 )
 
 

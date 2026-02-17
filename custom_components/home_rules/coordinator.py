@@ -97,6 +97,7 @@ class CoordinatorData:
     reactivate_delay: int = 0
     auto_mode: bool = False
     dry_run: bool = False
+    timer_countdown: str = "Off"
     last_evaluated: str | None = None
     last_changed: str | None = None
     recent_evaluations: list[dict[str, Any]] = field(default_factory=list)
@@ -225,7 +226,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         async with self._lock:
             now = dt_util.utcnow().isoformat()
             self._clear_issue(ISSUE_ENTITY_UNAVAILABLE)
-            home, had_unavailable = self._build_home_input()
+            home, had_unavailable, timer_countdown = self._build_home_input()
             current = current_state(home)
 
             if self._session.last is None:
@@ -303,6 +304,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 reactivate_delay=self._session.reactivate_delay,
                 auto_mode=self._auto_mode,
                 dry_run=self._controls.dry_run,
+                timer_countdown=timer_countdown,
                 last_evaluated=now,
                 last_changed=self._last_changed,
                 recent_evaluations=list(self._recent),
@@ -351,7 +353,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         """Resolve an optional entity ID, returning None if blank."""
         return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip() or None
 
-    def _build_home_input(self) -> tuple[HomeInput, bool]:
+    def _build_home_input(self) -> tuple[HomeInput, bool, str]:
         had_unavailable = False
         climate_entity = self._entity_id(CONF_CLIMATE_ENTITY_ID)
         timer_entity = self._entity_id(CONF_TIMER_ENTITY_ID)
@@ -423,6 +425,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             mode = AirconMode.UNKNOWN
 
         timer_active = str(timer_state.state).lower() not in {"idle", "cancelled"}
+        timer_countdown = self._timer_countdown(timer_state)
 
         return (
             HomeInput(
@@ -439,6 +442,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 cooling_enabled=self._controls.cooling_enabled,
             ),
             had_unavailable,
+            timer_countdown,
         )
 
     async def _execute_adjustment(self, adjustment: HomeOutput) -> None:
@@ -555,6 +559,23 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return float(state.state)
         except ValueError as err:
             raise ValueError(f"invalid numeric {label}: {state.state}") from err
+
+    def _timer_countdown(self, timer_state: State) -> str:
+        timer_mode = str(timer_state.state).lower()
+        if timer_mode in {"idle", "cancelled"}:
+            return "Off"
+
+        remaining = timer_state.attributes.get("remaining")
+        if remaining not in (None, ""):
+            return str(remaining)
+
+        finishes_at_raw = timer_state.attributes.get("finishes_at")
+        finishes_at = dt_util.parse_datetime(str(finishes_at_raw)) if finishes_at_raw else None
+        if finishes_at is None:
+            return "Off"
+
+        remaining_seconds = max(0, int((finishes_at - dt_util.utcnow()).total_seconds()))
+        return str(timedelta(seconds=remaining_seconds))
 
     def _normalized_power(self, state: State, label: str) -> float:
         value = self._state_to_float(state, label)
