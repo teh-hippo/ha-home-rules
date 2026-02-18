@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v1.0.9 (2026-02-18)
+
+### Bug Fixes
+
+- Resolve mypy errors missed by local checks; fix check.sh to use uv
+  ([`d62b548`](https://github.com/teh-hippo/ha-home-rules/commit/d62b54891154357073a2c0d11529cf4284cfd036))
+
+### Chores
+
+- Add uv.lock to .gitignore
+  ([`078e5c2`](https://github.com/teh-hippo/ha-home-rules/commit/078e5c21131548df1399d0a36bdfd9fdc548bd17))
+
+
+## v1.0.8 (2026-02-17)
+
+### Features
+
+- Add timer countdown sensor
+  ([`c6ca3ca`](https://github.com/teh-hippo/ha-home-rules/commit/c6ca3ca9256ece01502df4f45418eccb0b9b3570))
+
+
 ## v1.0.7 (2026-02-15)
 
 ### Bug Fixes
