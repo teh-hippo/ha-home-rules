@@ -74,10 +74,18 @@ class CachedState:
     failed_to_change: int = 0
 
 
-def turn_on_aircon(config: RuleParameters, home: HomeInput) -> HomeOutput | None:
-    """Return desired activation mode when aircon should turn on or change mode."""
+@dataclass(frozen=True)
+class TurnOnDecision:
+    """Desired activation result and matching human-readable reason."""
+
+    output: HomeOutput | None
+    reason: str
+
+
+def evaluate_turn_on(config: RuleParameters, home: HomeInput) -> TurnOnDecision:
+    """Evaluate desired activation mode and reason."""
     if not home.have_solar:
-        return None
+        return TurnOnDecision(output=None, reason="No solar available")
 
     aggressive_cooling_active = home.aggressive_cooling and home.grid_usage == 0
 
@@ -85,20 +93,25 @@ def turn_on_aircon(config: RuleParameters, home: HomeInput) -> HomeOutput | None
         aggressive_cooling_active or home.humidity <= config.humidity_threshold
     ):
         if home.aircon_mode != AirconMode.COOL:
-            return HomeOutput.COOL
+            return TurnOnDecision(output=HomeOutput.COOL, reason="Solar above cool threshold")
         if home.grid_usage == 0:
-            return None
+            return TurnOnDecision(output=None, reason="Already cooling on solar")
 
     if aggressive_cooling_active:
-        return None
+        return TurnOnDecision(output=None, reason="Aggressive cooling hold")
 
     if home.generation >= config.generation_dry_threshold:
         if home.aircon_mode != AirconMode.DRY:
-            return HomeOutput.DRY
+            return TurnOnDecision(output=HomeOutput.DRY, reason="Solar above dry threshold")
         if home.grid_usage == 0:
-            return None
+            return TurnOnDecision(output=None, reason="Already drying on solar")
 
-    return None
+    return TurnOnDecision(output=None, reason="Insufficient solar")
+
+
+def turn_on_aircon(config: RuleParameters, home: HomeInput) -> HomeOutput | None:
+    """Return desired activation mode when aircon should turn on or change mode."""
+    return evaluate_turn_on(config, home).output
 
 
 def current_state(home: HomeInput) -> HomeOutput:
@@ -197,31 +210,6 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
     This function is pure (does not mutate ``state``) and is intended for HA UI/history.
     """
 
-    def turn_on_reason() -> str:
-        if not home.have_solar:
-            return "No solar available"
-
-        aggressive_cooling_active = home.aggressive_cooling and home.grid_usage == 0
-
-        if home.generation >= config.generation_cool_threshold and (
-            aggressive_cooling_active or home.humidity <= config.humidity_threshold
-        ):
-            if home.aircon_mode != AirconMode.COOL:
-                return "Solar above cool threshold"
-            if home.grid_usage == 0:
-                return "Already cooling on solar"
-
-        if aggressive_cooling_active:
-            return "Aggressive cooling hold"
-
-        if home.generation >= config.generation_dry_threshold:
-            if home.aircon_mode != AirconMode.DRY:
-                return "Solar above dry threshold"
-            if home.grid_usage == 0:
-                return "Already drying on solar"
-
-        return "Insufficient solar"
-
     if not home.enabled:
         return "Disabled"
 
@@ -237,7 +225,7 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
         if home.temperature < config.temperature_threshold:
             return "Temperature below threshold"
 
-        reason = turn_on_reason()
+        reason = evaluate_turn_on(config, home).reason
         if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
             return reason
 
@@ -252,7 +240,7 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
     # Aircon running (or timer/manual states).
     if not home.have_solar or home.grid_usage > 0:
         if home.auto:
-            reason = turn_on_reason()
+            reason = evaluate_turn_on(config, home).reason
             if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
                 return reason
 
@@ -266,7 +254,7 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
         return "No change"
 
     if home.auto:
-        reason = turn_on_reason()
+        reason = evaluate_turn_on(config, home).reason
         if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
             return reason
 
