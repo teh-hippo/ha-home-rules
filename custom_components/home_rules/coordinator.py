@@ -51,7 +51,6 @@ from .const import (
     ISSUE_RUNTIME,
     LOGGER,
     MAX_RECENT_EVALUATIONS,
-    STORAGE_KEY_TEMPLATE,
     STORAGE_VERSION,
     ControlMode,
 )
@@ -124,7 +123,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._store: Store[dict[str, Any]] = Store(
             hass,
             STORAGE_VERSION,
-            STORAGE_KEY_TEMPLATE.format(entry_id=config_entry.entry_id),
+            f"{DOMAIN}_{config_entry.entry_id}",
         )
 
         super().__init__(
@@ -659,7 +658,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self.hass,
             DOMAIN,
             self._issue_id(suffix),
-            is_fixable=True,
+            is_fixable=False,
             is_persistent=False,
             severity=ir.IssueSeverity.ERROR,
             translation_key=translation_key,

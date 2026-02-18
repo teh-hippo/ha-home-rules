@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+
+TO_REDACT: set[str] = set()
 
 
 async def async_get_config_entry_diagnostics(
@@ -17,8 +20,8 @@ async def async_get_config_entry_diagnostics(
     data = coordinator.data
 
     return {
-        "config": dict(entry.data),
-        "options": dict(entry.options),
+        "config": async_redact_data(dict(entry.data), TO_REDACT),
+        "options": async_redact_data(dict(entry.options), TO_REDACT),
         "controls": {
             "enabled": coordinator.controls.enabled,
             "cooling_enabled": coordinator.controls.cooling_enabled,

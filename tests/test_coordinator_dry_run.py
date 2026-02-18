@@ -23,7 +23,7 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory
     """Dry-run mode must not trip the failed_to_change safety counter."""
     from homeassistant.helpers.storage import Store
 
-    from custom_components.home_rules.const import STORAGE_KEY_TEMPLATE, STORAGE_VERSION
+    from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION
     from custom_components.home_rules.coordinator import HomeRulesCoordinator
     from custom_components.home_rules.rules import HomeOutput
 
@@ -35,7 +35,7 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory
 
     # Verify that the old "NoChange" string stored in previous versions
     # is migrated to HomeOutput.NO_CHANGE on reload.
-    key = STORAGE_KEY_TEMPLATE.format(entry_id=coordinator.config_entry.entry_id)
+    key = f"{DOMAIN}_{coordinator.config_entry.entry_id}"
     store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, key)
     await store.async_save({"session": {"last": "NoChange"}})
 
