@@ -108,6 +108,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     config_entry: ConfigEntry
 
+    # --- Initialisation and configuration ---
+
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self.hass = hass
         self.config_entry = config_entry
@@ -193,6 +195,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         await self._save_state()
         await self.async_run_evaluation("control")
 
+    # --- Public control interface ---
+
     @property
     def control_mode(self) -> ControlMode:
         if not self._controls.enabled:
@@ -214,6 +218,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def async_run_evaluation(self, trigger: str = "manual") -> None:
         data = await self._evaluate(trigger)
         self.async_set_updated_data(data)
+
+    # --- Evaluation ---
 
     async def _async_update_data(self) -> CoordinatorData:
         try:
@@ -344,6 +350,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 {"service": f"{service} ({err})"},
             )
 
+    # --- Input gateway ---
+
     def _entity_id(self, key: str) -> str:
         """Resolve an entity ID from options (preferred) or data."""
         return str(self.config_entry.options.get(key) or self.config_entry.data[key])
@@ -426,6 +434,14 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             timer_countdown,
         )
 
+    # --- Application effects ---
+
+    def _update_auto_mode(self, adjustment: HomeOutput) -> None:
+        if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
+            self._auto_mode = True
+        elif adjustment is HomeOutput.OFF:
+            self._auto_mode = False
+
     async def _execute_adjustment(self, adjustment: HomeOutput) -> None:
         if adjustment in (HomeOutput.NO_CHANGE, HomeOutput.RESET, HomeOutput.DISABLED):
             return
@@ -435,10 +451,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         if self._controls.dry_run:
             LOGGER.info("DRY RUN: would apply adjustment %s", adjustment.value)
-            if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
-                self._auto_mode = True
-            elif adjustment is HomeOutput.OFF:
-                self._auto_mode = False
+            self._update_auto_mode(adjustment)
             return
 
         try:
@@ -459,28 +472,25 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     },
                     blocking=True,
                 )
-                self._auto_mode = True
-                return
-
-            if adjustment is HomeOutput.OFF:
+            elif adjustment is HomeOutput.OFF:
                 await self.hass.services.async_call(
                     "climate",
                     "turn_off",
                     {"entity_id": climate_entity},
                     blocking=True,
                 )
-                self._auto_mode = False
-                return
-
-            if adjustment is HomeOutput.TIMER:
+            elif adjustment is HomeOutput.TIMER:
                 await self.hass.services.async_call(
                     "timer",
                     "start",
                     {"entity_id": timer_entity},
                     blocking=True,
                 )
+            self._update_auto_mode(adjustment)
         except ServiceValidationError as err:
             raise RuntimeError(f"service call failed: {err}") from err
+
+    # --- HA helpers ---
 
     @overload
     def _get_state(self, entity_id: str, label: str, *, allow_unavailable: Literal[False] = False) -> State: ...
