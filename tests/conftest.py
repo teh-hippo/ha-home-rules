@@ -34,6 +34,7 @@ else:
             CONF_GENERATION_ENTITY_ID,
             CONF_GRID_ENTITY_ID,
             CONF_HUMIDITY_ENTITY_ID,
+            CONF_INVERTER_ENTITY_ID,
             CONF_TEMPERATURE_ENTITY_ID,
             CONF_TIMER_ENTITY_ID,
             DOMAIN,
@@ -48,25 +49,30 @@ else:
             humidity: str = "40",
             climate: str = "off",
             timer: str = "idle",
+            timer_attributes: dict | None = None,
+            inverter: str | None = None,
             options: dict | None = None,
             extra_data: dict | None = None,
         ) -> HomeRulesCoordinator:
             hass.states.async_set("climate.test", climate)
-            hass.states.async_set("timer.test", timer)
+            hass.states.async_set("timer.test", timer, timer_attributes or {})
             hass.states.async_set("sensor.generation", generation, {"unit_of_measurement": "W"})
             hass.states.async_set("sensor.grid", grid, {"unit_of_measurement": "W"})
             hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
             hass.states.async_set("sensor.humidity", humidity, {"unit_of_measurement": "%"})
 
-            data = {
+            data: dict = {
                 CONF_CLIMATE_ENTITY_ID: "climate.test",
                 CONF_TIMER_ENTITY_ID: "timer.test",
                 CONF_GENERATION_ENTITY_ID: "sensor.generation",
                 CONF_GRID_ENTITY_ID: "sensor.grid",
                 CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
                 CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
-                **(extra_data or {}),
             }
+            if inverter is not None:
+                hass.states.async_set("sensor.inverter", inverter)
+                data[CONF_INVERTER_ENTITY_ID] = "sensor.inverter"
+            data.update(extra_data or {})
             entry = MockConfigEntry(domain=DOMAIN, data=data, options=options or {})
             entry.add_to_hass(hass)
             coordinator = HomeRulesCoordinator(hass, entry)

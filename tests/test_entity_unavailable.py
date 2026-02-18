@@ -7,96 +7,26 @@ import pytest
 pytest.importorskip("pytest_homeassistant_custom_component")
 
 
-async def test_unavailable_generation_does_not_fail_evaluation(hass) -> None:
+async def test_unavailable_generation_does_not_fail_evaluation(hass, coord_factory) -> None:
     from homeassistant.helpers import issue_registry as ir
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-    from custom_components.home_rules.const import (
-        CONF_CLIMATE_ENTITY_ID,
-        CONF_GENERATION_ENTITY_ID,
-        CONF_GRID_ENTITY_ID,
-        CONF_HUMIDITY_ENTITY_ID,
-        CONF_TEMPERATURE_ENTITY_ID,
-        CONF_TIMER_ENTITY_ID,
-        DOMAIN,
-    )
-    from custom_components.home_rules.coordinator import HomeRulesCoordinator
-
-    hass.states.async_set("climate.test", "off")
-    hass.states.async_set("timer.test", "idle")
-    hass.states.async_set("sensor.generation", "unavailable", {"unit_of_measurement": "W"})
-    hass.states.async_set("sensor.grid", "0", {"unit_of_measurement": "W"})
-    hass.states.async_set("sensor.temperature", "25", {"unit_of_measurement": "°C"})
-    hass.states.async_set("sensor.humidity", "40", {"unit_of_measurement": "%"})
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={
-            CONF_CLIMATE_ENTITY_ID: "climate.test",
-            CONF_TIMER_ENTITY_ID: "timer.test",
-            CONF_GENERATION_ENTITY_ID: "sensor.generation",
-            CONF_GRID_ENTITY_ID: "sensor.grid",
-            CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
-            CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
-        },
-        options={},
-    )
-    entry.add_to_hass(hass)
-
-    coordinator = HomeRulesCoordinator(hass, entry)
-    await coordinator.async_initialize()
-
-    await coordinator._evaluate("poll")
+    coordinator = await coord_factory(generation="unavailable")
+    await coordinator.async_run_evaluation("poll")
 
     registry = ir.async_get(hass)
-    assert registry.async_get_issue(DOMAIN, f"{entry.entry_id}_entity_unavailable") is None
+    assert registry.async_get_issue("home_rules", f"{coordinator.config_entry.entry_id}_entity_unavailable") is None
 
 
-async def test_unknown_power_sensors_do_not_raise_repairs_issue(hass) -> None:
+async def test_unknown_power_sensors_do_not_raise_repairs_issue(hass, coord_factory) -> None:
     """Unknown is common for power sensors (e.g., solar at night) and should not page users."""
-
     from homeassistant.helpers import issue_registry as ir
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-    from custom_components.home_rules.const import (
-        CONF_CLIMATE_ENTITY_ID,
-        CONF_GENERATION_ENTITY_ID,
-        CONF_GRID_ENTITY_ID,
-        CONF_HUMIDITY_ENTITY_ID,
-        CONF_INVERTER_ENTITY_ID,
-        CONF_TEMPERATURE_ENTITY_ID,
-        CONF_TIMER_ENTITY_ID,
-        DOMAIN,
+    coordinator = await coord_factory(
+        inverter="off-line",
+        generation="unknown",
+        grid="unknown",
     )
-    from custom_components.home_rules.coordinator import HomeRulesCoordinator
-
-    hass.states.async_set("climate.test", "off")
-    hass.states.async_set("timer.test", "idle")
-    hass.states.async_set("sensor.inverter", "off-line")
-    hass.states.async_set("sensor.generation", "unknown", {"unit_of_measurement": "W"})
-    hass.states.async_set("sensor.grid", "unknown", {"unit_of_measurement": "W"})
-    hass.states.async_set("sensor.temperature", "25", {"unit_of_measurement": "°C"})
-    hass.states.async_set("sensor.humidity", "40", {"unit_of_measurement": "%"})
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={
-            CONF_CLIMATE_ENTITY_ID: "climate.test",
-            CONF_TIMER_ENTITY_ID: "timer.test",
-            CONF_INVERTER_ENTITY_ID: "sensor.inverter",
-            CONF_GENERATION_ENTITY_ID: "sensor.generation",
-            CONF_GRID_ENTITY_ID: "sensor.grid",
-            CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
-            CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
-        },
-        options={},
-    )
-    entry.add_to_hass(hass)
-
-    coordinator = HomeRulesCoordinator(hass, entry)
-    await coordinator.async_initialize()
-
-    await coordinator._evaluate("poll")
+    await coordinator.async_run_evaluation("poll")
 
     registry = ir.async_get(hass)
-    assert registry.async_get_issue(DOMAIN, f"{entry.entry_id}_entity_unavailable") is None
+    assert registry.async_get_issue("home_rules", f"{coordinator.config_entry.entry_id}_entity_unavailable") is None
