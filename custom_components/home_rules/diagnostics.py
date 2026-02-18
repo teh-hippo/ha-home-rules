@@ -8,6 +8,8 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from .const import ControlMode
+
 TO_REDACT: set[str] = set()
 
 
@@ -23,10 +25,11 @@ async def async_get_config_entry_diagnostics(
         "config": async_redact_data(dict(entry.data), TO_REDACT),
         "options": async_redact_data(dict(entry.options), TO_REDACT),
         "controls": {
-            "enabled": coordinator.controls.enabled,
+            "mode": coordinator.control_mode.value,
+            "enabled": coordinator.control_mode is not ControlMode.DISABLED,
             "cooling_enabled": coordinator.controls.cooling_enabled,
-            "aggressive_cooling": coordinator.controls.aggressive_cooling,
-            "dry_run": coordinator.controls.dry_run,
+            "aggressive_cooling": coordinator.control_mode is ControlMode.AGGRESSIVE,
+            "dry_run": coordinator.control_mode is ControlMode.DRY_RUN,
         },
         "session": {
             "last_mode": data.mode.value,

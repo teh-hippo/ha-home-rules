@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Literal, overload
 
@@ -71,11 +71,9 @@ from .rules import (
 class ControlState:
     """User-facing control flags."""
 
-    enabled: bool = True
-    cooling_enabled: bool = True
-    aggressive_cooling: bool = False
     # Safety default: start in dry-run until explicitly disabled.
-    dry_run: bool = True
+    mode: ControlMode = ControlMode.DRY_RUN
+    cooling_enabled: bool = True
 
 
 @dataclass
@@ -164,6 +162,23 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def controls(self) -> ControlState:
         return self._controls
 
+    def _control_mode_from_storage(self, controls: dict[str, Any]) -> ControlMode:
+        """Load control mode from persisted state, including legacy booleans."""
+        mode_raw = controls.get("mode")
+        if mode_raw is not None:
+            try:
+                return ControlMode(str(mode_raw))
+            except ValueError:
+                pass
+
+        if not bool(controls.get("enabled", True)):
+            return ControlMode.DISABLED
+        if bool(controls.get("dry_run", True)):
+            return ControlMode.DRY_RUN
+        if bool(controls.get("aggressive_cooling", False)):
+            return ControlMode.AGGRESSIVE
+        return ControlMode.LIVE
+
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
         if not stored:
@@ -173,10 +188,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         session = stored.get("session", {})
 
         self._controls = ControlState(
-            enabled=bool(controls.get("enabled", True)),
+            mode=self._control_mode_from_storage(controls),
             cooling_enabled=bool(controls.get("cooling_enabled", True)),
-            aggressive_cooling=bool(controls.get("aggressive_cooling", False)),
-            dry_run=bool(controls.get("dry_run", True)),
         )
         last = session.get("last")
         if last == "NoChange":
@@ -200,19 +213,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     @property
     def control_mode(self) -> ControlMode:
-        if not self._controls.enabled:
-            return ControlMode.DISABLED
-        if self._controls.dry_run:
-            return ControlMode.DRY_RUN
-        if self._controls.aggressive_cooling:
-            return ControlMode.AGGRESSIVE
-        return ControlMode.LIVE
+        return self._controls.mode
 
     async def async_set_mode(self, mode: ControlMode) -> None:
         """Set operational mode (enabled/dry-run/aggressive) in one action."""
-        self._controls.enabled = mode is not ControlMode.DISABLED
-        self._controls.dry_run = mode is ControlMode.DRY_RUN
-        self._controls.aggressive_cooling = mode is ControlMode.AGGRESSIVE
+        self._controls.mode = mode
         await self._save_state()
         await self.async_run_evaluation("control_mode")
 
@@ -255,7 +260,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
             previous = self._session.last
             applied = apply_adjustment(self._session, current, adjustment)
-            if self._controls.dry_run:
+            if self.control_mode is ControlMode.DRY_RUN:
                 self._session.failed_to_change = 0
                 applied = True
             if not applied:
@@ -281,7 +286,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 "humidity": home.humidity,
                 "have_solar": home.have_solar,
                 "auto": home.auto,
-                "dry_run": self._controls.dry_run,
+                "dry_run": self.control_mode is ControlMode.DRY_RUN,
                 "tolerated": self._session.tolerated,
                 "reactivate_delay": self._session.reactivate_delay,
             }
@@ -312,7 +317,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 tolerated=self._session.tolerated,
                 reactivate_delay=self._session.reactivate_delay,
                 auto_mode=self._auto_mode,
-                dry_run=self._controls.dry_run,
+                dry_run=self.control_mode is ControlMode.DRY_RUN,
                 timer_finishes_at=timer_finishes_at,
                 last_evaluated=now,
                 last_changed=self._last_changed,
@@ -337,7 +342,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         new_mode = (self._session.last or current).value
         message = (
             f"Mode changed: {previous.value} -> {new_mode} "
-            f"(current={current.value}, action={adjustment.value}, dry_run={self._controls.dry_run})"
+            f"(current={current.value}, action={adjustment.value}, dry_run={self.control_mode is ControlMode.DRY_RUN})"
         )
 
         try:
@@ -434,8 +439,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 temperature=temperature,
                 humidity=humidity,
                 auto=self._auto_mode,
-                aggressive_cooling=self._controls.aggressive_cooling,
-                enabled=self._controls.enabled,
+                aggressive_cooling=self.control_mode is ControlMode.AGGRESSIVE,
+                enabled=self.control_mode is not ControlMode.DISABLED,
                 cooling_enabled=self._controls.cooling_enabled,
             ),
             timer_finishes_at,
@@ -479,7 +484,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         climate_entity = self._entity_id(CONF_CLIMATE_ENTITY_ID)
         timer_entity = self._entity_id(CONF_TIMER_ENTITY_ID)
 
-        if self._controls.dry_run:
+        if self.control_mode is ControlMode.DRY_RUN:
             LOGGER.info("DRY RUN: would apply adjustment %s", adjustment.value)
             self._update_auto_mode(adjustment)
             return
@@ -637,7 +642,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _save_state(self) -> None:
         await self._store.async_save(
             {
-                "controls": asdict(self._controls),
+                "controls": {
+                    "mode": self._controls.mode.value,
+                    "cooling_enabled": self._controls.cooling_enabled,
+                },
                 "session": {
                     "reactivate_delay": self._session.reactivate_delay,
                     "tolerated": self._session.tolerated,

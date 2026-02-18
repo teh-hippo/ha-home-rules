@@ -58,7 +58,7 @@ async def test_async_set_mode_disabled(coord_factory) -> None:
     await coordinator.async_set_mode(ControlMode.DISABLED)
 
     assert coordinator.control_mode is ControlMode.DISABLED
-    assert coordinator.controls.enabled is False
+    assert coordinator.controls.mode is ControlMode.DISABLED
 
 
 async def test_async_set_control_disables_cooling(coord_factory) -> None:
