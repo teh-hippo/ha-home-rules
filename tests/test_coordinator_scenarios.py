@@ -83,3 +83,59 @@ async def test_below_dry_threshold_no_change(coord_factory) -> None:
     await coordinator.async_run_evaluation("test")
 
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+
+
+async def test_restart_timer_still_active_preserves_timer_state(coord_factory) -> None:
+    """After restart with timer still running, session state is preserved as TIMER."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    # Simulate session that was in TIMER state, timer is still active in HA.
+    coordinator = await coord_factory(
+        climate="cool",
+        timer="active",
+        timer_attributes={"remaining": "0:02:00"},
+        generation="0",  # No solar — reason the timer was running
+    )
+    # Bootstrap stored state as if we had previously been in TIMER mode.
+    coordinator._session.last = HomeOutput.TIMER
+    coordinator._initialized = False  # Reset so startup sync runs again.
+
+    await coordinator.async_run_evaluation("restart")
+
+    # Timer is still active → session.last should remain TIMER.
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._session.last is HomeOutput.TIMER
+
+
+async def test_restart_with_stale_timer_state_syncs_to_live(hass, coord_factory) -> None:
+    """After restart, if stored state was TIMER but timer has expired, sync to live."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    # Timer has expired (idle), aircon is off — timer finished while HA was down.
+    coordinator = await coord_factory(
+        climate="off",
+        timer="idle",
+        generation="0",
+    )
+    # Simulate stale stored state: session said TIMER but reality is now OFF.
+    coordinator._session.last = HomeOutput.TIMER
+    coordinator._initialized = False  # Reset so startup sync runs again.
+
+    await coordinator.async_run_evaluation("restart")
+
+    # Startup sync should have resolved TIMER → OFF (live state).
+    assert coordinator._session.last is HomeOutput.OFF
+
+
+async def test_restart_first_eval_uses_live_state_when_no_stored_session(coord_factory) -> None:
+    """First eval with no stored session initialises session.last from live entity state."""
+    # High solar, hot, aircon is already cooling.
+    coordinator = await coord_factory(climate="cool", generation="6000", temperature="27")
+    # session.last starts as None (no stored state).
+    coordinator._session.last = None
+    coordinator._initialized = False
+
+    await coordinator.async_run_evaluation("startup")
+
+    # Session must be initialised from live state, not left as None.
+    assert coordinator._session.last is not None

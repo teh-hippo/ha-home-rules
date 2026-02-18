@@ -118,6 +118,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._session = CachedState()
         self._controls = ControlState()
         self._auto_mode = False
+        self._initialized = False
         self._recent: list[dict[str, Any]] = []
         self._last_changed: str | None = None
         self._store: Store[dict[str, Any]] = Store(
@@ -236,7 +237,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             home, timer_finishes_at = self._build_home_input()
             current = current_state(home)
 
-            if self._session.last is None:
+            if not self._initialized:
+                self._initialized = True
+                self._sync_on_startup(current, home)
+            elif self._session.last is None:
                 self._session.last = current
 
             session_snapshot = CachedState(
@@ -258,7 +262,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if not applied:
                 raise HomeAssistantError("failed to apply adjustment")
 
-            if previous != self._session.last:
+            if previous is not None and previous != self._session.last:
                 self._last_changed = now
                 await self._maybe_notify(previous, current, adjustment)
 
@@ -439,6 +443,29 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         )
 
     # --- Application effects ---
+
+    def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
+        """Reconcile persisted session state with live entity state after a restart.
+
+        Called once on the first evaluation after startup. Rules:
+        - Timer is still active: preserve TIMER state (timer continues post-restart).
+        - Otherwise: sync session.last to the live current state so the first
+          evaluation starts from truth rather than potentially stale storage.
+        """
+        if self._session.last is None:
+            self._session.last = current
+            return
+
+        if home.timer and self._session.last is HomeOutput.TIMER:
+            return  # Timer is still running; session state is accurate.
+
+        if self._session.last != current:
+            LOGGER.info(
+                "Startup sync: restoring from %s to live state %s",
+                self._session.last.value,
+                current.value,
+            )
+            self._session.last = current
 
     def _update_auto_mode(self, adjustment: HomeOutput) -> None:
         if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
