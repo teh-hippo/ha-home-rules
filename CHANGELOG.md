@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v1.0.12 (2026-02-18)
+
+### Bug Fixes
+
+- Align HA metadata and options diagnostics APIs
+  ([`1060da4`](https://github.com/teh-hippo/ha-home-rules/commit/1060da4ffc050f9d134adc6bac4a5ff594e64300))
+
+### Continuous Integration
+
+- Make HACS brands check non-blocking
+  ([`e75edf0`](https://github.com/teh-hippo/ha-home-rules/commit/e75edf0abf84fdf99d68b3a047ed40cbfe3955c9))
+
+### Refactoring
+
+- Share base entity metadata setup
+  ([`6e65954`](https://github.com/teh-hippo/ha-home-rules/commit/6e65954262d33b1566eadfaed27f04a47e63b652))
+
+- Store control mode as single enum field
+  ([`6d5d861`](https://github.com/teh-hippo/ha-home-rules/commit/6d5d8610d2ba813dcef164985b5a557720d56459))
+
+- Unify turn-on decision and reason logic
+  ([`456d182`](https://github.com/teh-hippo/ha-home-rules/commit/456d18242b4a1fd3203c9a589a85c601ca7650d8))
+
+### Testing
+
+- Cover config flow lifecycle and diagnostics
+  ([`c1de354`](https://github.com/teh-hippo/ha-home-rules/commit/c1de3548eacc99e2eb999f485935309966e704b0))
+
+
 ## v1.0.11 (2026-02-18)
 
 ### Bug Fixes
