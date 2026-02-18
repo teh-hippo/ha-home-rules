@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v1.0.10 (2026-02-18)
+
+### Bug Fixes
+
+- Timer countdown sensor now ticks in real-time
+  ([`36c1890`](https://github.com/teh-hippo/ha-home-rules/commit/36c1890bc595929bf50dd4af670e55391efa7c17))
+
+### Continuous Integration
+
+- Gate release on validate workflow success
+  ([`80baa5d`](https://github.com/teh-hippo/ha-home-rules/commit/80baa5d0928d35d5002493301e401beb55486499))
+
+### Documentation
+
+- Add Development section to README
+  ([`76788b8`](https://github.com/teh-hippo/ha-home-rules/commit/76788b85d0371c914bb254c056e47d0b63c694c0))
+
+
 ## v1.0.9 (2026-02-18)
 
 ### Bug Fixes
