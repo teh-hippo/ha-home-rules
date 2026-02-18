@@ -30,7 +30,7 @@ Home Rules watches your climate + sensor inputs (solar, grid usage, temperature,
 
 ## Development
 
-Run all checks (ruff, mypy, pytest) with:
+Run all checks (manifest key ordering, ruff, mypy, pytest) with:
 
 ```bash
 bash scripts/check.sh
@@ -46,7 +46,11 @@ Use this exact flow before every push to reduce CI failures:
 git pull --rebase origin master
 bash scripts/check.sh
 git push
-gh run list --workflow Validate --limit 1
+gh run watch --workflow Validate --exit-status
 ```
 
 If the push rebases onto new commits, run `bash scripts/check.sh` again before pushing.
+
+`Validate` currently runs HACS as non-blocking while `brands` assets are pending upstream; `hassfest` and tests remain blocking.
+
+Common CI pitfall: hassfest requires manifest keys to be ordered as `domain`, `name`, then alphabetical keys. `bash scripts/check.sh` now enforces this locally before push.
