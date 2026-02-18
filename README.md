@@ -37,3 +37,16 @@ bash scripts/check.sh
 ```
 
 Requires [uv](https://docs.astral.sh/uv/) — no manual venv setup needed.
+
+### Pre-push CI checklist
+
+Use this exact flow before every push to reduce CI failures:
+
+```bash
+git pull --rebase origin master
+bash scripts/check.sh
+git push
+gh run list --workflow Validate --limit 1
+```
+
+If the push rebases onto new commits, run `bash scripts/check.sh` again before pushing.
