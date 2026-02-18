@@ -7,6 +7,8 @@ Locally, you may not have the HA pytest plugin installed, so keep fixtures optio
 import pytest
 
 try:
+    from typing import Any
+
     import pytest_homeassistant_custom_component  # noqa: F401
 except ModuleNotFoundError:
     # Unit tests (e.g., rules engine) can run without HA.
@@ -61,7 +63,7 @@ else:
             hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
             hass.states.async_set("sensor.humidity", humidity, {"unit_of_measurement": "%"})
 
-            data: dict = {
+            data: dict[str, Any] = {
                 CONF_CLIMATE_ENTITY_ID: "climate.test",
                 CONF_TIMER_ENTITY_ID: "timer.test",
                 CONF_GENERATION_ENTITY_ID: "sensor.generation",

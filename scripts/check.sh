@@ -3,15 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if [ ! -f ".venv/bin/activate" ]; then
-  echo "ERROR: .venv not found. Create it first (see CONTRIBUTING.md)." >&2
-  exit 2
-fi
+UV_RUN="uv run --with-requirements requirements_test.txt"
 
-source .venv/bin/activate
-
-ruff check .
-ruff format --check .
-mypy custom_components tests
-pytest tests -q
-
+$UV_RUN ruff check .
+$UV_RUN ruff format --check .
+$UV_RUN mypy custom_components tests
+$UV_RUN pytest tests -q

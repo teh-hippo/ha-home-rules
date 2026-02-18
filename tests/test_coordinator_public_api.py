@@ -10,6 +10,8 @@ This file serves as the Phase 0 behavior contract for subsequent refactoring.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
@@ -74,7 +76,7 @@ async def test_evaluation_fires_ha_event(hass, coord_factory) -> None:
     """Each evaluation fires an EVENT_EVALUATION event on the HA event bus."""
     from custom_components.home_rules.const import EVENT_EVALUATION
 
-    events: list = []
+    events: list[Any] = []
     hass.bus.async_listen(EVENT_EVALUATION, lambda e: events.append(e))
 
     coordinator = await coord_factory()

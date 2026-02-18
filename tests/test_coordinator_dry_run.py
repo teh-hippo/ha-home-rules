@@ -6,6 +6,8 @@ when running only the pure rules-engine unit tests.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
@@ -34,7 +36,7 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory
     # Verify that the old "NoChange" string stored in previous versions
     # is migrated to HomeOutput.NO_CHANGE on reload.
     key = STORAGE_KEY_TEMPLATE.format(entry_id=coordinator.config_entry.entry_id)
-    store = Store(hass, STORAGE_VERSION, key)
+    store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, key)
     await store.async_save({"session": {"last": "NoChange"}})
 
     reloaded = HomeRulesCoordinator(hass, coordinator.config_entry)

@@ -406,6 +406,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._normalized_power(generation_state, "generation") if (have_solar and generation_state) else 0.0
         )
         grid_usage = self._normalized_power(grid_state, "grid") if (have_solar and grid_state) else 0.0
+        # These labels always return a synthetic State (never None) per _get_state fallbacks.
+        assert temp_state is not None
+        assert humidity_state is not None
         temperature = self._normalized_temperature(temp_state)
         humidity = self._state_to_float(humidity_state, "humidity")
 
