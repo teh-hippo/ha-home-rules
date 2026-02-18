@@ -61,8 +61,9 @@ SENSORS = (
         icon="mdi:clock-check-outline",
     ),
     SensorDescription(
-        key="timer_countdown",
+        key="timer_finishes_at",
         name="Timer Countdown",
+        device_class=SensorDeviceClass.TIMESTAMP,
         object_id=f"{DOMAIN}_timer_countdown",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:timer-outline",
@@ -106,6 +107,8 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
         if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
             if value is None:
                 return None
+            if isinstance(value, datetime):
+                return value
             parsed = dt_util.parse_datetime(str(value))
             return parsed or None
 

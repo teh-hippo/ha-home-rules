@@ -16,7 +16,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 def test_timer_countdown_sensor_is_registered() -> None:
     from custom_components.home_rules.sensor import SENSORS
 
-    assert any(description.key == "timer_countdown" for description in SENSORS)
+    assert any(description.key == "timer_finishes_at" for description in SENSORS)
 
 
 async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory) -> None:
@@ -45,15 +45,20 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory
 
 
 async def test_timer_countdown_uses_remaining_attribute(coord_factory) -> None:
+    from datetime import UTC, datetime, timedelta
+
     coordinator = await coord_factory(
         timer="active",
         timer_attributes={"remaining": "0:04:59"},
     )
     await coordinator.async_run_evaluation("poll")
-    assert coordinator.data.timer_countdown == "0:04:59"
+    result = coordinator.data.timer_finishes_at
+    assert isinstance(result, datetime)
+    expected = datetime.now(tz=UTC) + timedelta(minutes=4, seconds=59)
+    assert abs((result - expected).total_seconds()) < 5
 
 
 async def test_timer_countdown_is_off_when_timer_idle(coord_factory) -> None:
     coordinator = await coord_factory()  # timer="idle" by default
     await coordinator.async_run_evaluation("poll")
-    assert coordinator.data.timer_countdown == "Off"
+    assert coordinator.data.timer_finishes_at is None
