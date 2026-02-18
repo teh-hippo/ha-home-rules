@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.11 (2026-02-18)
+
+### Bug Fixes
+
+- Explicit startup state reconciliation after restart
+  ([`c45db59`](https://github.com/teh-hippo/ha-home-rules/commit/c45db5957fce08ed0381f0ecc58145e1cb8d4c25))
+
+
 ## v1.0.10 (2026-02-18)
 
 ### Bug Fixes
