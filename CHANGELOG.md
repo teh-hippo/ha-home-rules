@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.0.14 (2026-02-18)
+
+### Bug Fixes
+
+- Note compact runtime footprint
+  ([`c2ef187`](https://github.com/teh-hippo/ha-home-rules/commit/c2ef18700140adcbf8c68b2a23c5c351a3cee894))
+
+### Refactoring
+
+- Reduce runtime LOC by 30%
+  ([`94fe3a0`](https://github.com/teh-hippo/ha-home-rules/commit/94fe3a0c1952291db6a3b4b2290e0edb73ef615a))
+
+
 ## v1.0.13 (2026-02-18)
 
 ### Bug Fixes
