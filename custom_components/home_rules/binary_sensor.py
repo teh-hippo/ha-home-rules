@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -19,23 +19,20 @@ type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
 
 
 @dataclass(frozen=True)
-class BinaryDescription:
-    key: str
-    name: str
-    icon: str | None = None
-    entity_category: EntityCategory | None = None
+class BinaryDescription(BinarySensorEntityDescription):
+    """Home Rules binary sensor description, extending HA's base."""
 
 
 BINARY_SENSORS = (
     BinaryDescription(
-        "solar_available",
-        "Solar Available",
+        key="solar_available",
+        name="Solar Available",
         icon="mdi:white-balance-sunny",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     BinaryDescription(
-        "auto_mode",
-        "Auto Mode",
+        key="auto_mode",
+        name="Auto Mode",
         icon="mdi:autorenew",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -63,17 +60,14 @@ class HomeRulesBinarySensor(CoordinatorEntity[HomeRulesCoordinator], BinarySenso
         description: BinaryDescription,
     ) -> None:
         super().__init__(coordinator)
-        self._description = description
-        self._attr_name = description.name
+        self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_suggested_object_id = f"{DOMAIN}_{description.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name="Home Rules",
         )
-        self._attr_icon = description.icon
-        self._attr_entity_category = description.entity_category
 
     @property
     def is_on(self) -> bool:
-        return bool(getattr(self.coordinator.data, self._description.key))
+        return bool(getattr(self.coordinator.data, self.entity_description.key))

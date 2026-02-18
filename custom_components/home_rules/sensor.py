@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -22,45 +22,47 @@ type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
 
 
 @dataclass(frozen=True)
-class SensorDescription:
-    key: str
-    name: str
-    device_class: SensorDeviceClass | None = None
+class SensorDescription(SensorEntityDescription):
+    """Home Rules sensor description, extending HA's base with suggested_object_id."""
+
     object_id: str | None = None
-    entity_category: EntityCategory | None = None
-    icon: str | None = None
 
 
 SENSORS = (
-    SensorDescription("mode", "Mode", object_id=f"{DOMAIN}_mode", icon="mdi:home-automation"),
-    SensorDescription("current", "Current State", object_id=f"{DOMAIN}_current_state", icon="mdi:information-outline"),
-    SensorDescription("adjustment", "Action", object_id=f"{DOMAIN}_action", icon="mdi:flash"),
+    SensorDescription(key="mode", name="Mode", object_id=f"{DOMAIN}_mode", icon="mdi:home-automation"),
     SensorDescription(
-        "decision",
-        "Decision",
+        key="current",
+        name="Current State",
+        object_id=f"{DOMAIN}_current_state",
+        icon="mdi:information-outline",
+    ),
+    SensorDescription(key="adjustment", name="Action", object_id=f"{DOMAIN}_action", icon="mdi:flash"),
+    SensorDescription(
+        key="decision",
+        name="Decision",
         object_id=f"{DOMAIN}_decision",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:comment-question-outline",
     ),
     SensorDescription(
-        "last_evaluated",
-        "Last Evaluated",
-        SensorDeviceClass.TIMESTAMP,
+        key="last_evaluated",
+        name="Last Evaluated",
+        device_class=SensorDeviceClass.TIMESTAMP,
         object_id=f"{DOMAIN}_last_evaluated",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:clock-outline",
     ),
     SensorDescription(
-        "last_changed",
-        "Last Changed",
-        SensorDeviceClass.TIMESTAMP,
+        key="last_changed",
+        name="Last Changed",
+        device_class=SensorDeviceClass.TIMESTAMP,
         object_id=f"{DOMAIN}_last_changed",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:clock-check-outline",
     ),
     SensorDescription(
-        "timer_countdown",
-        "Timer Countdown",
+        key="timer_countdown",
+        name="Timer Countdown",
         object_id=f"{DOMAIN}_timer_countdown",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:timer-outline",
@@ -89,23 +91,19 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
         description: SensorDescription,
     ) -> None:
         super().__init__(coordinator)
-        self._description = description
-        self._attr_name = description.name
+        self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_suggested_object_id = description.object_id or f"{DOMAIN}_{description.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name="Home Rules",
         )
-        self._attr_device_class = description.device_class
-        self._attr_entity_category = description.entity_category
-        self._attr_icon = description.icon
 
     @property
     def native_value(self) -> str | datetime | None:
-        value: object = getattr(self.coordinator.data, self._description.key)
+        value: object = getattr(self.coordinator.data, self.entity_description.key)
 
-        if self._description.device_class == SensorDeviceClass.TIMESTAMP:
+        if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
             if value is None:
                 return None
             parsed = dt_util.parse_datetime(str(value))
@@ -117,7 +115,7 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        if self._description.key != "decision":
+        if self.entity_description.key != "decision":
             return None
 
         recent = list(self.coordinator.data.recent_evaluations)[:10]

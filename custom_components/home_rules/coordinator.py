@@ -8,13 +8,14 @@ from datetime import timedelta
 from typing import Any, Literal, overload
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
+from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfTemperature
 from homeassistant.core import HomeAssistant, State
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
     CONF_CLIMATE_ENTITY_ID,
@@ -255,7 +256,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 self._session.failed_to_change = 0
                 applied = True
             if not applied:
-                raise RuntimeError("failed to apply adjustment")
+                raise HomeAssistantError("failed to apply adjustment")
 
             if previous != self._session.last:
                 self._last_changed = now
@@ -488,7 +489,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 )
             self._update_auto_mode(adjustment)
         except ServiceValidationError as err:
-            raise RuntimeError(f"service call failed: {err}") from err
+            raise HomeAssistantError(f"service call failed: {err}") from err
 
     # --- HA helpers ---
 
@@ -587,11 +588,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _normalized_temperature(self, state: State) -> float:
         value = self._state_to_float(state, "temperature")
-        unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip().lower()
-        if unit in {"", "°c", "c"}:
+        unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
+        if unit in {"", "°C", "C", "°c", "c"}:
             return value
-        if unit in {"°f", "f"}:
-            return (value - 32) * 5 / 9
+        if unit in {"°F", "F", "°f", "f"}:
+            return TemperatureConverter.convert(value, UnitOfTemperature.FAHRENHEIT, UnitOfTemperature.CELSIUS)
         raise ValueError(f"unsupported temperature unit for {state.entity_id}: {unit}")
 
     async def _save_state(self) -> None:
