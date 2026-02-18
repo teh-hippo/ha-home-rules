@@ -1,35 +1,24 @@
-"""Diagnostics for Home Rules."""
-
-from __future__ import annotations
-
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import ControlMode
-
-TO_REDACT: set[str] = set()
+from . import const as c
 
 
-async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-) -> dict[str, Any]:
-    """Return diagnostics for a config entry."""
+async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     coordinator = entry.runtime_data
     data = coordinator.data
-
     return {
-        "config": async_redact_data(dict(entry.data), TO_REDACT),
-        "options": async_redact_data(dict(entry.options), TO_REDACT),
+        "config": async_redact_data(dict(entry.data), set()),
+        "options": async_redact_data(dict(entry.options), set()),
         "controls": {
             "mode": coordinator.control_mode.value,
-            "enabled": coordinator.control_mode is not ControlMode.DISABLED,
+            "enabled": coordinator.control_mode is not c.ControlMode.DISABLED,
             "cooling_enabled": coordinator.controls.cooling_enabled,
-            "aggressive_cooling": coordinator.control_mode is ControlMode.AGGRESSIVE,
-            "dry_run": coordinator.control_mode is ControlMode.DRY_RUN,
+            "aggressive_cooling": coordinator.control_mode is c.ControlMode.AGGRESSIVE,
+            "dry_run": coordinator.control_mode is c.ControlMode.DRY_RUN,
         },
         "session": {
             "last_mode": data.mode.value,

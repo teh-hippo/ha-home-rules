@@ -1,7 +1,4 @@
-"""Config flow for Home Rules."""
-
-from __future__ import annotations
-
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
@@ -10,55 +7,90 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 from homeassistant.helpers.selector import SelectOptionDict
 
-from .const import (
-    CONF_CLIMATE_ENTITY_ID,
-    CONF_EVAL_INTERVAL,
-    CONF_GENERATION_COOL_THRESHOLD,
-    CONF_GENERATION_DRY_THRESHOLD,
-    CONF_GENERATION_ENTITY_ID,
-    CONF_GRID_ENTITY_ID,
-    CONF_GRID_USAGE_DELAY,
-    CONF_HUMIDITY_ENTITY_ID,
-    CONF_HUMIDITY_THRESHOLD,
-    CONF_INVERTER_ENTITY_ID,
-    CONF_NOTIFICATION_SERVICE,
-    CONF_REACTIVATE_DELAY,
-    CONF_TEMPERATURE_COOL,
-    CONF_TEMPERATURE_ENTITY_ID,
-    CONF_TEMPERATURE_THRESHOLD,
-    CONF_TIMER_ENTITY_ID,
-    DEFAULT_EVAL_INTERVAL,
-    DEFAULT_GENERATION_COOL_THRESHOLD,
-    DEFAULT_GENERATION_DRY_THRESHOLD,
-    DEFAULT_GRID_USAGE_DELAY,
-    DEFAULT_HUMIDITY_THRESHOLD,
-    DEFAULT_REACTIVATE_DELAY,
-    DEFAULT_TEMPERATURE_COOL,
-    DEFAULT_TEMPERATURE_THRESHOLD,
-    DOMAIN,
-)
+from . import const as c
 
-_HOME_RULES_PREFIXES = (
-    "switch.home_rules_",
-    "select.home_rules_",
-    "sensor.home_rules_",
-    "binary_sensor.home_rules_",
-    "button.home_rules_",
+_HOME_RULES_PREFIXES = tuple(
+    f"{platform}.{c.DOMAIN}_" for platform in ("switch", "select", "sensor", "binary_sensor", "button")
 )
-
 _VALID_POWER_UNITS = {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}
-
-_DOMAIN_CHECKS: dict[str, tuple[str, str]] = {
-    CONF_TIMER_ENTITY_ID: ("timer.", "invalid_timer_entity"),
-    CONF_CLIMATE_ENTITY_ID: ("climate.", "invalid_climate_entity"),
-}
-
 _SENSOR_KEYS = {
-    CONF_GENERATION_ENTITY_ID,
-    CONF_GRID_ENTITY_ID,
-    CONF_TEMPERATURE_ENTITY_ID,
-    CONF_HUMIDITY_ENTITY_ID,
+    c.CONF_GENERATION_ENTITY_ID,
+    c.CONF_GRID_ENTITY_ID,
+    c.CONF_TEMPERATURE_ENTITY_ID,
+    c.CONF_HUMIDITY_ENTITY_ID,
 }
+_DOMAIN_CHECKS = {
+    c.CONF_TIMER_ENTITY_ID: ("timer.", "invalid_timer_entity"),
+    c.CONF_CLIMATE_ENTITY_ID: ("climate.", "invalid_climate_entity"),
+}
+_DEFAULT_OPTIONS = {
+    c.CONF_EVAL_INTERVAL: c.DEFAULT_EVAL_INTERVAL,
+    c.CONF_GENERATION_COOL_THRESHOLD: c.DEFAULT_GENERATION_COOL_THRESHOLD,
+    c.CONF_GENERATION_DRY_THRESHOLD: c.DEFAULT_GENERATION_DRY_THRESHOLD,
+    c.CONF_HUMIDITY_THRESHOLD: c.DEFAULT_HUMIDITY_THRESHOLD,
+    c.CONF_TEMPERATURE_THRESHOLD: c.DEFAULT_TEMPERATURE_THRESHOLD,
+    c.CONF_TEMPERATURE_COOL: c.DEFAULT_TEMPERATURE_COOL,
+    c.CONF_GRID_USAGE_DELAY: c.DEFAULT_GRID_USAGE_DELAY,
+    c.CONF_REACTIVATE_DELAY: c.DEFAULT_REACTIVATE_DELAY,
+}
+
+
+def _entity_selector(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector:
+    config = (
+        selector.EntitySelectorConfig(domain=domain)
+        if device_class is None
+        else selector.EntitySelectorConfig(domain=domain, device_class=device_class)
+    )
+    return selector.EntitySelector(config)
+
+
+def _number_selector(
+    min_value: float, max_value: float, step: float, unit: str | None = None
+) -> selector.NumberSelector:
+    config = (
+        selector.NumberSelectorConfig(min=min_value, max=max_value, step=step, mode=selector.NumberSelectorMode.BOX)
+        if unit is None
+        else selector.NumberSelectorConfig(
+            min=min_value,
+            max=max_value,
+            step=step,
+            unit_of_measurement=unit,
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    )
+    return selector.NumberSelector(config)
+
+
+_ENTITY_SELECTORS = {
+    c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"),
+    c.CONF_TIMER_ENTITY_ID: _entity_selector("timer"),
+    c.CONF_INVERTER_ENTITY_ID: _entity_selector(["sensor", "binary_sensor"]),
+    c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"),
+    c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"),
+    c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"),
+    c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"),
+}
+
+_NUMBER_FIELDS = (
+    (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")),
+    (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")),
+    (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")),
+    (c.CONF_HUMIDITY_THRESHOLD, c.DEFAULT_HUMIDITY_THRESHOLD, _number_selector(0, 100, 1, "%")),
+    (c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD, _number_selector(0, 40, 0.5, "C")),
+    (c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL, _number_selector(0, 40, 0.5, "C")),
+    (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)),
+    (c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY, _number_selector(0, 5, 1)),
+)
+
+
+def _schema(required: tuple[str, ...], optional: tuple[str, ...] = ()) -> vol.Schema:
+    schema: dict[Any, Any] = {vol.Optional(key): _ENTITY_SELECTORS[key] for key in optional}
+    schema.update({vol.Required(key): _ENTITY_SELECTORS[key] for key in required})
+    return vol.Schema(schema)
+
+
+def _option_default(config_entry: ConfigEntry, current: Mapping[str, Any], key: str, fallback: Any = "") -> Any:
+    return current.get(key, config_entry.data.get(key, fallback))
 
 
 def _validate_entities(
@@ -69,8 +101,6 @@ def _validate_entities(
     allow_inverter: bool = False,
     check_domains: bool = True,
 ) -> dict[str, str]:
-    """Validate entity selections shared by config and options flows."""
-    errors: dict[str, str] = {}
     for key in required_keys:
         entity_id = str(user_input[key])
         state = hass.states.get(entity_id)
@@ -78,330 +108,132 @@ def _validate_entities(
             return {"base": "entity_not_found"}
         if entity_id.startswith(_HOME_RULES_PREFIXES):
             return {"base": "invalid_entity_selection"}
-
-        if key in (CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID):
+        if key in (c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID):
             unit = str(state.attributes.get("unit_of_measurement", "")).lower()
             if unit not in _VALID_POWER_UNITS:
                 return {"base": "invalid_power_unit"}
-
         if check_domains:
-            domain_check = _DOMAIN_CHECKS.get(key)
-            if domain_check and not entity_id.startswith(domain_check[0]):
+            if (domain_check := _DOMAIN_CHECKS.get(key)) and not entity_id.startswith(domain_check[0]):
                 return {"base": domain_check[1]}
-
             if key in _SENSOR_KEYS and not entity_id.startswith("sensor."):
                 return {"base": "invalid_sensor_entity"}
 
-    if allow_inverter:
-        inverter_entity = str(user_input.get(CONF_INVERTER_ENTITY_ID, "")).strip()
-        if inverter_entity:
-            state = hass.states.get(inverter_entity)
-            if state is None:
-                return {"base": "entity_not_found"}
-            if inverter_entity.startswith(_HOME_RULES_PREFIXES):
-                return {"base": "invalid_entity_selection"}
-            if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
-                return {"base": "invalid_inverter_entity"}
+    if not allow_inverter:
+        return {}
+    inverter_entity = str(user_input.get(c.CONF_INVERTER_ENTITY_ID, "")).strip()
+    if not inverter_entity:
+        return {}
+    if hass.states.get(inverter_entity) is None:
+        return {"base": "entity_not_found"}
+    if inverter_entity.startswith(_HOME_RULES_PREFIXES):
+        return {"base": "invalid_entity_selection"}
+    if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
+        return {"base": "invalid_inverter_entity"}
+    return {}
 
-    return errors
 
-
-class HomeRulesConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle config flow."""
-
+class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
     @staticmethod
-    def async_get_options_flow(_config_entry: ConfigEntry) -> HomeRulesOptionsFlow:
-        """Get options flow handler."""
+    def async_get_options_flow(_config_entry: ConfigEntry) -> "HomeRulesOptionsFlow":
         return HomeRulesOptionsFlow()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Handle user setup."""
-        await self.async_set_unique_id(DOMAIN)
+        await self.async_set_unique_id(c.DOMAIN)
         self._abort_if_unique_id_configured()
-
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            errors = _validate_entities(
-                self.hass, user_input, required_keys=[CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID]
-            )
-            if not errors:
-                self._data.update(user_input)
-                return await self.async_step_solar()
-
-        return self.async_show_form(step_id="user", data_schema=self._step_user_schema(), errors=errors)
+        errors = (
+            _validate_entities(self.hass, user_input, required_keys=[c.CONF_CLIMATE_ENTITY_ID, c.CONF_TIMER_ENTITY_ID])
+            if user_input
+            else {}
+        )
+        if user_input and not errors:
+            self._data.update(user_input)
+            return await self.async_step_solar()
+        return self.async_show_form(
+            step_id="user", data_schema=_schema((c.CONF_CLIMATE_ENTITY_ID, c.CONF_TIMER_ENTITY_ID)), errors=errors
+        )
 
     async def async_step_solar(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Configure solar inputs."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            errors = _validate_entities(
+        errors = (
+            _validate_entities(
                 self.hass,
                 user_input,
-                required_keys=[CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID],
+                required_keys=[c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID],
                 allow_inverter=True,
             )
-            if not errors:
-                self._data.update(user_input)
-                return await self.async_step_comfort()
-
-        return self.async_show_form(step_id="solar", data_schema=self._step_solar_schema(), errors=errors)
-
-    async def async_step_comfort(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Configure comfort inputs and complete setup."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            errors = _validate_entities(
-                self.hass, user_input, required_keys=[CONF_TEMPERATURE_ENTITY_ID, CONF_HUMIDITY_ENTITY_ID]
-            )
-            if not errors:
-                self._data.update(user_input)
-                return self.async_create_entry(
-                    title="Home Rules",
-                    data=self._data,
-                    options={
-                        CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
-                        CONF_GENERATION_COOL_THRESHOLD: DEFAULT_GENERATION_COOL_THRESHOLD,
-                        CONF_GENERATION_DRY_THRESHOLD: DEFAULT_GENERATION_DRY_THRESHOLD,
-                        CONF_HUMIDITY_THRESHOLD: DEFAULT_HUMIDITY_THRESHOLD,
-                        CONF_TEMPERATURE_THRESHOLD: DEFAULT_TEMPERATURE_THRESHOLD,
-                        CONF_TEMPERATURE_COOL: DEFAULT_TEMPERATURE_COOL,
-                        CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
-                        CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
-                    },
-                )
-
+            if user_input
+            else {}
+        )
+        if user_input and not errors:
+            self._data.update(user_input)
+            return await self.async_step_comfort()
         return self.async_show_form(
-            step_id="comfort",
-            data_schema=self._step_comfort_schema(),
+            step_id="solar",
+            data_schema=_schema(
+                (c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID), optional=(c.CONF_INVERTER_ENTITY_ID,)
+            ),
             errors=errors,
         )
 
-    def _step_user_schema(self) -> vol.Schema:
-        return vol.Schema(
-            {
-                vol.Required(CONF_CLIMATE_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="climate")
-                ),
-                vol.Required(CONF_TIMER_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="timer")
-                ),
-            }
+    async def async_step_comfort(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors = (
+            _validate_entities(
+                self.hass, user_input, required_keys=[c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID]
+            )
+            if user_input
+            else {}
         )
-
-    def _step_solar_schema(self) -> vol.Schema:
-        return vol.Schema(
-            {
-                vol.Optional(CONF_INVERTER_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])
-                ),
-                vol.Required(CONF_GENERATION_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor", device_class="power")
-                ),
-                vol.Required(CONF_GRID_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor", device_class="power")
-                ),
-            }
-        )
-
-    def _step_comfort_schema(self) -> vol.Schema:
-        return vol.Schema(
-            {
-                vol.Required(CONF_TEMPERATURE_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-                ),
-                vol.Required(CONF_HUMIDITY_ENTITY_ID): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
-                ),
-            }
+        if user_input and not errors:
+            self._data.update(user_input)
+            return self.async_create_entry(title="Home Rules", data=self._data, options=_DEFAULT_OPTIONS)
+        return self.async_show_form(
+            step_id="comfort",
+            data_schema=_schema((c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)),
+            errors=errors,
         )
 
 
 class HomeRulesOptionsFlow(OptionsFlow):
-    """Handle options flow."""
-
     def _notify_service_options(self) -> list[str]:
-        services = self.hass.services.async_services_for_domain("notify")
-        return [f"notify.{name}" for name in sorted(services)]
+        return [f"notify.{name}" for name in sorted(self.hass.services.async_services_for_domain("notify"))]
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            errors = _validate_entities(
-                self.hass,
-                user_input,
-                required_keys=[
-                    CONF_CLIMATE_ENTITY_ID,
-                    CONF_TIMER_ENTITY_ID,
-                    CONF_GENERATION_ENTITY_ID,
-                    CONF_GRID_ENTITY_ID,
-                    CONF_TEMPERATURE_ENTITY_ID,
-                    CONF_HUMIDITY_ENTITY_ID,
-                ],
-                allow_inverter=True,
-            )
-            if not errors:
-                data = dict(self.config_entry.options)
-                data.update(user_input)
-                return self.async_create_entry(data=data)
+        required = [
+            c.CONF_CLIMATE_ENTITY_ID,
+            c.CONF_TIMER_ENTITY_ID,
+            c.CONF_GENERATION_ENTITY_ID,
+            c.CONF_GRID_ENTITY_ID,
+            c.CONF_TEMPERATURE_ENTITY_ID,
+            c.CONF_HUMIDITY_ENTITY_ID,
+        ]
+        errors = (
+            _validate_entities(self.hass, user_input, required_keys=required, allow_inverter=True) if user_input else {}
+        )
+        if user_input and not errors:
+            return self.async_create_entry(data={**self.config_entry.options, **user_input})
 
         current = self.config_entry.options
-        notify_services = self._notify_service_options()
         notify_options: list[SelectOptionDict] = [{"label": "Disabled", "value": ""}]
-        notify_options.extend({"label": service, "value": service} for service in notify_services)
+        notify_options.extend({"label": service, "value": service} for service in self._notify_service_options())
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_CLIMATE_ENTITY_ID,
-                        default=current.get(
-                            CONF_CLIMATE_ENTITY_ID,
-                            self.config_entry.data.get(CONF_CLIMATE_ENTITY_ID),
-                        ),
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="climate")),
-                    vol.Required(
-                        CONF_TIMER_ENTITY_ID,
-                        default=current.get(CONF_TIMER_ENTITY_ID, self.config_entry.data.get(CONF_TIMER_ENTITY_ID)),
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="timer")),
-                    vol.Optional(
-                        CONF_INVERTER_ENTITY_ID,
-                        default=current.get(
-                            CONF_INVERTER_ENTITY_ID,
-                            self.config_entry.data.get(CONF_INVERTER_ENTITY_ID, ""),
-                        ),
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])),
-                    vol.Required(
-                        CONF_GENERATION_ENTITY_ID,
-                        default=current.get(
-                            CONF_GENERATION_ENTITY_ID,
-                            self.config_entry.data.get(CONF_GENERATION_ENTITY_ID),
-                        ),
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="power")),
-                    vol.Required(
-                        CONF_GRID_ENTITY_ID,
-                        default=current.get(CONF_GRID_ENTITY_ID, self.config_entry.data.get(CONF_GRID_ENTITY_ID)),
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="power")),
-                    vol.Required(
-                        CONF_TEMPERATURE_ENTITY_ID,
-                        default=current.get(
-                            CONF_TEMPERATURE_ENTITY_ID,
-                            self.config_entry.data.get(CONF_TEMPERATURE_ENTITY_ID),
-                        ),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-                    ),
-                    vol.Required(
-                        CONF_HUMIDITY_ENTITY_ID,
-                        default=current.get(
-                            CONF_HUMIDITY_ENTITY_ID,
-                            self.config_entry.data.get(CONF_HUMIDITY_ENTITY_ID),
-                        ),
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="humidity")),
-                    vol.Required(
-                        CONF_EVAL_INTERVAL,
-                        default=current.get(CONF_EVAL_INTERVAL, DEFAULT_EVAL_INTERVAL),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=60,
-                            max=3600,
-                            step=60,
-                            unit_of_measurement="s",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_GENERATION_COOL_THRESHOLD,
-                        default=current.get(CONF_GENERATION_COOL_THRESHOLD, DEFAULT_GENERATION_COOL_THRESHOLD),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=20000,
-                            step=100,
-                            unit_of_measurement="W",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_GENERATION_DRY_THRESHOLD,
-                        default=current.get(CONF_GENERATION_DRY_THRESHOLD, DEFAULT_GENERATION_DRY_THRESHOLD),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=20000,
-                            step=100,
-                            unit_of_measurement="W",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_HUMIDITY_THRESHOLD,
-                        default=current.get(CONF_HUMIDITY_THRESHOLD, DEFAULT_HUMIDITY_THRESHOLD),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=100,
-                            step=1,
-                            unit_of_measurement="%",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_TEMPERATURE_THRESHOLD,
-                        default=current.get(CONF_TEMPERATURE_THRESHOLD, DEFAULT_TEMPERATURE_THRESHOLD),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=40,
-                            step=0.5,
-                            unit_of_measurement="C",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_TEMPERATURE_COOL,
-                        default=current.get(CONF_TEMPERATURE_COOL, DEFAULT_TEMPERATURE_COOL),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=40,
-                            step=0.5,
-                            unit_of_measurement="C",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_GRID_USAGE_DELAY,
-                        default=current.get(CONF_GRID_USAGE_DELAY, DEFAULT_GRID_USAGE_DELAY),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=5,
-                            step=1,
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_REACTIVATE_DELAY,
-                        default=current.get(CONF_REACTIVATE_DELAY, DEFAULT_REACTIVATE_DELAY),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=5,
-                            step=1,
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_NOTIFICATION_SERVICE,
-                        default=current.get(CONF_NOTIFICATION_SERVICE, ""),
-                    ): selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options)),
-                }
-            ),
-            errors=errors,
+        data_schema: dict[Any, Any] = {}
+        for marker, key in (
+            (vol.Required, c.CONF_CLIMATE_ENTITY_ID),
+            (vol.Required, c.CONF_TIMER_ENTITY_ID),
+            (vol.Optional, c.CONF_INVERTER_ENTITY_ID),
+            (vol.Required, c.CONF_GENERATION_ENTITY_ID),
+            (vol.Required, c.CONF_GRID_ENTITY_ID),
+            (vol.Required, c.CONF_TEMPERATURE_ENTITY_ID),
+            (vol.Required, c.CONF_HUMIDITY_ENTITY_ID),
+        ):
+            data_schema[marker(key, default=_option_default(self.config_entry, current, key))] = _ENTITY_SELECTORS[key]
+        for key, default, number_selector in _NUMBER_FIELDS:
+            data_schema[vol.Required(key, default=current.get(key, default))] = number_selector
+        data_schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=current.get(c.CONF_NOTIFICATION_SERVICE, ""))] = (
+            selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
         )
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(data_schema), errors=errors)

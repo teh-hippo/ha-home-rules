@@ -1,19 +1,13 @@
-"""Pure decision engine for Home Rules."""
-
-from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import StrEnum
 
 ALLOWED_FAILURES = 3
+_NO_ACTION_REASONS = {"Insufficient solar", "Aggressive cooling hold"}
 
 
 class AirconMode(StrEnum):
-    """Known aircon modes."""
-
     DRY = "dry"
     COOL = "cool"
-    # Some climate integrations report HVAC "auto" (heat/cool) as `auto` instead of `heat_cool`.
     AUTO = "auto"
     HEAT = "heat"
     HEAT_COOL = "heat_cool"
@@ -23,8 +17,6 @@ class AirconMode(StrEnum):
 
 
 class HomeOutput(StrEnum):
-    """Decision engine output modes."""
-
     NO_CHANGE = "No Change"
     OFF = "Off"
     COOL = "Cool"
@@ -36,8 +28,6 @@ class HomeOutput(StrEnum):
 
 @dataclass
 class HomeInput:
-    """Current home state required by the rule engine."""
-
     aircon_mode: AirconMode
     have_solar: bool
     generation: float
@@ -53,8 +43,6 @@ class HomeInput:
 
 @dataclass
 class RuleParameters:
-    """Configurable thresholds and delays."""
-
     generation_cool_threshold: float
     generation_dry_threshold: float
     temperature_threshold: float
@@ -66,8 +54,6 @@ class RuleParameters:
 
 @dataclass
 class CachedState:
-    """Persisted decision session state."""
-
     reactivate_delay: int = 0
     tolerated: int = 0
     last: HomeOutput | None = None
@@ -76,146 +62,108 @@ class CachedState:
 
 @dataclass(frozen=True)
 class TurnOnDecision:
-    """Desired activation result and matching human-readable reason."""
-
     output: HomeOutput | None
     reason: str
 
 
 def evaluate_turn_on(config: RuleParameters, home: HomeInput) -> TurnOnDecision:
-    """Evaluate desired activation mode and reason."""
     if not home.have_solar:
         return TurnOnDecision(output=None, reason="No solar available")
-
-    aggressive_cooling_active = home.aggressive_cooling and home.grid_usage == 0
-
+    aggressive = home.aggressive_cooling and home.grid_usage == 0
     if home.generation >= config.generation_cool_threshold and (
-        aggressive_cooling_active or home.humidity <= config.humidity_threshold
+        aggressive or home.humidity <= config.humidity_threshold
     ):
         if home.aircon_mode != AirconMode.COOL:
             return TurnOnDecision(output=HomeOutput.COOL, reason="Solar above cool threshold")
         if home.grid_usage == 0:
             return TurnOnDecision(output=None, reason="Already cooling on solar")
-
-    if aggressive_cooling_active:
+    if aggressive:
         return TurnOnDecision(output=None, reason="Aggressive cooling hold")
-
     if home.generation >= config.generation_dry_threshold:
         if home.aircon_mode != AirconMode.DRY:
             return TurnOnDecision(output=HomeOutput.DRY, reason="Solar above dry threshold")
         if home.grid_usage == 0:
             return TurnOnDecision(output=None, reason="Already drying on solar")
-
     return TurnOnDecision(output=None, reason="Insufficient solar")
 
 
-def turn_on_aircon(config: RuleParameters, home: HomeInput) -> HomeOutput | None:
-    """Return desired activation mode when aircon should turn on or change mode."""
-    return evaluate_turn_on(config, home).output
+def _activation_reason(config: RuleParameters, home: HomeInput) -> str | None:
+    reason = evaluate_turn_on(config, home).reason
+    return None if reason in _NO_ACTION_REASONS else reason
 
 
 def current_state(home: HomeInput) -> HomeOutput:
-    """Map current input to high-level state."""
     if not home.enabled:
         return HomeOutput.DISABLED
-
     if home.timer and home.aircon_mode != AirconMode.OFF:
         return HomeOutput.TIMER
-
-    if home.aircon_mode == AirconMode.COOL:
-        return HomeOutput.COOL
-    if home.aircon_mode == AirconMode.DRY:
-        return HomeOutput.DRY
-    if home.aircon_mode in (AirconMode.OFF, AirconMode.UNKNOWN):
-        return HomeOutput.OFF
-
-    return HomeOutput.COOL
+    return {
+        AirconMode.COOL: HomeOutput.COOL,
+        AirconMode.DRY: HomeOutput.DRY,
+    }.get(
+        home.aircon_mode,
+        HomeOutput.OFF if home.aircon_mode in (AirconMode.OFF, AirconMode.UNKNOWN) else HomeOutput.COOL,
+    )
 
 
 def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> HomeOutput:
-    """Evaluate desired adjustment from current state and config."""
     if not home.enabled:
         state.tolerated = 0
-        if state.last is HomeOutput.DISABLED:
-            return HomeOutput.NO_CHANGE
-        return HomeOutput.DISABLED
-
+        return HomeOutput.NO_CHANGE if state.last is HomeOutput.DISABLED else HomeOutput.DISABLED
     if home.aircon_mode == AirconMode.UNKNOWN:
         return HomeOutput.NO_CHANGE
-
     if state.reactivate_delay > 0:
         state.reactivate_delay -= 1
         return HomeOutput.NO_CHANGE
 
+    decision = evaluate_turn_on(config, home)
     if home.aircon_mode == AirconMode.OFF:
         state.tolerated = 0
-        if home.cooling_enabled and home.temperature >= config.temperature_threshold:
-            change = turn_on_aircon(config, home)
-            if change is not None:
-                return change
-
+        if home.cooling_enabled and home.temperature >= config.temperature_threshold and decision.output is not None:
+            return decision.output
         if home.auto:
             return HomeOutput.OFF
-
         if state.last is HomeOutput.TIMER and not home.timer:
             return HomeOutput.RESET
-
     elif not home.have_solar or home.grid_usage > 0:
         if home.auto:
-            change = turn_on_aircon(config, home)
-            if change is not None:
+            if decision.output is not None:
                 state.tolerated = 0
-                return change
-
+                return decision.output
             state.tolerated += 1
             if state.tolerated < config.grid_usage_delay:
                 return HomeOutput.NO_CHANGE
-
             state.tolerated = 0
             state.reactivate_delay = config.reactivate_delay
             return HomeOutput.OFF
-
         if not home.timer:
             return HomeOutput.TIMER
-
     elif home.auto:
         state.tolerated = 0
-        change = turn_on_aircon(config, home)
-        if change is not None:
-            return change
-
+        if decision.output is not None:
+            return decision.output
     return HomeOutput.NO_CHANGE
 
 
 def apply_adjustment(session: CachedState, current: HomeOutput, adjustment: HomeOutput) -> bool:
-    """Update session state after applying adjustment and return success."""
     if adjustment in (HomeOutput.NO_CHANGE, HomeOutput.RESET):
         if adjustment is HomeOutput.RESET:
             session.last = current
         session.failed_to_change = 0
         return True
-
     if session.last is None or session.last != adjustment:
         session.last = adjustment
         session.failed_to_change = 0
         return True
-
     session.failed_to_change += 1
     return session.failed_to_change <= ALLOWED_FAILURES
 
 
 def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
-    """Return a short, human-readable explanation for the next adjustment.
-
-    This function is pure (does not mutate ``state``) and is intended for HA UI/history.
-    """
-
     if not home.enabled:
         return "Disabled"
-
     if home.aircon_mode == AirconMode.UNKNOWN:
         return "Unknown aircon mode"
-
     if state.reactivate_delay > 0:
         return "Waiting reactivate delay"
 
@@ -224,38 +172,25 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
             return "Cooling disabled"
         if home.temperature < config.temperature_threshold:
             return "Temperature below threshold"
-
-        reason = evaluate_turn_on(config, home).reason
-        if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
+        if reason := _activation_reason(config, home):
             return reason
-
         if home.auto:
             return "Auto idle"
-
         if state.last is HomeOutput.TIMER and not home.timer:
             return "Timer cleared (reset)"
-
         return "No change"
 
-    # Aircon running (or timer/manual states).
     if not home.have_solar or home.grid_usage > 0:
         if home.auto:
-            reason = evaluate_turn_on(config, home).reason
-            if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
+            if reason := _activation_reason(config, home):
                 return reason
+            return (
+                "Grid usage tolerated"
+                if (state.tolerated + 1) < config.grid_usage_delay
+                else "Grid usage too high (turn off)"
+            )
+        return "Manual mode (start timer)" if not home.timer else "No change"
 
-            if (state.tolerated + 1) < config.grid_usage_delay:
-                return "Grid usage tolerated"
-            return "Grid usage too high (turn off)"
-
-        if not home.timer:
-            return "Manual mode (start timer)"
-
-        return "No change"
-
-    if home.auto:
-        reason = evaluate_turn_on(config, home).reason
-        if reason not in {"Insufficient solar", "Aggressive cooling hold"}:
-            return reason
-
+    if home.auto and (reason := _activation_reason(config, home)):
+        return reason
     return "No change"

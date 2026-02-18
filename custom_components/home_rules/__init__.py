@@ -1,56 +1,37 @@
-"""Home Rules integration.
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
-Keep imports lazy so the pure rules engine can be unit-tested without Home Assistant installed.
-"""
-
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
+from . import const as c
+from .coordinator import HomeRulesCoordinator
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Home Rules from a config entry."""
-    from homeassistant.helpers import entity_registry as er
-
-    from .const import LOGGER, PLATFORMS
-    from .coordinator import HomeRulesCoordinator
-
     coordinator = HomeRulesCoordinator(hass, entry)
     await coordinator.async_initialize()
     await coordinator.async_config_entry_first_refresh()
-
     entry.runtime_data = coordinator
 
-    # Clean up legacy entities that were replaced by the control-mode select.
     registry = er.async_get(hass)
-    legacy_unique_ids = {
+    legacy = {
         f"{entry.entry_id}_enabled",
         f"{entry.entry_id}_aggressive_cooling",
         f"{entry.entry_id}_dry_run",
         f"{entry.entry_id}_notifications_enabled",
     }
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if entity_entry.unique_id in legacy_unique_ids:
+        if entity_entry.unique_id in legacy:
             registry.async_remove(entity_entry.entity_id)
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, c.PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-
-    LOGGER.debug("Home Rules set up")
+    c.LOGGER.debug("Home Rules set up")
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    from .const import PLATFORMS
-
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return await hass.config_entries.async_unload_platforms(entry, c.PLATFORMS)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update."""
     await hass.config_entries.async_reload(entry.entry_id)
