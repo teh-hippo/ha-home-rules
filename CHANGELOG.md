@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.0.15 (2026-02-18)
+
+### Bug Fixes
+
+- Standardise CI tooling to uv, ruff, mypy strict
+  ([`cf06b53`](https://github.com/teh-hippo/ha-home-rules/commit/cf06b53c7d6d8e9d8850adb67ce599a4c58d4fd6))
+
+### Continuous Integration
+
+- Pin Python 3.13 via .python-version for uv
+  ([`ced1afb`](https://github.com/teh-hippo/ha-home-rules/commit/ced1afb5dac800391f19be1e5be4662d8c0072ab))
+
+- Standardise tooling — uv, ruff, mypy strict, PSR, dependabot
+  ([`3a748ca`](https://github.com/teh-hippo/ha-home-rules/commit/3a748ca4e9c58b8e73510a910ca89e889f9204d6))
+
+
 ## v1.0.14 (2026-02-18)
 
 ### Bug Fixes
