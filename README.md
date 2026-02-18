@@ -4,43 +4,41 @@
 
 # Home Rules
 
-Solar-aware aircon automation as a Home Assistant custom integration.
+Solar-aware aircon automation for Home Assistant.
 
-## Highlights
+## What it does
 
-- Sunshine in, chill out.
-- Safe by default: starts in **Dry Run** so you can watch decisions first
-- One **Control Mode** selector (Disabled / Dry Run / Live / Aggressive)
-- Sensors that explain the "why" (mode/action/decision + last change)
+- Starts safe in **Dry Run** mode so you can validate behavior first.
+- Uses one **Control Mode** selector (**Disabled / Dry Run / Live / Aggressive**).
+- Exposes decision sensors so you can see why a mode/action was chosen.
+- Can optionally send mode-change alerts to a `notify.*` target.
 
-## Installation
+## Install
 
-Install via HACS (custom repository): add `https://github.com/teh-hippo/ha-home-rules` as an **Integration**, install **Home Rules**, then restart Home Assistant.
+Install through HACS as a custom repository:
+1. Add `https://github.com/teh-hippo/ha-home-rules` as an **Integration** repository.
+2. Install **Home Rules**.
+3. Restart Home Assistant.
 
-## Setup
+## Configure
 
-Add the **Home Rules** integration in Home Assistant and follow the prompts to select your entities and tune options.
+Add **Home Rules** from Settings -> Devices & Services, select your entities, then tune options.
 
-## How it works
-
-Home Rules watches your climate + sensor inputs (solar, grid usage, temperature, humidity) and runs a small rules engine. In **Dry Run** it only reports decisions; in **Live/Aggressive** it applies changes to your climate entity, and can optionally notify a `notify.*` target on mode changes.
-
-## Control Mode
 `select.home_rules_control_mode` defaults to **Dry Run** for safe setup. Switch to **Live** once you're happy with decisions and want the integration to control your climate entity.
 
 ## Development
 
-Run all checks (manifest key ordering, ruff, mypy, pytest) with:
+Run local validation with:
 
 ```bash
 bash scripts/check.sh
 ```
 
-Requires [uv](https://docs.astral.sh/uv/) — no manual venv setup needed.
+`check.sh` verifies manifest key ordering plus ruff, mypy, and pytest (requires [uv](https://docs.astral.sh/uv/)).
 
 ### Pre-push CI checklist
 
-Use this exact flow before every push to reduce CI failures:
+Use this exact flow before every push:
 
 ```bash
 git pull --rebase origin master
@@ -51,6 +49,9 @@ gh run watch --workflow Validate --exit-status
 
 If the push rebases onto new commits, run `bash scripts/check.sh` again before pushing.
 
-`Validate` currently runs HACS as non-blocking while `brands` assets are pending upstream; `hassfest` and tests remain blocking.
+`Validate` currently treats HACS as informational while `brands` assets are pending upstream; `hassfest` and tests remain blocking.
 
-Common CI pitfall: hassfest requires manifest keys to be ordered as `domain`, `name`, then alphabetical keys. `bash scripts/check.sh` now enforces this locally before push.
+## Release process
+
+Releases are created by `.github/workflows/release.yml` after **Validate** succeeds on `master`.
+Use conventional commits; `fix`, `perf`, and `build` commits trigger patch releases via semantic-release.
