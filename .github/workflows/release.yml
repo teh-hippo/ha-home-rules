@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  push:
+  workflow_run:
+    workflows: [ Validate ]
+    types: [ completed ]
     branches: [ master ]
 
 concurrency:
@@ -11,6 +13,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: write
       id-token: write
