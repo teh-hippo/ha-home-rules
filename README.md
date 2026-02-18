@@ -27,3 +27,13 @@ Home Rules watches your climate + sensor inputs (solar, grid usage, temperature,
 
 ## Control Mode
 `select.home_rules_control_mode` defaults to **Dry Run** for safe setup. Switch to **Live** once you're happy with decisions and want the integration to control your climate entity.
+
+## Development
+
+Run all checks (ruff, mypy, pytest) with:
+
+```bash
+bash scripts/check.sh
+```
+
+Requires [uv](https://docs.astral.sh/uv/) — no manual venv setup needed.
