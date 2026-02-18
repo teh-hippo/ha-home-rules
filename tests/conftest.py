@@ -82,3 +82,47 @@ else:
             return coordinator
 
         return _make
+
+    @pytest.fixture
+    def mock_entry(hass):
+        """Create a MockConfigEntry with default Home Rules input entities."""
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        from custom_components.home_rules.const import (
+            CONF_CLIMATE_ENTITY_ID,
+            CONF_GENERATION_ENTITY_ID,
+            CONF_GRID_ENTITY_ID,
+            CONF_HUMIDITY_ENTITY_ID,
+            CONF_TEMPERATURE_ENTITY_ID,
+            CONF_TIMER_ENTITY_ID,
+            DOMAIN,
+        )
+
+        hass.states.async_set("climate.test", "off")
+        hass.states.async_set("timer.test", "idle")
+        hass.states.async_set("sensor.generation", "6000", {"unit_of_measurement": "W"})
+        hass.states.async_set("sensor.grid", "0", {"unit_of_measurement": "W"})
+        hass.states.async_set("sensor.temperature", "25", {"unit_of_measurement": "°C"})
+        hass.states.async_set("sensor.humidity", "40", {"unit_of_measurement": "%"})
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={
+                CONF_CLIMATE_ENTITY_ID: "climate.test",
+                CONF_TIMER_ENTITY_ID: "timer.test",
+                CONF_GENERATION_ENTITY_ID: "sensor.generation",
+                CONF_GRID_ENTITY_ID: "sensor.grid",
+                CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
+                CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
+            },
+            options={},
+        )
+        entry.add_to_hass(hass)
+        return entry
+
+    @pytest.fixture
+    async def loaded_entry(hass, mock_entry):
+        """Set up Home Rules through the config entry lifecycle."""
+        assert await hass.config_entries.async_setup(mock_entry.entry_id)
+        await hass.async_block_till_done()
+        return mock_entry
