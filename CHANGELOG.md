@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.13 (2026-02-18)
+
+### Bug Fixes
+
+- Tighten README and release guidance
+  ([`61665f9`](https://github.com/teh-hippo/ha-home-rules/commit/61665f97ad0f0888fa40327147fe3b941dc7c057))
+
+
 ## v1.0.12 (2026-02-18)
 
 ### Bug Fixes
