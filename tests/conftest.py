@@ -16,3 +16,61 @@ else:
     @pytest.fixture(autouse=True)
     def _enable_custom_integrations(enable_custom_integrations):
         """Enable custom component loading in HA tests."""
+
+    @pytest.fixture
+    def coord_factory(hass):
+        """Factory fixture: creates an initialized HomeRulesCoordinator with configurable HA states.
+
+        Usage::
+
+            async def test_something(coord_factory) -> None:
+                coordinator = await coord_factory()           # default high-solar scenario
+                coordinator = await coord_factory(generation="0")  # no solar
+        """
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        from custom_components.home_rules.const import (
+            CONF_CLIMATE_ENTITY_ID,
+            CONF_GENERATION_ENTITY_ID,
+            CONF_GRID_ENTITY_ID,
+            CONF_HUMIDITY_ENTITY_ID,
+            CONF_TEMPERATURE_ENTITY_ID,
+            CONF_TIMER_ENTITY_ID,
+            DOMAIN,
+        )
+        from custom_components.home_rules.coordinator import HomeRulesCoordinator
+
+        async def _make(
+            *,
+            generation: str = "6000",
+            grid: str = "0",
+            temperature: str = "25",
+            humidity: str = "40",
+            climate: str = "off",
+            timer: str = "idle",
+            options: dict | None = None,
+            extra_data: dict | None = None,
+        ) -> HomeRulesCoordinator:
+            hass.states.async_set("climate.test", climate)
+            hass.states.async_set("timer.test", timer)
+            hass.states.async_set("sensor.generation", generation, {"unit_of_measurement": "W"})
+            hass.states.async_set("sensor.grid", grid, {"unit_of_measurement": "W"})
+            hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
+            hass.states.async_set("sensor.humidity", humidity, {"unit_of_measurement": "%"})
+
+            data = {
+                CONF_CLIMATE_ENTITY_ID: "climate.test",
+                CONF_TIMER_ENTITY_ID: "timer.test",
+                CONF_GENERATION_ENTITY_ID: "sensor.generation",
+                CONF_GRID_ENTITY_ID: "sensor.grid",
+                CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
+                CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
+                **(extra_data or {}),
+            }
+            entry = MockConfigEntry(domain=DOMAIN, data=data, options=options or {})
+            entry.add_to_hass(hass)
+            coordinator = HomeRulesCoordinator(hass, entry)
+            await coordinator.async_initialize()
+            return coordinator
+
+        return _make
