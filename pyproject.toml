@@ -6,6 +6,16 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
 
+[dependency-groups]
+dev = [
+    "coverage>=7.0",
+    "mypy>=1.15",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-homeassistant-custom-component>=0.13",
+    "ruff>=0.9",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
@@ -42,7 +52,6 @@ commit_message = "chore(release): {version}"
 tag_format = "v{version}"
 
 [tool.semantic_release.commit_parser_options]
-# Treat dependency update merges (Dependabot uses `build(deps): ...`) as patch releases.
 patch_tags = ["fix", "perf", "build"]
 other_allowed_tags = ["chore", "ci", "docs", "style", "refactor", "test"]
 
@@ -51,8 +60,6 @@ match = "master"
 prerelease = false
 
 [tool.semantic_release.changelog]
-# PSR v10 defaults to `mode="update"` which requires an insertion flag in the changelog.
-# Keep the changelog fully generated on each release for predictable results.
 mode = "init"
 
 [tool.semantic_release.changelog.default_templates]

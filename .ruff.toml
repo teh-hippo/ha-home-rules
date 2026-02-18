@@ -3,17 +3,17 @@ line-length = 120
 
 [lint]
 select = [
-    "B",
-    "E",
-    "F",
-    "I",
-    "N",
-    "S",
-    "UP",
-    "W",
+    "B",   # flake8-bugbear
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "S",   # flake8-bandit
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
 ]
 ignore = [
-    "S101",
+    "S101",  # assert used (fine in tests)
 ]
 
 [lint.isort]

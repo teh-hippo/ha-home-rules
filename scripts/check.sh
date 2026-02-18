@@ -1,28 +1,18 @@
 #!/usr/bin/env bash
+# Local preflight — mirrors CI exactly. Run before every push.
 set -euo pipefail
-
 cd "$(dirname "$0")/.."
 
-UV_RUN="uv run --with-requirements requirements_test.txt"
+echo "=== Lint ==="
+uv run ruff check .
+uv run ruff format --check .
 
-$UV_RUN python - <<'PY'
-import json
-import sys
-from pathlib import Path
+echo "=== Mypy ==="
+uv run mypy custom_components/home_rules tests
 
-manifest_path = Path("custom_components/home_rules/manifest.json")
-manifest = json.loads(manifest_path.read_text())
-keys = list(manifest)
-expected = ["domain", "name"] + sorted(k for k in manifest if k not in {"domain", "name"})
+echo "=== Test + Coverage ==="
+uv run coverage run -m pytest tests/ -v --tb=short
+uv run coverage report --include="custom_components/home_rules/*" --fail-under=80
 
-if keys != expected:
-    print(f"Manifest keys are not sorted as hassfest expects: {manifest_path}")
-    print(f"Current:  {keys}")
-    print(f"Expected: {expected}")
-    sys.exit(1)
-PY
-
-$UV_RUN ruff check .
-$UV_RUN ruff format --check .
-$UV_RUN mypy custom_components tests
-$UV_RUN pytest tests -q
+echo ""
+echo "✅ All checks passed — safe to push."

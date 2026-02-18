@@ -29,30 +29,8 @@ Add **Home Rules** from Settings -> Devices & Services, select your entities, th
 
 ## Development
 
-Run local validation with:
-
 ```bash
 bash scripts/check.sh
 ```
 
-`check.sh` verifies manifest key ordering plus ruff, mypy, and pytest (requires [uv](https://docs.astral.sh/uv/)).
-
-### Pre-push CI checklist
-
-Use this exact flow before every push:
-
-```bash
-git pull --rebase origin master
-bash scripts/check.sh
-git push
-gh run watch --workflow Validate --exit-status
-```
-
-If the push rebases onto new commits, run `bash scripts/check.sh` again before pushing.
-
-`Validate` currently treats HACS as informational while `brands` assets are pending upstream; `hassfest` and tests remain blocking.
-
-## Release process
-
-Releases are created by `.github/workflows/release.yml` after **Validate** succeeds on `master`.
-Use conventional commits; `fix`, `perf`, and `build` commits trigger patch releases via semantic-release.
+Requires [uv](https://docs.astral.sh/uv/). Uses [Conventional Commits](https://www.conventionalcommits.org/).
