@@ -667,3 +667,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _clear_issue(self, suffix: str) -> None:
         ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(suffix))
+
+
+type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]

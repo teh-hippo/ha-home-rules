@@ -5,17 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import HomeRulesCoordinator
-
-type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
+from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
+from .entity import HomeRulesEntity
 
 
 @dataclass(frozen=True)
@@ -48,10 +44,8 @@ async def async_setup_entry(
     async_add_entities(HomeRulesBinarySensor(entry, coordinator, description) for description in BINARY_SENSORS)
 
 
-class HomeRulesBinarySensor(CoordinatorEntity[HomeRulesCoordinator], BinarySensorEntity):
+class HomeRulesBinarySensor(HomeRulesEntity, BinarySensorEntity):
     """Coordinator-backed binary sensor."""
-
-    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -59,14 +53,13 @@ class HomeRulesBinarySensor(CoordinatorEntity[HomeRulesCoordinator], BinarySenso
         coordinator: HomeRulesCoordinator,
         description: BinaryDescription,
     ) -> None:
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_suggested_object_id = f"{DOMAIN}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Home Rules",
+        super().__init__(
+            entry,
+            coordinator,
+            unique_id_suffix=description.key,
+            object_id=f"{DOMAIN}_{description.key}",
         )
+        self.entity_description = description
 
     @property
     def is_on(self) -> bool:

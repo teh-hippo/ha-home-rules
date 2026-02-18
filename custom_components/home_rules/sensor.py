@@ -7,18 +7,14 @@ from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .coordinator import HomeRulesCoordinator
-
-type HomeRulesConfigEntry = ConfigEntry[HomeRulesCoordinator]
+from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
+from .entity import HomeRulesEntity
 
 
 @dataclass(frozen=True)
@@ -80,10 +76,8 @@ async def async_setup_entry(
     async_add_entities(HomeRulesSensor(entry, coordinator, description) for description in SENSORS)
 
 
-class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
+class HomeRulesSensor(HomeRulesEntity, SensorEntity):
     """Coordinator-backed sensor entity."""
-
-    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -91,14 +85,13 @@ class HomeRulesSensor(CoordinatorEntity[HomeRulesCoordinator], SensorEntity):
         coordinator: HomeRulesCoordinator,
         description: SensorDescription,
     ) -> None:
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_suggested_object_id = description.object_id or f"{DOMAIN}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Home Rules",
+        super().__init__(
+            entry,
+            coordinator,
+            unique_id_suffix=description.key,
+            object_id=description.object_id or f"{DOMAIN}_{description.key}",
         )
+        self.entity_description = description
 
     @property
     def native_value(self) -> str | datetime | None:
