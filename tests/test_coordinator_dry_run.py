@@ -62,3 +62,33 @@ async def test_timer_countdown_is_off_when_timer_idle(coord_factory) -> None:
     coordinator = await coord_factory()  # timer="idle" by default
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.timer_finishes_at is None
+
+
+async def test_timer_countdown_falls_back_to_remaining_when_finishes_at_invalid(coord_factory) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    # Timer is active with both finishes_at and remaining, but finishes_at is unparseable
+    coordinator = await coord_factory(
+        timer="active",
+        timer_attributes={"finishes_at": "invalid-date-format", "remaining": "0:03:30"},
+    )
+    await coordinator.async_run_evaluation("poll")
+    result = coordinator.data.timer_finishes_at
+    assert isinstance(result, datetime)
+    expected = datetime.now(tz=UTC) + timedelta(minutes=3, seconds=30)
+    assert abs((result - expected).total_seconds()) < 5
+
+
+async def test_timer_countdown_uses_finishes_at_when_valid(coord_factory) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    # Timer is active with valid finishes_at attribute
+    finish_time = datetime.now(tz=UTC) + timedelta(minutes=5)
+    coordinator = await coord_factory(
+        timer="active",
+        timer_attributes={"finishes_at": finish_time.isoformat()},
+    )
+    await coordinator.async_run_evaluation("poll")
+    result = coordinator.data.timer_finishes_at
+    assert isinstance(result, datetime)
+    assert abs((result - finish_time).total_seconds()) < 1

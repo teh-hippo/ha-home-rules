@@ -440,7 +440,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if str(timer_state.state).lower() in {"idle", "cancelled"}:
             return None
         if finishes_at := timer_state.attributes.get("finishes_at"):
-            return dt_util.parse_datetime(str(finishes_at))
+            if parsed := dt_util.parse_datetime(str(finishes_at)):
+                return parsed
         if (remaining := timer_state.attributes.get("remaining")) in (None, ""):
             return None
         if len(parts := str(remaining).split(":")) != 3:
