@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v1.1.1 (2026-02-19)
+
+### Bug Fixes
+
+- Mark test-coverage quality scale as done
+  ([`a5dd278`](https://github.com/teh-hippo/ha-home-rules/commit/a5dd278cd85b9b7625fe13f883ec883db0e4245d))
+
+### Continuous Integration
+
+- Add conventional commit validation to PR checks
+  ([`d1e95f0`](https://github.com/teh-hippo/ha-home-rules/commit/d1e95f07f6c1e734ef5b5aa8d0dca4a1f66f9dab))
+
+- Improve commit pattern and error message clarity
+  ([`f90cf84`](https://github.com/teh-hippo/ha-home-rules/commit/f90cf846ee9561045db1153afe33fcfb67e0d650))
+
+### Documentation
+
+- Remove "starts in dry run" mention from README
+  ([`33dbb83`](https://github.com/teh-hippo/ha-home-rules/commit/33dbb83a2e89b76b4f0fc6e57434050d0ecb32e8))
+
+
 ## v1.1.0 (2026-02-19)
 
 ### Bug Fixes
