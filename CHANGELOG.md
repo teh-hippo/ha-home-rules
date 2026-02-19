@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.1.2 (2026-02-19)
+
+### Bug Fixes
+
+- Avoid runtime issue on startup retries
+  ([`98154cc`](https://github.com/teh-hippo/ha-home-rules/commit/98154ccbc75c223e6bba1635804bcbfb7cbeb7d9))
+
+
 ## v1.1.1 (2026-02-19)
 
 ### Bug Fixes
