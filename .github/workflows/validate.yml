@@ -26,7 +26,7 @@ jobs:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          pattern='^(feat|fix|perf|build|chore|ci|docs|style|refactor|test)(\(.+\))?!?: .+'
+          pattern='^(feat|fix|perf|build|chore|ci|docs|style|refactor|test)(\([^)]+\))?!?: .+'
           fail=0
           for sha in $(git rev-list "$PR_BASE".."$PR_HEAD"); do
             msg=$(git log -1 --format=%s "$sha")
@@ -37,7 +37,7 @@ jobs:
           done
           if [ "$fail" -ne 0 ]; then
             echo ""
-            echo "Commit messages must follow Conventional Commits: type(scope): description"
+            echo "Commit messages must follow Conventional Commits: type[(scope)]: description"
             echo "Allowed types: feat, fix, perf, build, chore, ci, docs, style, refactor, test"
             exit 1
           fi
