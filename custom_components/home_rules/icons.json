@@ -1,0 +1,50 @@
+{
+  "entity": {
+    "sensor": {
+      "mode": {
+        "default": "mdi:home-automation"
+      },
+      "current": {
+        "default": "mdi:information-outline"
+      },
+      "adjustment": {
+        "default": "mdi:flash"
+      },
+      "decision": {
+        "default": "mdi:comment-question-outline"
+      },
+      "last_evaluated": {
+        "default": "mdi:clock-outline"
+      },
+      "last_changed": {
+        "default": "mdi:clock-check-outline"
+      },
+      "timer_finishes_at": {
+        "default": "mdi:timer-outline"
+      }
+    },
+    "binary_sensor": {
+      "solar_available": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "auto_mode": {
+        "default": "mdi:autorenew"
+      }
+    },
+    "select": {
+      "control_mode": {
+        "default": "mdi:tune-variant"
+      }
+    },
+    "switch": {
+      "cooling_enabled": {
+        "default": "mdi:snowflake"
+      }
+    },
+    "button": {
+      "evaluate_now": {
+        "default": "mdi:play-circle-outline"
+      }
+    }
+  }
+}
