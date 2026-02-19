@@ -13,7 +13,6 @@ Solar-aware aircon automation for Home Assistant.
 
 ## Features
 
-- Starts safe in **Dry Run** mode so you can validate behavior first.
 - Uses one **Control Mode** selector (**Disabled / Dry Run / Live / Aggressive**).
 - Exposes decision sensors so you can see why a mode/action was chosen.
 - Can optionally send mode-change alerts to a `notify.*` target.
