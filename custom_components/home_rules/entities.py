@@ -165,7 +165,7 @@ class HomeRulesBinarySensor(HomeRulesEntity, BinarySensorEntity):
 
 
 class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
-    _attr_name = "Control Mode"
+    _attr_translation_key = "control_mode"
     _attr_options = [mode.value for mode in ControlMode]
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:tune-variant"
@@ -182,7 +182,7 @@ class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
 
 
 class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
-    _attr_name = "Cooling Enabled"
+    _attr_translation_key = "cooling_enabled"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:snowflake"
 
@@ -201,7 +201,7 @@ class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
 
 
 class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
-    _attr_name = "Evaluate Now"
+    _attr_translation_key = "evaluate_now"
 
     def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator) -> None:
         super().__init__(entry, coordinator, unique_id_suffix="evaluate", object_id=f"{DOMAIN}_evaluate_now")
