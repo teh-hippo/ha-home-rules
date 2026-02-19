@@ -1,6 +1,78 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-02-19)
+
+### Bug Fixes
+
+- Classify integration as helper
+  ([`3a36cf4`](https://github.com/teh-hippo/ha-home-rules/commit/3a36cf4d09503440f3bcdaaf8dfa10f19ad44212))
+
+- Localize coordinator update failures
+  ([`fd45f77`](https://github.com/teh-hippo/ha-home-rules/commit/fd45f7788e7fb55ba512b76c37c3644578c2668e))
+
+- Use const domain in update failure translation
+  ([`05a74de`](https://github.com/teh-hippo/ha-home-rules/commit/05a74de8c55d99c5beae8616a2887b9f35bc0729))
+
+- Use translation keys for control entities
+  ([`cadf221`](https://github.com/teh-hippo/ha-home-rules/commit/cadf221133777762313c1eaf946645c7b3b4767c))
+
+### Chores
+
+- Track uv lockfile
+  ([`fe9193a`](https://github.com/teh-hippo/ha-home-rules/commit/fe9193a9845d730664aeab5474edaeb06351b9d2))
+
+### Continuous Integration
+
+- Minimal 4-line .gitignore
+  ([`8398bb0`](https://github.com/teh-hippo/ha-home-rules/commit/8398bb09daea03b1526da2cb039820dc6c164ef9))
+
+- Remove uv.lock from gitignore
+  ([`d55d5a2`](https://github.com/teh-hippo/ha-home-rules/commit/d55d5a296498864add271f428933955c67ca7005))
+
+### Documentation
+
+- Standardize section naming
+  ([`24f8d4e`](https://github.com/teh-hippo/ha-home-rules/commit/24f8d4ebf2cc6f76e128065fa374b82dc502a988))
+
+- Standardize status badge set
+  ([`e55dda3`](https://github.com/teh-hippo/ha-home-rules/commit/e55dda31b9af884b3ee5cfaf99323b8e9873bc57))
+
+### Features
+
+- Add entity icon mappings
+  ([`4fbdc28`](https://github.com/teh-hippo/ha-home-rules/commit/4fbdc28cc1bedfacea59f26eb8171d372449bdd1))
+
+- Add entity translations for UI controls
+  ([`89352f5`](https://github.com/teh-hippo/ha-home-rules/commit/89352f562a351fce8f93a971ad57cf78c6a9f6b5))
+
+- Add quality scale declaration
+  ([`aad1214`](https://github.com/teh-hippo/ha-home-rules/commit/aad1214bfeef8047214e8a2ca0f6b9c810f4137e))
+
+- Declare parallel updates for platforms
+  ([`8481b91`](https://github.com/teh-hippo/ha-home-rules/commit/8481b91b4e0364e74de1442f5a7d42ff0e802865))
+
+### Refactoring
+
+- Add coverage config section
+  ([`77b3687`](https://github.com/teh-hippo/ha-home-rules/commit/77b3687f8b99395a724984df0f3dd03fa60eb862))
+
+- Align mypy test override codes
+  ([`bcab8be`](https://github.com/teh-hippo/ha-home-rules/commit/bcab8be0610ee67626d618fc9eac966efe372a0e))
+
+- Drop redundant mypy warn_return_any
+  ([`416ce5b`](https://github.com/teh-hippo/ha-home-rules/commit/416ce5b1e9bf17639ed202b61f08731737e68530))
+
+- Remove empty manifest requirements
+  ([`368f68e`](https://github.com/teh-hippo/ha-home-rules/commit/368f68eae975875e0f506c6c134ed42e80815244))
+
+- Simplify hacs metadata
+  ([`aa8b6ea`](https://github.com/teh-hippo/ha-home-rules/commit/aa8b6ea725785e7a42f02bb88a364f43cc6ffd73))
+
+- Use SPDX license string
+  ([`d686c7a`](https://github.com/teh-hippo/ha-home-rules/commit/d686c7ad6a1a042afe024dfa11494457a5b1f6bc))
+
+
 ## v1.0.15 (2026-02-18)
 
 ### Bug Fixes
