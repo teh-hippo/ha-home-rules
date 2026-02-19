@@ -3,7 +3,7 @@ name = "ha-home-rules"
 version = "1.0.15"
 description = "Home Assistant custom integration for solar-aware aircon automation"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.12"
 
 [dependency-groups]
