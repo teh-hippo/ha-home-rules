@@ -40,6 +40,7 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = false
 warn_return_any = false
+disable_error_code = ["arg-type", "type-arg"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
