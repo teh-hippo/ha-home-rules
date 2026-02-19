@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.1.3 (2026-02-19)
+
+### Bug Fixes
+
+- Lock manifest metadata classification
+  ([`2067be2`](https://github.com/teh-hippo/ha-home-rules/commit/2067be2b1d426491db0bcfb5a05db13baaa2632f))
+
+
 ## v1.1.2 (2026-02-19)
 
 ### Bug Fixes
