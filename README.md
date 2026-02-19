@@ -11,7 +11,7 @@
 
 Solar-aware aircon automation for Home Assistant.
 
-## What it does
+## Features
 
 - Starts safe in **Dry Run** mode so you can validate behavior first.
 - Uses one **Control Mode** selector (**Disabled / Dry Run / Live / Aggressive**).
@@ -19,14 +19,14 @@ Solar-aware aircon automation for Home Assistant.
 - Can optionally send mode-change alerts to a `notify.*` target.
 - Runtime integration code is intentionally compact to keep maintenance overhead low.
 
-## Install
+## Installation
 
 Install through HACS as a custom repository:
 1. Add `https://github.com/teh-hippo/ha-home-rules` as an **Integration** repository.
 2. Install **Home Rules**.
 3. Restart Home Assistant.
 
-## Configure
+## Configuration
 
 Add **Home Rules** from Settings -> Devices & Services, select your entities, then tune options.
 
@@ -39,6 +39,16 @@ bash scripts/check.sh
 ```
 
 Requires [uv](https://docs.astral.sh/uv/). Uses [Conventional Commits](https://www.conventionalcommits.org/).
+
+## Troubleshooting
+
+- Verify all configured entities exist and are available.
+- Keep Control Mode in **Dry Run** until behavior matches expectations.
+- Check Home Assistant logs for `home_rules` issues.
+
+## License
+
+MIT
 
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
 [hacs-url]: https://github.com/hacs/integration
