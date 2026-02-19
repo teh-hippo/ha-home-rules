@@ -13,6 +13,36 @@ permissions:
   contents: read
 
 jobs:
+  commits:
+    name: Commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate conventional commits
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pattern='^(feat|fix|perf|build|chore|ci|docs|style|refactor|test)(\(.+\))?!?: .+'
+          fail=0
+          for sha in $(git rev-list "$PR_BASE".."$PR_HEAD"); do
+            msg=$(git log -1 --format=%s "$sha")
+            if ! echo "$msg" | grep -qE "$pattern"; then
+              echo "❌ $msg"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "Commit messages must follow Conventional Commits: type(scope): description"
+            echo "Allowed types: feat, fix, perf, build, chore, ci, docs, style, refactor, test"
+            exit 1
+          fi
+          echo "✅ All commit messages follow Conventional Commits"
+
   hassfest:
     name: Hassfest
     runs-on: ubuntu-latest
