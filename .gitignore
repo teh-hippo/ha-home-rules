@@ -1,12 +1,4 @@
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
 .venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+.*_cache/
 .coverage
-htmlcov/
-.DS_Store
