@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfPower, UnitOfTemperature
 from homeassistant.core import HomeAssistant, State
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -80,6 +80,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._controls = ControlState()
         self._auto_mode = False
         self._initialized = False
+        # Track first refresh to handle entity dependencies at startup.
+        # This flag is never reset because coordinator instances are not reused;
+        # each reload creates a new coordinator instance.
+        self._first_refresh_done = False
         self._recent: deque[dict[str, Any]] = deque(maxlen=c.MAX_RECENT_EVALUATIONS)
         self._last_changed: str | None = None
         self._store: Store[dict[str, Any]] = Store(hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
@@ -175,6 +179,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _async_update_data(self) -> CoordinatorData:
         try:
             return await self._evaluate("poll")
+        except ConfigEntryNotReady:
+            raise
         except Exception as err:  # noqa: BLE001
             self._create_issue(c.ISSUE_RUNTIME, "runtime_error", {"error": str(err)})
             raise UpdateFailed(
@@ -241,6 +247,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self.hass.bus.async_fire(c.EVENT_EVALUATION, record)
             for issue in (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE):
                 self._clear_issue(issue)
+
+            # Mark first refresh as complete after successful evaluation
+            self._first_refresh_done = True
 
             return CoordinatorData(
                 mode=mode,
@@ -398,6 +407,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _get_state(self, entity_id: str, label: str, *, allow_unavailable: bool = False) -> State:
         state = self.hass.states.get(entity_id)
         if state is None:
+            # During first refresh, raise ConfigEntryNotReady for required entities
+            # so HA will retry setup instead of creating repair issues
+            if not self._first_refresh_done and not allow_unavailable:
+                raise ConfigEntryNotReady(f"Required entity not yet available: {entity_id}")
             self._create_issue(c.ISSUE_ENTITY_MISSING, "entity_missing", {"entity_id": entity_id, "label": label})
             raise ValueError(f"missing entity: {entity_id}")
 
@@ -405,6 +418,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if raw in {"unknown", "unavailable"} and allow_unavailable:
             return self._fallback_state(entity_id, label, state)
         if raw in {"unknown", "unavailable"}:
+            # During first refresh, raise ConfigEntryNotReady for required entities
+            # so HA will retry setup instead of creating repair issues
+            if not self._first_refresh_done:
+                raise ConfigEntryNotReady(f"Required entity not yet available: {entity_id}")
             self._create_issue(
                 c.ISSUE_ENTITY_UNAVAILABLE,
                 "entity_unavailable",
