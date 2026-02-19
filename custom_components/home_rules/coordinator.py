@@ -177,7 +177,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return await self._evaluate("poll")
         except Exception as err:  # noqa: BLE001
             self._create_issue(c.ISSUE_RUNTIME, "runtime_error", {"error": str(err)})
-            raise UpdateFailed(str(err)) from err
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:

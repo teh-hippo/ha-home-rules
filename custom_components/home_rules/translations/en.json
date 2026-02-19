@@ -86,5 +86,10 @@
       "title": "Notifications misconfigured",
       "description": "Notify service **{service}** is not available. Select a valid notification service in Home Rules options."
     }
+  },
+  "exceptions": {
+    "update_failed": {
+      "message": "Failed to evaluate Home Rules: {error}"
+    }
   }
 }
