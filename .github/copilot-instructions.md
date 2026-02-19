@@ -93,7 +93,7 @@ CI validates commit messages via `.github/workflows/validate.yml`.
 ## Home Assistant Integration Specifics
 
 ### Manifest Requirements
-- **Integration Type**: Must be `"service"` so it appears under Integrations (not Helpers)
+- **Integration Type**: The `integration_type` field must be `"service"` so it appears under Integrations (not Helpers)
 - **Keys Must Be Sorted**: hassfest requires alphabetically sorted keys in `manifest.json`
 - **File**: `custom_components/home_rules/manifest.json`
 
@@ -170,8 +170,7 @@ DO NOT manually:
 
 ### Git/Release Issues
 - **Commit format is critical**: Invalid format will fail CI and prevent releases
-- **Don't force push**: Not available in this environment
-- **Don't rebase**: Not available in this environment
+- **Don't force push or rebase**: The master branch is protected; force pushes are not allowed
 - **No manual version changes**: Let semantic-release handle it
 
 ### Home Assistant Specifics
