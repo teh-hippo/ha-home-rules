@@ -87,6 +87,23 @@
       "description": "Notify service **{service}** is not available. Select a valid notification service in Home Rules options."
     }
   },
+  "entity": {
+    "select": {
+      "control_mode": {
+        "name": "Control Mode"
+      }
+    },
+    "switch": {
+      "cooling_enabled": {
+        "name": "Cooling Enabled"
+      }
+    },
+    "button": {
+      "evaluate_now": {
+        "name": "Evaluate Now"
+      }
+    }
+  },
   "exceptions": {
     "update_failed": {
       "message": "Failed to evaluate Home Rules: {error}"
