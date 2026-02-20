@@ -516,3 +516,66 @@ def test_explain_manual_no_solar_timer_active() -> None:
     """Manual mode with no solar but timer already active returns 'No change'."""
     home = default_input(aircon_mode=AirconMode.COOL, auto=False, have_solar=False, timer=True)
     assert explain(TEST_PARAMS, home, CachedState()) == "No change"
+
+
+def test_explain_disabled() -> None:
+    assert explain(TEST_PARAMS, default_input(enabled=False), CachedState()) == "Disabled"
+
+
+def test_explain_unknown_aircon_mode() -> None:
+    assert explain(TEST_PARAMS, default_input(aircon_mode=AirconMode.UNKNOWN), CachedState()) == "Unknown aircon mode"
+
+
+def test_explain_reactivate_delay() -> None:
+    assert explain(TEST_PARAMS, default_input(), CachedState(reactivate_delay=1)) == "Waiting reactivate delay"
+
+
+def test_explain_cooling_disabled() -> None:
+    assert explain(TEST_PARAMS, default_input(cooling_enabled=False), CachedState()) == "Cooling disabled"
+
+
+def test_explain_temperature_below_threshold() -> None:
+    home = default_input(temperature=TEST_PARAMS.temperature_threshold - 1)
+    assert explain(TEST_PARAMS, home, CachedState()) == "Temperature below threshold"
+
+
+def test_explain_auto_idle() -> None:
+    home = default_input(auto=True, generation=0.0)
+    assert explain(TEST_PARAMS, home, CachedState()) == "Auto idle"
+
+
+def test_explain_timer_cleared() -> None:
+    home = default_input(timer=False)
+    assert explain(TEST_PARAMS, home, CachedState(last=HomeOutput.TIMER)) == "Timer cleared (reset)"
+
+
+def test_explain_off_no_change() -> None:
+    assert explain(TEST_PARAMS, default_input(), CachedState()) == "No change"
+
+
+def test_explain_auto_grid_usage_tolerated() -> None:
+    home = default_input(aircon_mode=AirconMode.COOL, auto=True, grid_usage=100.0, generation=0.0)
+    state = CachedState(tolerated=0)
+    assert explain(TEST_PARAMS, home, state) == "Grid usage tolerated"
+
+
+def test_explain_auto_grid_usage_too_high() -> None:
+    home = default_input(aircon_mode=AirconMode.COOL, auto=True, grid_usage=100.0, generation=0.0)
+    state = CachedState(tolerated=TEST_PARAMS.grid_usage_delay - 1)
+    assert explain(TEST_PARAMS, home, state) == "Grid usage too high (turn off)"
+
+
+def test_explain_solar_no_change() -> None:
+    home = default_input(aircon_mode=AirconMode.COOL, have_solar=True, grid_usage=0.0, generation=0.0)
+    assert explain(TEST_PARAMS, home, CachedState()) == "No change"
+
+
+def test_explain_activation_reason_returned() -> None:
+    home = default_input(
+        aircon_mode=AirconMode.OFF,
+        auto=True,
+        have_solar=True,
+        grid_usage=0.0,
+        generation=TEST_PARAMS.generation_cool_threshold + 1,
+    )
+    assert explain(TEST_PARAMS, home, CachedState()) == "Solar above cool threshold"
