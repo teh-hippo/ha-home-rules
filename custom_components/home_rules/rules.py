@@ -189,7 +189,7 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
                 if (state.tolerated + 1) < config.grid_usage_delay
                 else "Grid usage too high (turn off)"
             )
-        return "Manual mode (start timer)" if not home.timer else "No change"
+        return "Manual" if not home.timer else "No change"
 
     if home.auto and (reason := _activation_reason(config, home)):
         return reason
