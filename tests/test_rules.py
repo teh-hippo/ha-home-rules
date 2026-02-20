@@ -11,6 +11,7 @@ from custom_components.home_rules.rules import (
     adjust,
     apply_adjustment,
     current_state,
+    explain,
 )
 
 TEST_PARAMS = RuleParameters(
@@ -497,3 +498,21 @@ def test_apply_adjustment_fails_after_allowed_failures() -> None:
     assert session.failed_to_change == 3
     assert not apply_adjustment(session, HomeOutput.OFF, HomeOutput.COOL)
     assert session.failed_to_change == 4
+
+
+def test_explain_manual_no_solar_no_timer() -> None:
+    """Manual mode with no solar and no timer active returns 'Manual'."""
+    home = default_input(aircon_mode=AirconMode.COOL, auto=False, have_solar=False, timer=False)
+    assert explain(TEST_PARAMS, home, CachedState()) == "Manual"
+
+
+def test_explain_manual_grid_usage_no_timer() -> None:
+    """Manual mode with grid usage and no timer active returns 'Manual'."""
+    home = default_input(aircon_mode=AirconMode.COOL, auto=False, grid_usage=100.0, timer=False)
+    assert explain(TEST_PARAMS, home, CachedState()) == "Manual"
+
+
+def test_explain_manual_no_solar_timer_active() -> None:
+    """Manual mode with no solar but timer already active returns 'No change'."""
+    home = default_input(aircon_mode=AirconMode.COOL, auto=False, have_solar=False, timer=True)
+    assert explain(TEST_PARAMS, home, CachedState()) == "No change"
