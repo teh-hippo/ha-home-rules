@@ -500,77 +500,77 @@ def test_apply_adjustment_fails_after_allowed_failures() -> None:
     assert session.failed_to_change == 4
 
 
-def test_explain_manual_no_solar_no_timer() -> None:
+def test_explain_manual_no_solar_no_timer():
     """Manual mode with no solar and no timer active returns 'Manual'."""
     home = default_input(aircon_mode=AirconMode.COOL, auto=False, have_solar=False, timer=False)
     assert explain(TEST_PARAMS, home, CachedState()) == "Manual"
 
 
-def test_explain_manual_grid_usage_no_timer() -> None:
+def test_explain_manual_grid_usage_no_timer():
     """Manual mode with grid usage and no timer active returns 'Manual'."""
     home = default_input(aircon_mode=AirconMode.COOL, auto=False, grid_usage=100.0, timer=False)
     assert explain(TEST_PARAMS, home, CachedState()) == "Manual"
 
 
-def test_explain_manual_no_solar_timer_active() -> None:
+def test_explain_manual_no_solar_timer_active():
     """Manual mode with no solar but timer already active returns 'No change'."""
     home = default_input(aircon_mode=AirconMode.COOL, auto=False, have_solar=False, timer=True)
     assert explain(TEST_PARAMS, home, CachedState()) == "No change"
 
 
-def test_explain_disabled() -> None:
+def test_explain_disabled():
     assert explain(TEST_PARAMS, default_input(enabled=False), CachedState()) == "Disabled"
 
 
-def test_explain_unknown_aircon_mode() -> None:
+def test_explain_unknown_aircon_mode():
     assert explain(TEST_PARAMS, default_input(aircon_mode=AirconMode.UNKNOWN), CachedState()) == "Unknown aircon mode"
 
 
-def test_explain_reactivate_delay() -> None:
+def test_explain_reactivate_delay():
     assert explain(TEST_PARAMS, default_input(), CachedState(reactivate_delay=1)) == "Waiting reactivate delay"
 
 
-def test_explain_cooling_disabled() -> None:
+def test_explain_cooling_disabled():
     assert explain(TEST_PARAMS, default_input(cooling_enabled=False), CachedState()) == "Cooling disabled"
 
 
-def test_explain_temperature_below_threshold() -> None:
+def test_explain_temperature_below_threshold():
     home = default_input(temperature=TEST_PARAMS.temperature_threshold - 1)
     assert explain(TEST_PARAMS, home, CachedState()) == "Temperature below threshold"
 
 
-def test_explain_auto_idle() -> None:
+def test_explain_auto_idle():
     home = default_input(auto=True, generation=0.0)
     assert explain(TEST_PARAMS, home, CachedState()) == "Auto idle"
 
 
-def test_explain_timer_cleared() -> None:
+def test_explain_timer_cleared():
     home = default_input(timer=False)
     assert explain(TEST_PARAMS, home, CachedState(last=HomeOutput.TIMER)) == "Timer cleared (reset)"
 
 
-def test_explain_off_no_change() -> None:
+def test_explain_off_no_change():
     assert explain(TEST_PARAMS, default_input(), CachedState()) == "No change"
 
 
-def test_explain_auto_grid_usage_tolerated() -> None:
+def test_explain_auto_grid_usage_tolerated():
     home = default_input(aircon_mode=AirconMode.COOL, auto=True, grid_usage=100.0, generation=0.0)
     state = CachedState(tolerated=0)
     assert explain(TEST_PARAMS, home, state) == "Grid usage tolerated"
 
 
-def test_explain_auto_grid_usage_too_high() -> None:
+def test_explain_auto_grid_usage_too_high():
     home = default_input(aircon_mode=AirconMode.COOL, auto=True, grid_usage=100.0, generation=0.0)
     state = CachedState(tolerated=TEST_PARAMS.grid_usage_delay - 1)
     assert explain(TEST_PARAMS, home, state) == "Grid usage too high (turn off)"
 
 
-def test_explain_solar_no_change() -> None:
+def test_explain_solar_no_change():
     home = default_input(aircon_mode=AirconMode.COOL, have_solar=True, grid_usage=0.0, generation=0.0)
     assert explain(TEST_PARAMS, home, CachedState()) == "No change"
 
 
-def test_explain_activation_reason_returned() -> None:
+def test_explain_activation_reason_returned():
     home = default_input(
         aircon_mode=AirconMode.OFF,
         auto=True,
