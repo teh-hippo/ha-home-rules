@@ -4,6 +4,7 @@ from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
 from homeassistant.components.button import ButtonEntity
+from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.components.switch import SwitchEntity
@@ -14,7 +15,20 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, ControlMode
+from .const import (
+    CONF_GENERATION_COOL_THRESHOLD,
+    CONF_GENERATION_DRY_THRESHOLD,
+    CONF_HUMIDITY_THRESHOLD,
+    CONF_TEMPERATURE_COOL,
+    CONF_TEMPERATURE_THRESHOLD,
+    DEFAULT_GENERATION_COOL_THRESHOLD,
+    DEFAULT_GENERATION_DRY_THRESHOLD,
+    DEFAULT_HUMIDITY_THRESHOLD,
+    DEFAULT_TEMPERATURE_COOL,
+    DEFAULT_TEMPERATURE_THRESHOLD,
+    DOMAIN,
+    ControlMode,
+)
 from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 
 AEC = AddEntitiesCallback
@@ -210,6 +224,109 @@ class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
         await self.coordinator.async_run_evaluation("manual")
 
 
+@dataclass(frozen=True)
+class NumberDescription(NumberEntityDescription):
+    conf_key: str = ""
+    default: float = 0.0
+    object_id: str | None = None
+
+
+NUMBERS = (
+    NumberDescription(
+        key="temperature_threshold",
+        name="Temperature Threshold",
+        icon="mdi:thermometer-alert",
+        native_min_value=0,
+        native_max_value=40,
+        native_step=0.5,
+        native_unit_of_measurement="°C",
+        entity_category=EntityCategory.CONFIG,
+        conf_key=CONF_TEMPERATURE_THRESHOLD,
+        default=DEFAULT_TEMPERATURE_THRESHOLD,
+        object_id=f"{DOMAIN}_temperature_threshold",
+    ),
+    NumberDescription(
+        key="temperature_cool",
+        name="Cool Setpoint",
+        icon="mdi:thermometer-chevron-down",
+        native_min_value=0,
+        native_max_value=40,
+        native_step=0.5,
+        native_unit_of_measurement="°C",
+        entity_category=EntityCategory.CONFIG,
+        conf_key=CONF_TEMPERATURE_COOL,
+        default=DEFAULT_TEMPERATURE_COOL,
+        object_id=f"{DOMAIN}_cool_setpoint",
+    ),
+    NumberDescription(
+        key="generation_cool_threshold",
+        name="Cool Generation Threshold",
+        icon="mdi:solar-power",
+        native_min_value=0,
+        native_max_value=20000,
+        native_step=100,
+        native_unit_of_measurement="W",
+        entity_category=EntityCategory.CONFIG,
+        conf_key=CONF_GENERATION_COOL_THRESHOLD,
+        default=DEFAULT_GENERATION_COOL_THRESHOLD,
+        object_id=f"{DOMAIN}_cool_generation_threshold",
+    ),
+    NumberDescription(
+        key="generation_dry_threshold",
+        name="Dry Generation Threshold",
+        icon="mdi:solar-power-variant",
+        native_min_value=0,
+        native_max_value=20000,
+        native_step=100,
+        native_unit_of_measurement="W",
+        entity_category=EntityCategory.CONFIG,
+        conf_key=CONF_GENERATION_DRY_THRESHOLD,
+        default=DEFAULT_GENERATION_DRY_THRESHOLD,
+        object_id=f"{DOMAIN}_dry_generation_threshold",
+    ),
+    NumberDescription(
+        key="humidity_threshold",
+        name="Humidity Threshold",
+        icon="mdi:water-percent-alert",
+        native_min_value=0,
+        native_max_value=100,
+        native_step=1,
+        native_unit_of_measurement="%",
+        entity_category=EntityCategory.CONFIG,
+        conf_key=CONF_HUMIDITY_THRESHOLD,
+        default=DEFAULT_HUMIDITY_THRESHOLD,
+        object_id=f"{DOMAIN}_humidity_threshold",
+    ),
+)
+
+
+class HomeRulesNumberEntity(HomeRulesEntity, NumberEntity):
+    _attr_mode = NumberMode.BOX
+
+    def __init__(
+        self,
+        entry: HomeRulesConfigEntry,
+        coordinator: HomeRulesCoordinator,
+        description: NumberDescription,
+    ) -> None:
+        super().__init__(
+            entry,
+            coordinator,
+            unique_id_suffix=description.key,
+            object_id=description.object_id or f"{DOMAIN}_{description.key}",
+        )
+        self.entity_description = description
+        self._conf_key = description.conf_key
+        self._default = description.default
+
+    @property
+    def native_value(self) -> float:
+        return self.coordinator.get_parameter(self._conf_key, self._default)
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.coordinator.async_set_parameter(self._conf_key, value)
+
+
 async def async_setup_sensor_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
     add_entities(HomeRulesSensor(entry, entry.runtime_data, description) for description in SENSORS)
 
@@ -228,3 +345,7 @@ async def async_setup_switch_entry(hass: HomeAssistant, entry: HCE, add_entities
 
 async def async_setup_button_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
     add_entities([HomeRulesEvaluateButton(entry, entry.runtime_data)])
+
+
+async def async_setup_number_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
+    add_entities(HomeRulesNumberEntity(entry, entry.runtime_data, description) for description in NUMBERS)

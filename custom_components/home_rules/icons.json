@@ -45,6 +45,23 @@
       "evaluate_now": {
         "default": "mdi:play-circle-outline"
       }
+    },
+    "number": {
+      "temperature_threshold": {
+        "default": "mdi:thermometer-alert"
+      },
+      "temperature_cool": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "generation_cool_threshold": {
+        "default": "mdi:solar-power"
+      },
+      "generation_dry_threshold": {
+        "default": "mdi:solar-power-variant"
+      },
+      "humidity_threshold": {
+        "default": "mdi:water-percent-alert"
+      }
     }
   }
 }
