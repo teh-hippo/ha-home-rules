@@ -177,19 +177,15 @@ def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
         if home.auto:
             return "Auto idle"
         if state.last is HomeOutput.TIMER and not home.timer:
-            return "Timer cleared (reset)"
+            return "Timer expired"
         return "No change"
 
     if not home.have_solar or home.grid_usage > 0:
         if home.auto:
             if reason := _activation_reason(config, home):
                 return reason
-            return (
-                "Grid usage tolerated"
-                if (state.tolerated + 1) < config.grid_usage_delay
-                else "Grid usage too high (turn off)"
-            )
-        return "Manual mode (start timer)" if not home.timer else "No change"
+            return "Grid usage tolerated" if (state.tolerated + 1) < config.grid_usage_delay else "Grid usage too high"
+        return "Manual" if not home.timer else "No change"
 
     if home.auto and (reason := _activation_reason(config, home)):
         return reason
