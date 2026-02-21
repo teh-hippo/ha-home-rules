@@ -88,6 +88,37 @@
     }
   },
   "entity": {
+    "sensor": {
+      "mode": {
+        "name": "Mode"
+      },
+      "current": {
+        "name": "Current State"
+      },
+      "adjustment": {
+        "name": "Action"
+      },
+      "decision": {
+        "name": "Decision"
+      },
+      "last_evaluated": {
+        "name": "Last Evaluated"
+      },
+      "last_changed": {
+        "name": "Last Changed"
+      },
+      "timer_finishes_at": {
+        "name": "Timer Countdown"
+      }
+    },
+    "binary_sensor": {
+      "solar_available": {
+        "name": "Solar Available"
+      },
+      "auto_mode": {
+        "name": "Auto Mode"
+      }
+    },
     "select": {
       "control_mode": {
         "name": "Control Mode"

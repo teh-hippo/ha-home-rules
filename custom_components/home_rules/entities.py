@@ -58,41 +58,36 @@ class SensorDescription(SensorEntityDescription):
 
 
 SENSORS = (
-    SensorDescription(key="mode", name="Mode", icon="mdi:home-automation", object_id=f"{DOMAIN}_mode"),
+    SensorDescription(key="mode", translation_key="mode", object_id=f"{DOMAIN}_mode"),
     SensorDescription(
         key="current",
-        name="Current State",
-        icon="mdi:information-outline",
+        translation_key="current",
         object_id=f"{DOMAIN}_current_state",
     ),
-    SensorDescription(key="adjustment", name="Action", icon="mdi:flash", object_id=f"{DOMAIN}_action"),
+    SensorDescription(key="adjustment", translation_key="adjustment", object_id=f"{DOMAIN}_action"),
     SensorDescription(
         key="decision",
-        name="Decision",
-        icon="mdi:comment-question-outline",
+        translation_key="decision",
         entity_category=EntityCategory.DIAGNOSTIC,
         object_id=f"{DOMAIN}_decision",
     ),
     SensorDescription(
         key="last_evaluated",
-        name="Last Evaluated",
-        icon="mdi:clock-outline",
+        translation_key="last_evaluated",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         object_id=f"{DOMAIN}_last_evaluated",
     ),
     SensorDescription(
         key="last_changed",
-        name="Last Changed",
-        icon="mdi:clock-check-outline",
+        translation_key="last_changed",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         object_id=f"{DOMAIN}_last_changed",
     ),
     SensorDescription(
         key="timer_finishes_at",
-        name="Timer Countdown",
-        icon="mdi:timer-outline",
+        translation_key="timer_finishes_at",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         object_id=f"{DOMAIN}_timer_countdown",
@@ -102,14 +97,12 @@ SENSORS = (
 BINARY_SENSORS = (
     BinarySensorEntityDescription(
         key="solar_available",
-        name="Solar Available",
-        icon="mdi:white-balance-sunny",
+        translation_key="solar_available",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     BinarySensorEntityDescription(
         key="auto_mode",
-        name="Auto Mode",
-        icon="mdi:autorenew",
+        translation_key="auto_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
@@ -182,7 +175,6 @@ class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
     _attr_translation_key = "control_mode"
     _attr_options = [mode.value for mode in ControlMode]
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:tune-variant"
 
     def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator) -> None:
         super().__init__(entry, coordinator, unique_id_suffix="control_mode", object_id=f"{DOMAIN}_control_mode")
@@ -198,7 +190,6 @@ class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
 class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
     _attr_translation_key = "cooling_enabled"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:snowflake"
 
     def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator) -> None:
         super().__init__(entry, coordinator, unique_id_suffix="cooling_enabled", object_id=f"{DOMAIN}_cooling_enabled")
@@ -234,8 +225,7 @@ class NumberDescription(NumberEntityDescription):
 NUMBERS = (
     NumberDescription(
         key="temperature_threshold",
-        name="Temperature Threshold",
-        icon="mdi:thermometer-alert",
+        translation_key="temperature_threshold",
         native_min_value=0,
         native_max_value=40,
         native_step=0.5,
@@ -247,8 +237,7 @@ NUMBERS = (
     ),
     NumberDescription(
         key="temperature_cool",
-        name="Cool Setpoint",
-        icon="mdi:thermometer-chevron-down",
+        translation_key="temperature_cool",
         native_min_value=0,
         native_max_value=40,
         native_step=0.5,
@@ -260,8 +249,7 @@ NUMBERS = (
     ),
     NumberDescription(
         key="generation_cool_threshold",
-        name="Cool Generation Threshold",
-        icon="mdi:solar-power",
+        translation_key="generation_cool_threshold",
         native_min_value=0,
         native_max_value=20000,
         native_step=100,
@@ -273,8 +261,7 @@ NUMBERS = (
     ),
     NumberDescription(
         key="generation_dry_threshold",
-        name="Dry Generation Threshold",
-        icon="mdi:solar-power-variant",
+        translation_key="generation_dry_threshold",
         native_min_value=0,
         native_max_value=20000,
         native_step=100,
@@ -286,8 +273,7 @@ NUMBERS = (
     ),
     NumberDescription(
         key="humidity_threshold",
-        name="Humidity Threshold",
-        icon="mdi:water-percent-alert",
+        translation_key="humidity_threshold",
         native_min_value=0,
         native_max_value=100,
         native_step=1,

@@ -29,3 +29,13 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
 
     assert hass.states.get("select.home_rules_control_mode").state == "Dry Run"
     assert hass.states.get("switch.home_rules_cooling_enabled").state == "on"
+
+
+async def test_all_entities_use_translation_key_not_name(hass, loaded_entry) -> None:
+    """All entity descriptions must use translation_key and not hardcoded name/icon."""
+    from custom_components.home_rules.entities import BINARY_SENSORS, NUMBERS, SENSORS
+
+    for desc in (*SENSORS, *BINARY_SENSORS, *NUMBERS):
+        assert desc.translation_key, f"{desc.key} missing translation_key"
+        assert not isinstance(desc.name, str), f"{desc.key} should not set name (use translation_key)"
+        assert desc.icon is None, f"{desc.key} should not set icon (use icons.json)"
