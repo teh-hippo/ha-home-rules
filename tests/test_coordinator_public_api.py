@@ -30,23 +30,22 @@ async def test_evaluation_produces_coordinator_data(coord_factory) -> None:
     assert coordinator.data.solar_online is True
 
 
-async def test_default_control_mode_is_dry_run(coord_factory) -> None:
-    """Coordinator starts in dry-run mode as a safety default."""
+async def test_default_control_mode_is_monitor(coord_factory) -> None:
+    """Coordinator starts in monitor mode as a safety default."""
     from custom_components.home_rules.const import ControlMode
 
     coordinator = await coord_factory()
-    assert coordinator.control_mode is ControlMode.DRY_RUN
+    assert coordinator.control_mode is ControlMode.MONITOR
 
 
-async def test_async_set_mode_live(coord_factory) -> None:
-    """async_set_mode(LIVE) transitions coordinator out of dry-run."""
+async def test_async_set_mode_solar_cooling(coord_factory) -> None:
+    """async_set_mode(SOLAR_COOLING) transitions coordinator out of monitor mode."""
     from custom_components.home_rules.const import ControlMode
 
-    # Zero generation avoids climate service calls while in live mode.
     coordinator = await coord_factory(generation="0")
-    await coordinator.async_set_mode(ControlMode.LIVE)
+    await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
 
-    assert coordinator.control_mode is ControlMode.LIVE
+    assert coordinator.control_mode is ControlMode.SOLAR_COOLING
     assert coordinator.data.dry_run is False
 
 

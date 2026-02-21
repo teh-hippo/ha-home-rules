@@ -27,7 +27,7 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
     for entity_id in entity_ids:
         assert hass.states.get(entity_id) is not None
 
-    assert hass.states.get("select.home_rules_control_mode").state == "Dry Run"
+    assert hass.states.get("select.home_rules_control_mode").state == "monitor"
     assert hass.states.get("switch.home_rules_cooling_enabled").state == "on"
 
 

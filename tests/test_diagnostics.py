@@ -14,5 +14,5 @@ async def test_diagnostics_contains_expected_sections(hass, loaded_entry) -> Non
     diagnostics = await async_get_config_entry_diagnostics(hass, loaded_entry)
 
     assert set(diagnostics) == {"config", "options", "controls", "session", "recent_evaluations"}
-    assert diagnostics["controls"]["mode"] == "Dry Run"
+    assert diagnostics["controls"]["mode"] == "monitor"
     assert isinstance(diagnostics["recent_evaluations"], list)

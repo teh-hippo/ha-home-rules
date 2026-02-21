@@ -62,3 +62,26 @@ async def test_timer_countdown_is_off_when_timer_idle(coord_factory) -> None:
     coordinator = await coord_factory()  # timer="idle" by default
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.timer_finishes_at is None
+
+
+async def test_legacy_control_mode_values_migrate_on_reload(hass, coord_factory) -> None:
+    """Old string mode values (e.g. 'Dry Run', 'Live') are mapped to new enum values."""
+    from homeassistant.helpers.storage import Store
+
+    from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION, ControlMode
+    from custom_components.home_rules.coordinator import HomeRulesCoordinator
+
+    coordinator = await coord_factory()
+    key = f"{DOMAIN}_{coordinator.config_entry.entry_id}"
+    store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, key)
+
+    for old, expected in [
+        ("Dry Run", ControlMode.MONITOR),
+        ("Live", ControlMode.SOLAR_COOLING),
+        ("Aggressive", ControlMode.BOOST_COOLING),
+        ("Disabled", ControlMode.DISABLED),
+    ]:
+        await store.async_save({"controls": {"mode": old}})
+        reloaded = HomeRulesCoordinator(hass, coordinator.config_entry)
+        await reloaded.async_initialize()
+        assert reloaded.control_mode is expected, f"'{old}' should migrate to {expected}"

@@ -29,7 +29,7 @@ Install through HACS as a custom repository:
 
 Add **Home Rules** from Settings -> Devices & Services, select your entities, then tune options.
 
-`select.home_rules_control_mode` defaults to **Dry Run** for safe setup. Switch to **Live** once you're happy with decisions and want the integration to control your climate entity.
+`select.home_rules_control_mode` defaults to **Monitor** for safe setup. Switch to **Solar Cooling** once you're happy with decisions and want the integration to control your climate entity.
 
 ## Development
 

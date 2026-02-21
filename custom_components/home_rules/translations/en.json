@@ -118,7 +118,13 @@
     },
     "select": {
       "control_mode": {
-        "name": "Control Mode"
+        "name": "Control Mode",
+        "state": {
+          "disabled": "Disabled",
+          "monitor": "Monitor",
+          "solar_cooling": "Solar Cooling",
+          "boost_cooling": "Boost Cooling"
+        }
       }
     },
     "switch": {
