@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v1.1.4 (2026-02-21)
+
+### Bug Fixes
+
+- Remove redundant parentheticals from reason labels
+  ([#22](https://github.com/teh-hippo/ha-home-rules/pull/22),
+  [`cb9435f`](https://github.com/teh-hippo/ha-home-rules/commit/cb9435fb6abe64687cc7756cf3cc965b04e7059b))
+
+
 ## v1.1.3 (2026-02-19)
 
 ### Bug Fixes
