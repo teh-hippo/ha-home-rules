@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.2.2 (2026-02-21)
+
+### Bug Fixes
+
+- **ci**: Detect Copilot review outcome via body text, not review state
+  ([`669e5b0`](https://github.com/teh-hippo/ha-home-rules/commit/669e5b0a30f1dea3e0b619f035e3850ac3651c23))
+
+
 ## v1.2.1 (2026-02-21)
 
 ### Bug Fixes

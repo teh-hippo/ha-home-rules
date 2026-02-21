@@ -8,5 +8,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/teh-hippo/ha-home-rules/issues",
   "single_config_entry": true,
-  "version": "1.2.1"
+  "version": "1.2.2"
 }
