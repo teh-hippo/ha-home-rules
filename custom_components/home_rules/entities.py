@@ -58,13 +58,7 @@ class SensorDescription(SensorEntityDescription):
 
 
 SENSORS = (
-    SensorDescription(key="mode", name="Mode", icon="mdi:home-automation", object_id=f"{DOMAIN}_mode"),
-    SensorDescription(
-        key="current",
-        name="Current State",
-        icon="mdi:information-outline",
-        object_id=f"{DOMAIN}_current_state",
-    ),
+    SensorDescription(key="mode", name="Current Mode", icon="mdi:home-automation", object_id=f"{DOMAIN}_current_mode"),
     SensorDescription(key="adjustment", name="Action", icon="mdi:flash", object_id=f"{DOMAIN}_action"),
     SensorDescription(
         key="decision",

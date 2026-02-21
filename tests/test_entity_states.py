@@ -10,8 +10,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 async def test_entities_register_on_setup(hass, loaded_entry) -> None:
     """All platform entities should be created when the config entry is set up."""
     entity_ids = [
-        "sensor.home_rules_mode",
-        "sensor.home_rules_current_state",
+        "sensor.home_rules_current_mode",
         "sensor.home_rules_action",
         "sensor.home_rules_decision",
         "sensor.home_rules_last_evaluated",
