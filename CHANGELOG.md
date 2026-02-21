@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-02-21)
+
+### Features
+
+- Configurable threshold values via number entities
+  ([#23](https://github.com/teh-hippo/ha-home-rules/pull/23),
+  [`96abfdf`](https://github.com/teh-hippo/ha-home-rules/commit/96abfdf632b7a458175b8e5fd1cdee1064737e19))
+
+
 ## v1.1.4 (2026-02-21)
 
 ### Bug Fixes
