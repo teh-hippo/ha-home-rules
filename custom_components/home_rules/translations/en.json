@@ -55,9 +55,6 @@
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
-          "humidity_threshold": "Humidity threshold (%)",
-          "temperature_threshold": "Temperature threshold (°C)",
-          "temperature_cool": "Cool setpoint (°C)",
           "grid_usage_delay": "Grid usage delay (evaluations)",
           "reactivate_delay": "Reactivation delay (evaluations)",
           "notification_service": "Notification service (optional)"
@@ -140,12 +137,6 @@
       },
       "temperature_cool": {
         "name": "Cool Setpoint"
-      },
-      "generation_cool_threshold": {
-        "name": "Cool Generation Threshold"
-      },
-      "generation_dry_threshold": {
-        "name": "Dry Generation Threshold"
       },
       "humidity_threshold": {
         "name": "Humidity Threshold"

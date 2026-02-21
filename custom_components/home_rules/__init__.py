@@ -18,6 +18,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         f"{entry.entry_id}_aggressive_cooling",
         f"{entry.entry_id}_dry_run",
         f"{entry.entry_id}_notifications_enabled",
+        f"{entry.entry_id}_generation_cool_threshold",
+        f"{entry.entry_id}_generation_dry_threshold",
     }
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         if entity_entry.unique_id in legacy:

@@ -28,6 +28,8 @@ async def test_setup_removes_legacy_entities(hass, mock_entry, entity_registry) 
         f"{mock_entry.entry_id}_aggressive_cooling",
         f"{mock_entry.entry_id}_dry_run",
         f"{mock_entry.entry_id}_notifications_enabled",
+        f"{mock_entry.entry_id}_generation_cool_threshold",
+        f"{mock_entry.entry_id}_generation_dry_threshold",
     }
 
     for unique_id in legacy_unique_ids:
