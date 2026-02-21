@@ -78,6 +78,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._lock = asyncio.Lock()
         self._session = CachedState()
         self._controls = ControlState()
+        self._parameters: dict[str, float] = {}
         self._auto_mode = False
         self._initialized = False
         # Track first refresh to handle entity dependencies at startup.
@@ -101,21 +102,29 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _eval_interval(self) -> int:
         return int(self.config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))
 
+    def get_parameter(self, key: str, default: float) -> float:
+        return float(self._parameters.get(key, self.config_entry.options.get(key, default)))
+
+    async def async_set_parameter(self, key: str, value: float) -> None:
+        self._parameters[key] = value
+        await self._save_state()
+        await self.async_run_evaluation("parameter")
+
     @property
     def parameters(self) -> RuleParameters:
         options = self.config_entry.options
         return RuleParameters(
-            generation_cool_threshold=float(
-                options.get(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD)
+            generation_cool_threshold=self.get_parameter(
+                c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD
             ),
-            generation_dry_threshold=float(
-                options.get(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD)
+            generation_dry_threshold=self.get_parameter(
+                c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD
             ),
-            temperature_threshold=float(options.get(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD)),
-            humidity_threshold=float(options.get(c.CONF_HUMIDITY_THRESHOLD, c.DEFAULT_HUMIDITY_THRESHOLD)),
+            temperature_threshold=self.get_parameter(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD),
+            humidity_threshold=self.get_parameter(c.CONF_HUMIDITY_THRESHOLD, c.DEFAULT_HUMIDITY_THRESHOLD),
             grid_usage_delay=int(options.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)),
             reactivate_delay=int(options.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)),
-            temperature_cool=float(options.get(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL)),
+            temperature_cool=self.get_parameter(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL),
         )
 
     @property
@@ -158,6 +167,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._auto_mode = bool(stored.get("auto_mode", False))
         self._last_changed = stored.get("last_changed")
         self._recent = deque(stored.get("recent_evaluations", []), maxlen=c.MAX_RECENT_EVALUATIONS)
+        params: dict[str, float] = {}
+        for k, v in stored.get("parameters", {}).items():
+            with suppress(TypeError, ValueError):
+                params[str(k)] = float(v)
+        self._parameters = params
 
     async def async_set_control(self, key: str, value: bool) -> None:
         setattr(self._controls, key, value)
@@ -505,6 +519,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 "auto_mode": self._auto_mode,
                 "last_changed": self._last_changed,
                 "recent_evaluations": list(self._recent),
+                "parameters": dict(self._parameters),
             }
         )
 

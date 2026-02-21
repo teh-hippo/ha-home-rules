@@ -102,6 +102,23 @@
       "evaluate_now": {
         "name": "Evaluate Now"
       }
+    },
+    "number": {
+      "temperature_threshold": {
+        "name": "Temperature Threshold"
+      },
+      "temperature_cool": {
+        "name": "Cool Setpoint"
+      },
+      "generation_cool_threshold": {
+        "name": "Cool Generation Threshold"
+      },
+      "generation_dry_threshold": {
+        "name": "Dry Generation Threshold"
+      },
+      "humidity_threshold": {
+        "name": "Humidity Threshold"
+      }
     }
   },
   "exceptions": {

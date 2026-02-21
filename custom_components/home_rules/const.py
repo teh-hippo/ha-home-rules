@@ -14,7 +14,14 @@ class ControlMode(StrEnum):
     AGGRESSIVE = "Aggressive"
 
 
-PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.SELECT, Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
+PLATFORMS: list[Platform] = [
+    Platform.SWITCH,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.NUMBER,
+]
 
 CONF_CLIMATE_ENTITY_ID = "climate_entity_id"
 CONF_TIMER_ENTITY_ID = "timer_entity_id"

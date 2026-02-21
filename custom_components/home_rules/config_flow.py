@@ -10,7 +10,7 @@ from homeassistant.helpers.selector import SelectOptionDict
 from . import const as c
 
 _HOME_RULES_PREFIXES = tuple(
-    f"{platform}.{c.DOMAIN}_" for platform in ("switch", "select", "sensor", "binary_sensor", "button")
+    f"{platform}.{c.DOMAIN}_" for platform in ("switch", "select", "sensor", "binary_sensor", "button", "number")
 )
 _VALID_POWER_UNITS = {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}
 _SENSOR_KEYS = {
