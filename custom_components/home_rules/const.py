@@ -9,9 +9,9 @@ DOMAIN = "home_rules"
 
 class ControlMode(StrEnum):
     DISABLED = "Disabled"
-    DRY_RUN = "Dry Run"
-    LIVE = "Live"
-    AGGRESSIVE = "Aggressive"
+    MONITOR = "Monitor"
+    SOLAR_COOLING = "Solar Cooling"
+    BOOST_COOLING = "Boost Cooling"
 
 
 PLATFORMS: list[Platform] = [

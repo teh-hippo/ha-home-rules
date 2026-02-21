@@ -31,7 +31,7 @@ from .rules import (
 
 @dataclass
 class ControlState:
-    mode: c.ControlMode = c.ControlMode.DRY_RUN
+    mode: c.ControlMode = c.ControlMode.MONITOR
     cooling_enabled: bool = True
 
 
@@ -127,10 +127,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if not bool(controls.get("enabled", True)):
             return c.ControlMode.DISABLED
         if bool(controls.get("dry_run", True)):
-            return c.ControlMode.DRY_RUN
+            return c.ControlMode.MONITOR
         if bool(controls.get("aggressive_cooling", False)):
-            return c.ControlMode.AGGRESSIVE
-        return c.ControlMode.LIVE
+            return c.ControlMode.BOOST_COOLING
+        return c.ControlMode.SOLAR_COOLING
 
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
@@ -217,7 +217,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
             previous = self._session.last
             applied = apply_adjustment(self._session, current, adjustment)
-            if self.control_mode is c.ControlMode.DRY_RUN:
+            if self.control_mode is c.ControlMode.MONITOR:
                 self._session.failed_to_change = 0
                 applied = True
             if not applied:
@@ -241,7 +241,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 "humidity": home.humidity,
                 "have_solar": home.have_solar,
                 "auto": home.auto,
-                "dry_run": self.control_mode is c.ControlMode.DRY_RUN,
+                "dry_run": self.control_mode is c.ControlMode.MONITOR,
                 "tolerated": self._session.tolerated,
                 "reactivate_delay": self._session.reactivate_delay,
             }
@@ -269,7 +269,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 tolerated=self._session.tolerated,
                 reactivate_delay=self._session.reactivate_delay,
                 auto_mode=self._auto_mode,
-                dry_run=self.control_mode is c.ControlMode.DRY_RUN,
+                dry_run=self.control_mode is c.ControlMode.MONITOR,
                 timer_finishes_at=timer_finishes_at,
                 last_evaluated=now,
                 last_changed=self._last_changed,
@@ -294,7 +294,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         message = (
             f"Mode changed: {previous.value} -> {(self._session.last or current).value} "
             f"(current={current.value}, action={adjustment.value}, "
-            f"dry_run={self.control_mode is c.ControlMode.DRY_RUN})"
+            f"dry_run={self.control_mode is c.ControlMode.MONITOR})"
         )
         try:
             await self.hass.services.async_call(
@@ -349,7 +349,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 temperature=temperature,
                 humidity=humidity,
                 auto=self._auto_mode,
-                aggressive_cooling=self.control_mode is c.ControlMode.AGGRESSIVE,
+                aggressive_cooling=self.control_mode is c.ControlMode.BOOST_COOLING,
                 enabled=self.control_mode is not c.ControlMode.DISABLED,
                 cooling_enabled=self._controls.cooling_enabled,
             ),
@@ -384,8 +384,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         climate_entity = str(self._entity_id(c.CONF_CLIMATE_ENTITY_ID))
         timer_entity = str(self._entity_id(c.CONF_TIMER_ENTITY_ID))
-        if self.control_mode is c.ControlMode.DRY_RUN:
-            c.LOGGER.info("DRY RUN: would apply adjustment %s", adjustment.value)
+        if self.control_mode is c.ControlMode.MONITOR:
+            c.LOGGER.info("MONITOR: would apply adjustment %s", adjustment.value)
             self._update_auto_mode(adjustment)
             return
 
