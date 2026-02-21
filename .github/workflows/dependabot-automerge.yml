@@ -24,7 +24,7 @@ jobs:
 
       - name: Request Copilot review and enable auto-merge
         run: |
-          gh pr edit "$PR_URL" --add-reviewer "copilot-pull-request-reviewer[bot]"
+          gh pr edit "$PR_URL" --add-reviewer "Copilot"
           gh pr merge --auto --rebase "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
