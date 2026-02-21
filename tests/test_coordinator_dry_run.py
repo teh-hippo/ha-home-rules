@@ -14,7 +14,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 
 def test_timer_countdown_sensor_is_registered() -> None:
-    from custom_components.home_rules.sensor import SENSORS
+    from custom_components.home_rules.entities import SENSORS
 
     assert any(description.key == "timer_finishes_at" for description in SENSORS)
 

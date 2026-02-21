@@ -41,7 +41,7 @@ async def test_unavailable_temperature_uses_below_threshold_default(coord_factor
     await coordinator.async_run_evaluation("poll")
 
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
-    assert coordinator.data.temperature_c < coordinator.parameters.temperature_threshold
+    assert coordinator._last_record["temperature"] < coordinator.parameters.temperature_threshold
 
 
 async def test_unavailable_humidity_uses_above_threshold_default(coord_factory) -> None:
@@ -53,4 +53,4 @@ async def test_unavailable_humidity_uses_above_threshold_default(coord_factory) 
     await coordinator.async_run_evaluation("poll")
 
     assert coordinator.data.adjustment is HomeOutput.DRY
-    assert coordinator.data.humidity_percent > coordinator.parameters.humidity_threshold
+    assert coordinator._last_record["humidity"] > coordinator.parameters.humidity_threshold

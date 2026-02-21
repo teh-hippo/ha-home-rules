@@ -35,7 +35,7 @@ async def test_high_humidity_yields_dry_not_cool(coord_factory) -> None:
     await coordinator.async_run_evaluation("test")
 
     assert coordinator.data.adjustment is HomeOutput.DRY
-    assert coordinator.data.humidity_percent == pytest.approx(70.0)
+    assert coordinator._last_record["humidity"] == pytest.approx(70.0)
 
 
 async def test_kw_generation_normalised_to_watts(hass, coord_factory) -> None:
@@ -48,7 +48,7 @@ async def test_kw_generation_normalised_to_watts(hass, coord_factory) -> None:
     await coordinator.async_run_evaluation("test")
 
     assert coordinator.data.adjustment is HomeOutput.COOL
-    assert coordinator.data.solar_generation_w == pytest.approx(6000.0)
+    assert coordinator._last_record["generation"] == pytest.approx(6000.0)
 
 
 async def test_fahrenheit_temperature_normalised_to_celsius(hass, coord_factory) -> None:
@@ -62,7 +62,7 @@ async def test_fahrenheit_temperature_normalised_to_celsius(hass, coord_factory)
 
     # 25°C, 40% humidity, 6000W → COOL
     assert coordinator.data.adjustment is HomeOutput.COOL
-    assert coordinator.data.temperature_c == pytest.approx(25.0, abs=0.1)
+    assert coordinator._last_record["temperature"] == pytest.approx(25.0, abs=0.1)
 
 
 async def test_cool_threshold_boundary_activates_cooling(coord_factory) -> None:

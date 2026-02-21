@@ -15,152 +15,84 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import (
-    CONF_HUMIDITY_THRESHOLD,
-    CONF_TEMPERATURE_COOL,
-    CONF_TEMPERATURE_THRESHOLD,
-    DEFAULT_HUMIDITY_THRESHOLD,
-    DEFAULT_TEMPERATURE_COOL,
-    DEFAULT_TEMPERATURE_THRESHOLD,
-    DOMAIN,
-    ControlMode,
-)
+from . import const as c
 from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 
 AEC = AddEntitiesCallback
 HCE = HomeRulesConfigEntry
 
+# Object-id overrides (where key → f"{c.DOMAIN}_{key}" isn't desired)
+_OBJECT_IDS: dict[str, str] = {
+    "current": f"{c.DOMAIN}_current_state",
+    "adjustment": f"{c.DOMAIN}_action",
+    "timer_finishes_at": f"{c.DOMAIN}_timer_countdown",
+    "temperature_cool": f"{c.DOMAIN}_cool_setpoint",
+}
 
-class HomeRulesEntity(CoordinatorEntity[HomeRulesCoordinator]):
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        entry: HomeRulesConfigEntry,
-        coordinator: HomeRulesCoordinator,
-        *,
-        unique_id_suffix: str,
-        object_id: str,
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_{unique_id_suffix}"
-        self._attr_suggested_object_id = object_id
-        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)}, name="Home Rules")
+_DIAG = EntityCategory.DIAGNOSTIC
+_CONF = EntityCategory.CONFIG
+_TS = SensorDeviceClass.TIMESTAMP
 
 
-@dataclass(frozen=True)
-class SensorDescription(SensorEntityDescription):
-    object_id: str | None = None
+def _sensor(key: str, **kw: Any) -> SensorEntityDescription:
+    return SensorEntityDescription(key=key, translation_key=key, **kw)
 
 
 SENSORS = (
-    SensorDescription(key="mode", translation_key="mode", object_id=f"{DOMAIN}_mode"),
-    SensorDescription(
-        key="current",
-        translation_key="current",
-        object_id=f"{DOMAIN}_current_state",
-    ),
-    SensorDescription(key="adjustment", translation_key="adjustment", object_id=f"{DOMAIN}_action"),
-    SensorDescription(
-        key="decision",
-        translation_key="decision",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        object_id=f"{DOMAIN}_decision",
-    ),
-    SensorDescription(
-        key="last_evaluated",
-        translation_key="last_evaluated",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        object_id=f"{DOMAIN}_last_evaluated",
-    ),
-    SensorDescription(
-        key="last_changed",
-        translation_key="last_changed",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        object_id=f"{DOMAIN}_last_changed",
-    ),
-    SensorDescription(
-        key="timer_finishes_at",
-        translation_key="timer_finishes_at",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        object_id=f"{DOMAIN}_timer_countdown",
-    ),
+    _sensor("mode"),
+    _sensor("current"),
+    _sensor("adjustment"),
+    _sensor("decision", entity_category=_DIAG),
+    _sensor("last_evaluated", device_class=_TS, entity_category=_DIAG),
+    _sensor("last_changed", device_class=_TS, entity_category=_DIAG),
+    _sensor("timer_finishes_at", device_class=_TS, entity_category=_DIAG),
 )
 
 BINARY_SENSORS = (
-    BinarySensorEntityDescription(
-        key="solar_available",
-        translation_key="solar_available",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    BinarySensorEntityDescription(
-        key="auto_mode",
-        translation_key="auto_mode",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
+    BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
+    BinarySensorEntityDescription(key="auto_mode", translation_key="auto_mode", entity_category=_DIAG),
 )
 
 
+class HomeRulesEntity(CoordinatorEntity[HomeRulesCoordinator]):
+    _attr_has_entity_name = True
+    _entity_key: str = ""
+
+    def __init__(self, entry: HCE, coordinator: HomeRulesCoordinator, key: str = "") -> None:
+        super().__init__(coordinator)
+        k = key or self._entity_key
+        self._attr_unique_id = f"{entry.entry_id}_{k}"
+        self._attr_suggested_object_id = _OBJECT_IDS.get(k, f"{c.DOMAIN}_{k}")
+        self._attr_device_info = DeviceInfo(identifiers={(c.DOMAIN, entry.entry_id)}, name="Home Rules")
+
+
 class HomeRulesSensor(HomeRulesEntity, SensorEntity):
-    def __init__(
-        self,
-        entry: HomeRulesConfigEntry,
-        coordinator: HomeRulesCoordinator,
-        description: SensorDescription,
-    ) -> None:
-        super().__init__(
-            entry,
-            coordinator,
-            unique_id_suffix=description.key,
-            object_id=description.object_id or f"{DOMAIN}_{description.key}",
-        )
+    def __init__(self, entry: HCE, coordinator: HomeRulesCoordinator, description: SensorEntityDescription) -> None:
+        super().__init__(entry, coordinator, description.key)
         self.entity_description = description
 
     @property
     def native_value(self) -> str | datetime | None:
         value: object = getattr(self.coordinator.data, self.entity_description.key)
-        if self.entity_description.device_class != SensorDeviceClass.TIMESTAMP:
+        if self.entity_description.device_class != _TS:
             return str(value.value if hasattr(value, "value") else value)
         if value is None:
             return None
-        return value if isinstance(value, datetime) else dt_util.parse_datetime(str(value)) or None
+        return value if isinstance(value, datetime) else dt_util.parse_datetime(str(value))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         if self.entity_description.key != "decision":
             return None
-        data = self.coordinator.data
-        return {
-            "reason": data.reason,
-            "control_mode": self.coordinator.control_mode.value,
-            "current": data.current.value,
-            "adjustment": data.adjustment.value,
-            "mode": data.mode.value,
-            "solar_online": data.solar_online,
-            "solar_generation_w": data.solar_generation_w,
-            "grid_usage_w": data.grid_usage_w,
-            "temperature_c": data.temperature_c,
-            "humidity_percent": data.humidity_percent,
-            "tolerated": data.tolerated,
-            "reactivate_delay": data.reactivate_delay,
-            "auto_mode": data.auto_mode,
-            "dry_run": data.dry_run,
-            "recent": list(data.recent_evaluations)[:10],
-        }
+        rec = dict(self.coordinator._last_record)
+        rec["recent"] = list(self.coordinator._recent)[:10]
+        return rec
 
 
 class HomeRulesBinarySensor(HomeRulesEntity, BinarySensorEntity):
-    def __init__(
-        self,
-        entry: HomeRulesConfigEntry,
-        coordinator: HomeRulesCoordinator,
-        description: BinarySensorEntityDescription,
-    ) -> None:
-        super().__init__(entry, coordinator, unique_id_suffix=description.key, object_id=f"{DOMAIN}_{description.key}")
-        self.entity_description = description
+    def __init__(self, entry: HCE, coordinator: HomeRulesCoordinator, desc: BinarySensorEntityDescription) -> None:
+        super().__init__(entry, coordinator, desc.key)
+        self.entity_description = desc
 
     @property
     def is_on(self) -> bool:
@@ -168,31 +100,27 @@ class HomeRulesBinarySensor(HomeRulesEntity, BinarySensorEntity):
 
 
 class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
+    _entity_key = "control_mode"
     _attr_translation_key = "control_mode"
-    _attr_options = [mode.value for mode in ControlMode]
-    _attr_entity_category = EntityCategory.CONFIG
-
-    def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator) -> None:
-        super().__init__(entry, coordinator, unique_id_suffix="control_mode", object_id=f"{DOMAIN}_control_mode")
+    _attr_options = [m.value for m in c.ControlMode]
+    _attr_entity_category = _CONF
 
     @property
     def current_option(self) -> str:
         return self.coordinator.control_mode.value
 
     async def async_select_option(self, option: str) -> None:
-        await self.coordinator.async_set_mode(ControlMode(option))
+        await self.coordinator.async_set_mode(c.ControlMode(option))
 
 
 class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
+    _entity_key = "cooling_enabled"
     _attr_translation_key = "cooling_enabled"
-    _attr_entity_category = EntityCategory.CONFIG
-
-    def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator) -> None:
-        super().__init__(entry, coordinator, unique_id_suffix="cooling_enabled", object_id=f"{DOMAIN}_cooling_enabled")
+    _attr_entity_category = _CONF
 
     @property
     def is_on(self) -> bool:
-        return bool(self.coordinator.controls.cooling_enabled)
+        return bool(self.coordinator.cooling_enabled)
 
     async def async_turn_on(self, **kwargs: object) -> None:
         await self.coordinator.async_set_control("cooling_enabled", True)
@@ -202,10 +130,8 @@ class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
 
 
 class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
+    _entity_key = "evaluate"
     _attr_translation_key = "evaluate_now"
-
-    def __init__(self, entry: HomeRulesConfigEntry, coordinator: HomeRulesCoordinator) -> None:
-        super().__init__(entry, coordinator, unique_id_suffix="evaluate", object_id=f"{DOMAIN}_evaluate_now")
 
     async def async_press(self) -> None:
         await self.coordinator.async_run_evaluation("manual")
@@ -215,46 +141,26 @@ class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
 class NumberDescription(NumberEntityDescription):
     conf_key: str = ""
     default: float = 0.0
-    object_id: str | None = None
+
+
+def _num(key: str, mn: float, mx: float, step: float, unit: str, conf: str, default: float) -> NumberDescription:
+    return NumberDescription(
+        key=key,
+        translation_key=key,
+        native_min_value=mn,
+        native_max_value=mx,
+        native_step=step,
+        native_unit_of_measurement=unit,
+        entity_category=_CONF,
+        conf_key=conf,
+        default=default,
+    )
 
 
 NUMBERS = (
-    NumberDescription(
-        key="temperature_threshold",
-        translation_key="temperature_threshold",
-        native_min_value=0,
-        native_max_value=40,
-        native_step=0.5,
-        native_unit_of_measurement="°C",
-        entity_category=EntityCategory.CONFIG,
-        conf_key=CONF_TEMPERATURE_THRESHOLD,
-        default=DEFAULT_TEMPERATURE_THRESHOLD,
-        object_id=f"{DOMAIN}_temperature_threshold",
-    ),
-    NumberDescription(
-        key="temperature_cool",
-        translation_key="temperature_cool",
-        native_min_value=0,
-        native_max_value=40,
-        native_step=0.5,
-        native_unit_of_measurement="°C",
-        entity_category=EntityCategory.CONFIG,
-        conf_key=CONF_TEMPERATURE_COOL,
-        default=DEFAULT_TEMPERATURE_COOL,
-        object_id=f"{DOMAIN}_cool_setpoint",
-    ),
-    NumberDescription(
-        key="humidity_threshold",
-        translation_key="humidity_threshold",
-        native_min_value=0,
-        native_max_value=100,
-        native_step=1,
-        native_unit_of_measurement="%",
-        entity_category=EntityCategory.CONFIG,
-        conf_key=CONF_HUMIDITY_THRESHOLD,
-        default=DEFAULT_HUMIDITY_THRESHOLD,
-        object_id=f"{DOMAIN}_humidity_threshold",
-    ),
+    _num("temperature_threshold", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD),
+    _num("temperature_cool", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL),
+    _num("humidity_threshold", 0, 100, 1, "%", c.CONF_HUMIDITY_THRESHOLD, c.DEFAULT_HUMIDITY_THRESHOLD),
 )
 
 
@@ -262,18 +168,8 @@ class HomeRulesNumberEntity(HomeRulesEntity, NumberEntity):
     entity_description: NumberDescription
     _attr_mode = NumberMode.BOX
 
-    def __init__(
-        self,
-        entry: HomeRulesConfigEntry,
-        coordinator: HomeRulesCoordinator,
-        description: NumberDescription,
-    ) -> None:
-        super().__init__(
-            entry,
-            coordinator,
-            unique_id_suffix=description.key,
-            object_id=description.object_id or f"{DOMAIN}_{description.key}",
-        )
+    def __init__(self, entry: HCE, coordinator: HomeRulesCoordinator, description: NumberDescription) -> None:
+        super().__init__(entry, coordinator, description.key)
         self.entity_description = description
 
     @property
@@ -284,25 +180,25 @@ class HomeRulesNumberEntity(HomeRulesEntity, NumberEntity):
         await self.coordinator.async_set_parameter(self.entity_description.conf_key, value)
 
 
-async def async_setup_sensor_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
-    add_entities(HomeRulesSensor(entry, entry.runtime_data, description) for description in SENSORS)
+async def async_setup_sensor_entry(hass: HomeAssistant, entry: HCE, add: AEC) -> None:
+    add(HomeRulesSensor(entry, entry.runtime_data, d) for d in SENSORS)
 
 
-async def async_setup_binary_sensor_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
-    add_entities(HomeRulesBinarySensor(entry, entry.runtime_data, description) for description in BINARY_SENSORS)
+async def async_setup_binary_sensor_entry(hass: HomeAssistant, entry: HCE, add: AEC) -> None:
+    add(HomeRulesBinarySensor(entry, entry.runtime_data, d) for d in BINARY_SENSORS)
 
 
-async def async_setup_select_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
-    add_entities([HomeRulesModeSelect(entry, entry.runtime_data)])
+async def async_setup_select_entry(hass: HomeAssistant, entry: HCE, add: AEC) -> None:
+    add([HomeRulesModeSelect(entry, entry.runtime_data)])
 
 
-async def async_setup_switch_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
-    add_entities([HomeRulesCoolingEnabledSwitch(entry, entry.runtime_data)])
+async def async_setup_switch_entry(hass: HomeAssistant, entry: HCE, add: AEC) -> None:
+    add([HomeRulesCoolingEnabledSwitch(entry, entry.runtime_data)])
 
 
-async def async_setup_button_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
-    add_entities([HomeRulesEvaluateButton(entry, entry.runtime_data)])
+async def async_setup_button_entry(hass: HomeAssistant, entry: HCE, add: AEC) -> None:
+    add([HomeRulesEvaluateButton(entry, entry.runtime_data)])
 
 
-async def async_setup_number_entry(hass: HomeAssistant, entry: HCE, add_entities: AEC) -> None:
-    add_entities(HomeRulesNumberEntity(entry, entry.runtime_data, description) for description in NUMBERS)
+async def async_setup_number_entry(hass: HomeAssistant, entry: HCE, add: AEC) -> None:
+    add(HomeRulesNumberEntity(entry, entry.runtime_data, d) for d in NUMBERS)

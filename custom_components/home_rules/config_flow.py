@@ -33,29 +33,20 @@ _DEFAULT_OPTIONS = {
 
 
 def _entity_selector(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector:
-    config = (
-        selector.EntitySelectorConfig(domain=domain)
-        if device_class is None
-        else selector.EntitySelectorConfig(domain=domain, device_class=device_class)
-    )
-    return selector.EntitySelector(config)
+    cfg = selector.EntitySelectorConfig(domain=domain)
+    if device_class:
+        cfg = selector.EntitySelectorConfig(domain=domain, device_class=device_class)
+    return selector.EntitySelector(cfg)
 
 
-def _number_selector(
-    min_value: float, max_value: float, step: float, unit: str | None = None
-) -> selector.NumberSelector:
-    config = (
-        selector.NumberSelectorConfig(min=min_value, max=max_value, step=step, mode=selector.NumberSelectorMode.BOX)
+def _number_selector(min_val: float, max_val: float, step: float, unit: str | None = None) -> selector.NumberSelector:
+    mode = selector.NumberSelectorMode.BOX
+    cfg = (
+        selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=mode)
         if unit is None
-        else selector.NumberSelectorConfig(
-            min=min_value,
-            max=max_value,
-            step=step,
-            unit_of_measurement=unit,
-            mode=selector.NumberSelectorMode.BOX,
-        )
+        else selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, unit_of_measurement=unit, mode=mode)
     )
-    return selector.NumberSelector(config)
+    return selector.NumberSelector(cfg)
 
 
 _ENTITY_SELECTORS = {
@@ -96,36 +87,30 @@ def _validate_entities(
     check_domains: bool = True,
 ) -> dict[str, str]:
     for key in required_keys:
-        entity_id = str(user_input[key])
-        state = hass.states.get(entity_id)
-        if state is None:
+        eid = str(user_input[key])
+        if not (state := hass.states.get(eid)):
             return {"base": "entity_not_found"}
-        if entity_id.startswith(_HOME_RULES_PREFIXES):
+        if eid.startswith(_HOME_RULES_PREFIXES):
             return {"base": "invalid_entity_selection"}
         if key in (c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID):
-            unit = str(state.attributes.get("unit_of_measurement", "")).strip()
             try:
-                UnitOfPower(unit)
+                UnitOfPower(str(state.attributes.get("unit_of_measurement", "")).strip())
             except ValueError:
                 return {"base": "invalid_power_unit"}
-        if check_domains:
-            if (domain_check := _DOMAIN_CHECKS.get(key)) and not entity_id.startswith(domain_check[0]):
-                return {"base": domain_check[1]}
-            if key in _SENSOR_KEYS and not entity_id.startswith("sensor."):
-                return {"base": "invalid_sensor_entity"}
-
+        if check_domains and (dc := _DOMAIN_CHECKS.get(key)) and not eid.startswith(dc[0]):
+            return {"base": dc[1]}
+        if check_domains and key in _SENSOR_KEYS and not eid.startswith("sensor."):
+            return {"base": "invalid_sensor_entity"}
     if not allow_inverter:
         return {}
-    inverter_entity = str(user_input.get(c.CONF_INVERTER_ENTITY_ID, "")).strip()
-    if not inverter_entity:
+    inv = str(user_input.get(c.CONF_INVERTER_ENTITY_ID, "")).strip()
+    if not inv:
         return {}
-    if hass.states.get(inverter_entity) is None:
+    if not hass.states.get(inv):
         return {"base": "entity_not_found"}
-    if inverter_entity.startswith(_HOME_RULES_PREFIXES):
+    if inv.startswith(_HOME_RULES_PREFIXES):
         return {"base": "invalid_entity_selection"}
-    if not inverter_entity.startswith(("sensor.", "binary_sensor.")):
-        return {"base": "invalid_inverter_entity"}
-    return {}
+    return {"base": "invalid_inverter_entity"} if not inv.startswith(("sensor.", "binary_sensor.")) else {}
 
 
 class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
@@ -138,98 +123,78 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
     def async_get_options_flow(_config_entry: ConfigEntry) -> "HomeRulesOptionsFlow":
         return HomeRulesOptionsFlow()
 
+    async def _config_step(
+        self,
+        step_id: str,
+        user_input: dict[str, Any] | None,
+        required: tuple[str, ...],
+        optional: tuple[str, ...] = (),
+        **validate_kw: Any,
+    ) -> ConfigFlowResult:
+        errors = (
+            _validate_entities(self.hass, user_input, required_keys=list(required), **validate_kw) if user_input else {}
+        )
+        if user_input and not errors:
+            self._data.update(user_input)
+            if step_id == "user":
+                return await self.async_step_solar()
+            if step_id == "solar":
+                return await self.async_step_comfort()
+            return self.async_create_entry(title="Home Rules", data=self._data, options=_DEFAULT_OPTIONS)
+        return self.async_show_form(step_id=step_id, data_schema=_schema(required, optional), errors=errors)
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         await self.async_set_unique_id(c.DOMAIN)
         self._abort_if_unique_id_configured()
-        errors = (
-            _validate_entities(self.hass, user_input, required_keys=[c.CONF_CLIMATE_ENTITY_ID, c.CONF_TIMER_ENTITY_ID])
-            if user_input
-            else {}
-        )
-        if user_input and not errors:
-            self._data.update(user_input)
-            return await self.async_step_solar()
-        return self.async_show_form(
-            step_id="user", data_schema=_schema((c.CONF_CLIMATE_ENTITY_ID, c.CONF_TIMER_ENTITY_ID)), errors=errors
-        )
+        return await self._config_step("user", user_input, (c.CONF_CLIMATE_ENTITY_ID, c.CONF_TIMER_ENTITY_ID))
 
     async def async_step_solar(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errors = (
-            _validate_entities(
-                self.hass,
-                user_input,
-                required_keys=[c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID],
-                allow_inverter=True,
-            )
-            if user_input
-            else {}
-        )
-        if user_input and not errors:
-            self._data.update(user_input)
-            return await self.async_step_comfort()
-        return self.async_show_form(
-            step_id="solar",
-            data_schema=_schema(
-                (c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID), optional=(c.CONF_INVERTER_ENTITY_ID,)
-            ),
-            errors=errors,
+        return await self._config_step(
+            "solar",
+            user_input,
+            (c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID),
+            optional=(c.CONF_INVERTER_ENTITY_ID,),
+            allow_inverter=True,
         )
 
     async def async_step_comfort(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errors = (
-            _validate_entities(
-                self.hass, user_input, required_keys=[c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID]
-            )
-            if user_input
-            else {}
-        )
-        if user_input and not errors:
-            self._data.update(user_input)
-            return self.async_create_entry(title="Home Rules", data=self._data, options=_DEFAULT_OPTIONS)
-        return self.async_show_form(
-            step_id="comfort",
-            data_schema=_schema((c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)),
-            errors=errors,
-        )
+        return await self._config_step("comfort", user_input, (c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID))
+
+
+_OPTIONS_ENTITY_FIELDS: tuple[tuple[type, str], ...] = (
+    (vol.Required, c.CONF_CLIMATE_ENTITY_ID),
+    (vol.Required, c.CONF_TIMER_ENTITY_ID),
+    (vol.Optional, c.CONF_INVERTER_ENTITY_ID),
+    (vol.Required, c.CONF_GENERATION_ENTITY_ID),
+    (vol.Required, c.CONF_GRID_ENTITY_ID),
+    (vol.Required, c.CONF_TEMPERATURE_ENTITY_ID),
+    (vol.Required, c.CONF_HUMIDITY_ENTITY_ID),
+)
+_OPTIONS_REQUIRED = [k for _, k in _OPTIONS_ENTITY_FIELDS if _ is vol.Required]
 
 
 class HomeRulesOptionsFlow(OptionsFlow):
-    def _notify_service_options(self) -> list[str]:
-        return [f"notify.{name}" for name in sorted(self.hass.services.async_services_for_domain("notify"))]
-
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        required = [
-            c.CONF_CLIMATE_ENTITY_ID,
-            c.CONF_TIMER_ENTITY_ID,
-            c.CONF_GENERATION_ENTITY_ID,
-            c.CONF_GRID_ENTITY_ID,
-            c.CONF_TEMPERATURE_ENTITY_ID,
-            c.CONF_HUMIDITY_ENTITY_ID,
-        ]
         errors = (
-            _validate_entities(self.hass, user_input, required_keys=required, allow_inverter=True) if user_input else {}
+            _validate_entities(self.hass, user_input, required_keys=_OPTIONS_REQUIRED, allow_inverter=True)
+            if user_input
+            else {}
         )
         if user_input and not errors:
             return self.async_create_entry(data={**self.config_entry.options, **user_input})
 
-        current = self.config_entry.options
+        cur = self.config_entry.options
         notify_options: list[SelectOptionDict] = [{"label": "Disabled", "value": ""}]
-        notify_options.extend({"label": service, "value": service} for service in self._notify_service_options())
-
-        data_schema: dict[Any, Any] = {}
-        for marker, key in (
-            (vol.Required, c.CONF_CLIMATE_ENTITY_ID),
-            (vol.Required, c.CONF_TIMER_ENTITY_ID),
-            (vol.Optional, c.CONF_INVERTER_ENTITY_ID),
-            (vol.Required, c.CONF_GENERATION_ENTITY_ID),
-            (vol.Required, c.CONF_GRID_ENTITY_ID),
-            (vol.Required, c.CONF_TEMPERATURE_ENTITY_ID),
-            (vol.Required, c.CONF_HUMIDITY_ENTITY_ID),
-        ):
-            data_schema[marker(key, default=_option_default(self.config_entry, current, key))] = _ENTITY_SELECTORS[key]
-        for key, default, number_selector in _NUMBER_FIELDS:
-            data_schema[vol.Required(key, default=current.get(key, default))] = number_selector
-        data_schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=current.get(c.CONF_NOTIFICATION_SERVICE, ""))] = (
+        notify_options.extend(
+            {"label": f"notify.{n}", "value": f"notify.{n}"}
+            for n in sorted(self.hass.services.async_services_for_domain("notify"))
+        )
+        schema: dict[Any, Any] = {}
+        for marker, key in _OPTIONS_ENTITY_FIELDS:
+            schema[marker(key, default=_option_default(self.config_entry, cur, key))] = _ENTITY_SELECTORS[key]
+        for key, default, sel in _NUMBER_FIELDS:
+            schema[vol.Required(key, default=cur.get(key, default))] = sel
+        schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=cur.get(c.CONF_NOTIFICATION_SERVICE, ""))] = (
             selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
         )
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(data_schema), errors=errors)
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)

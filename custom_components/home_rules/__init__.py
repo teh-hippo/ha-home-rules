@@ -14,16 +14,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     registry = er.async_get(hass)
     legacy = {
-        f"{entry.entry_id}_enabled",
-        f"{entry.entry_id}_aggressive_cooling",
-        f"{entry.entry_id}_dry_run",
-        f"{entry.entry_id}_notifications_enabled",
-        f"{entry.entry_id}_generation_cool_threshold",
-        f"{entry.entry_id}_generation_dry_threshold",
+        f"{entry.entry_id}_{s}"
+        for s in (
+            "enabled",
+            "aggressive_cooling",
+            "dry_run",
+            "notifications_enabled",
+            "generation_cool_threshold",
+            "generation_dry_threshold",
+        )
     }
-    for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if entity_entry.unique_id in legacy:
-            registry.async_remove(entity_entry.entity_id)
+    for e in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if e.unique_id in legacy:
+            registry.async_remove(e.entity_id)
 
     await hass.config_entries.async_forward_entry_setups(entry, c.PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))

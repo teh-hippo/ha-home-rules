@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import NamedTuple
 
 ALLOWED_FAILURES = 3
-_NO_ACTION_REASONS = {"Insufficient solar", "Aggressive cooling hold"}
+_NO_ACTION_REASONS = frozenset({"Insufficient solar", "Aggressive cooling hold"})
 
 
 class AirconMode(StrEnum):
@@ -60,36 +61,30 @@ class CachedState:
     failed_to_change: int = 0
 
 
-@dataclass(frozen=True)
-class TurnOnDecision:
-    output: HomeOutput | None
+class AdjustResult(NamedTuple):
+    output: HomeOutput
     reason: str
 
 
-def evaluate_turn_on(config: RuleParameters, home: HomeInput) -> TurnOnDecision:
+def _evaluate_turn_on(config: RuleParameters, home: HomeInput) -> tuple[HomeOutput | None, str]:
     if not home.have_solar:
-        return TurnOnDecision(output=None, reason="No solar available")
+        return None, "No solar available"
     aggressive = home.aggressive_cooling and home.grid_usage == 0
     if home.generation >= config.generation_cool_threshold and (
         aggressive or home.humidity <= config.humidity_threshold
     ):
         if home.aircon_mode != AirconMode.COOL:
-            return TurnOnDecision(output=HomeOutput.COOL, reason="Solar above cool threshold")
+            return HomeOutput.COOL, "Solar above cool threshold"
         if home.grid_usage == 0:
-            return TurnOnDecision(output=None, reason="Already cooling on solar")
+            return None, "Already cooling on solar"
     if aggressive:
-        return TurnOnDecision(output=None, reason="Aggressive cooling hold")
+        return None, "Aggressive cooling hold"
     if home.generation >= config.generation_dry_threshold:
         if home.aircon_mode != AirconMode.DRY:
-            return TurnOnDecision(output=HomeOutput.DRY, reason="Solar above dry threshold")
+            return HomeOutput.DRY, "Solar above dry threshold"
         if home.grid_usage == 0:
-            return TurnOnDecision(output=None, reason="Already drying on solar")
-    return TurnOnDecision(output=None, reason="Insufficient solar")
-
-
-def _activation_reason(config: RuleParameters, home: HomeInput) -> str | None:
-    reason = evaluate_turn_on(config, home).reason
-    return None if reason in _NO_ACTION_REASONS else reason
+            return None, "Already drying on solar"
+    return None, "Insufficient solar"
 
 
 def current_state(home: HomeInput) -> HomeOutput:
@@ -106,43 +101,60 @@ def current_state(home: HomeInput) -> HomeOutput:
     )
 
 
-def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> HomeOutput:
+def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> AdjustResult:
+    """Compute the next adjustment and its human-readable reason."""
     if not home.enabled:
         state.tolerated = 0
-        return HomeOutput.NO_CHANGE if state.last is HomeOutput.DISABLED else HomeOutput.DISABLED
+        out = HomeOutput.NO_CHANGE if state.last is HomeOutput.DISABLED else HomeOutput.DISABLED
+        return AdjustResult(out, "Disabled")
     if home.aircon_mode == AirconMode.UNKNOWN:
-        return HomeOutput.NO_CHANGE
+        return AdjustResult(HomeOutput.NO_CHANGE, "Unknown aircon mode")
     if state.reactivate_delay > 0:
         state.reactivate_delay -= 1
-        return HomeOutput.NO_CHANGE
+        return AdjustResult(HomeOutput.NO_CHANGE, "Waiting reactivate delay")
 
-    decision = evaluate_turn_on(config, home)
+    output, reason = _evaluate_turn_on(config, home)
+    activation = reason if reason not in _NO_ACTION_REASONS else None
+
     if home.aircon_mode == AirconMode.OFF:
         state.tolerated = 0
-        if home.cooling_enabled and home.temperature >= config.temperature_threshold and decision.output is not None:
-            return decision.output
+        if home.cooling_enabled and home.temperature >= config.temperature_threshold and output is not None:
+            return AdjustResult(output, reason)
+        why = (
+            "Cooling disabled"
+            if not home.cooling_enabled
+            else "Temperature below threshold"
+            if home.temperature < config.temperature_threshold
+            else activation
+        )
         if home.auto:
-            return HomeOutput.OFF
+            return AdjustResult(HomeOutput.OFF, why or "Auto idle")
         if state.last is HomeOutput.TIMER and not home.timer:
-            return HomeOutput.RESET
-    elif not home.have_solar or home.grid_usage > 0:
+            return AdjustResult(HomeOutput.RESET, "Timer expired")
+        return AdjustResult(HomeOutput.NO_CHANGE, why or "No change")
+
+    if not home.have_solar or home.grid_usage > 0:
         if home.auto:
-            if decision.output is not None:
+            if output is not None:
                 state.tolerated = 0
-                return decision.output
+                return AdjustResult(output, reason)
             state.tolerated += 1
             if state.tolerated < config.grid_usage_delay:
-                return HomeOutput.NO_CHANGE
+                return AdjustResult(HomeOutput.NO_CHANGE, "Grid usage tolerated")
             state.tolerated = 0
             state.reactivate_delay = config.reactivate_delay
-            return HomeOutput.OFF
+            return AdjustResult(HomeOutput.OFF, "Grid usage too high")
         if not home.timer:
-            return HomeOutput.TIMER
-    elif home.auto:
+            return AdjustResult(HomeOutput.TIMER, "Manual")
+        return AdjustResult(HomeOutput.NO_CHANGE, "No change")
+
+    if home.auto:
         state.tolerated = 0
-        if decision.output is not None:
-            return decision.output
-    return HomeOutput.NO_CHANGE
+        if output is not None:
+            return AdjustResult(output, reason)
+        return AdjustResult(HomeOutput.NO_CHANGE, activation or "No change")
+
+    return AdjustResult(HomeOutput.NO_CHANGE, "No change")
 
 
 def apply_adjustment(session: CachedState, current: HomeOutput, adjustment: HomeOutput) -> bool:
@@ -157,36 +169,3 @@ def apply_adjustment(session: CachedState, current: HomeOutput, adjustment: Home
         return True
     session.failed_to_change += 1
     return session.failed_to_change <= ALLOWED_FAILURES
-
-
-def explain(config: RuleParameters, home: HomeInput, state: CachedState) -> str:
-    if not home.enabled:
-        return "Disabled"
-    if home.aircon_mode == AirconMode.UNKNOWN:
-        return "Unknown aircon mode"
-    if state.reactivate_delay > 0:
-        return "Waiting reactivate delay"
-
-    if home.aircon_mode == AirconMode.OFF:
-        if not home.cooling_enabled:
-            return "Cooling disabled"
-        if home.temperature < config.temperature_threshold:
-            return "Temperature below threshold"
-        if reason := _activation_reason(config, home):
-            return reason
-        if home.auto:
-            return "Auto idle"
-        if state.last is HomeOutput.TIMER and not home.timer:
-            return "Timer expired"
-        return "No change"
-
-    if not home.have_solar or home.grid_usage > 0:
-        if home.auto:
-            if reason := _activation_reason(config, home):
-                return reason
-            return "Grid usage tolerated" if (state.tolerated + 1) < config.grid_usage_delay else "Grid usage too high"
-        return "Manual" if not home.timer else "No change"
-
-    if home.auto and (reason := _activation_reason(config, home)):
-        return reason
-    return "No change"
