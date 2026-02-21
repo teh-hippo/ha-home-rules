@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.3.0 (2026-02-21)
+
+### Features
+
+- **entities**: Rename control modes to user-meaningful names
+  ([`5a45d90`](https://github.com/teh-hippo/ha-home-rules/commit/5a45d900069971c9226f00f7e0109007322ebb1e))
+
+### Refactoring
+
+- **entities**: Deduplicate threshold configuration
+  ([`352222d`](https://github.com/teh-hippo/ha-home-rules/commit/352222d931ee81d777385ac5425d4d5093c0e3e7))
+
+- **entities**: Use translation_key and icons.json for all entities
+  ([`aec01e8`](https://github.com/teh-hippo/ha-home-rules/commit/aec01e846a5db71fed5c665b332795ddb4393c11))
+
+
 ## v1.2.2 (2026-02-21)
 
 ### Bug Fixes
