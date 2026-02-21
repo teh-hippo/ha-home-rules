@@ -28,17 +28,6 @@ from .rules import (
     explain,
 )
 
-_POWER_UNITS = {
-    "": UnitOfPower.WATT,
-    "w": UnitOfPower.WATT,
-    "watt": UnitOfPower.WATT,
-    "watts": UnitOfPower.WATT,
-    "kw": UnitOfPower.KILO_WATT,
-    "kilowatt": UnitOfPower.KILO_WATT,
-    "kilowatts": UnitOfPower.KILO_WATT,
-    "mw": UnitOfPower.MEGA_WATT,
-}
-
 
 @dataclass
 class ControlState:
@@ -486,13 +475,15 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _normalized_power(self, state: State, label: str) -> float:
         value = self._state_to_float(state, label)
-        unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip().lower()
-        if source_unit := _POWER_UNITS.get(unit):
-            return max(0.0, PowerConverter.convert(value, source_unit, UnitOfPower.WATT))
-        self._create_issue(
-            c.ISSUE_INVALID_UNIT, "invalid_unit", {"entity_id": state.entity_id, "unit": unit or "(none)"}
-        )
-        raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}")
+        unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
+        try:
+            source_unit = UnitOfPower(unit)
+        except ValueError:
+            self._create_issue(
+                c.ISSUE_INVALID_UNIT, "invalid_unit", {"entity_id": state.entity_id, "unit": unit or "(none)"}
+            )
+            raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}") from None
+        return max(0.0, PowerConverter.convert(value, source_unit, UnitOfPower.WATT))
 
     def _normalized_temperature(self, state: State) -> float:
         value = self._state_to_float(state, "temperature")

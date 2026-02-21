@@ -3,6 +3,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.const import UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 from homeassistant.helpers.selector import SelectOptionDict
@@ -12,7 +13,6 @@ from . import const as c
 _HOME_RULES_PREFIXES = tuple(
     f"{platform}.{c.DOMAIN}_" for platform in ("switch", "select", "sensor", "binary_sensor", "button", "number")
 )
-_VALID_POWER_UNITS = {"", "w", "kw", "mw", "watt", "watts", "kilowatt", "kilowatts"}
 _SENSOR_KEYS = {
     c.CONF_GENERATION_ENTITY_ID,
     c.CONF_GRID_ENTITY_ID,
@@ -109,8 +109,10 @@ def _validate_entities(
         if entity_id.startswith(_HOME_RULES_PREFIXES):
             return {"base": "invalid_entity_selection"}
         if key in (c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID):
-            unit = str(state.attributes.get("unit_of_measurement", "")).lower()
-            if unit not in _VALID_POWER_UNITS:
+            unit = str(state.attributes.get("unit_of_measurement", "")).strip()
+            try:
+                UnitOfPower(unit)
+            except ValueError:
                 return {"base": "invalid_power_unit"}
         if check_domains:
             if (domain_check := _DOMAIN_CHECKS.get(key)) and not entity_id.startswith(domain_check[0]):
