@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v1.2.1 (2026-02-21)
+
+### Bug Fixes
+
+- **ci**: Check PR author not event actor for Dependabot detection
+  ([`a6fea26`](https://github.com/teh-hippo/ha-home-rules/commit/a6fea26dff72a3f65667b688f053842004d2b6cc))
+
+- **ci**: Move auto-merge to after Copilot approval
+  ([`7266ec1`](https://github.com/teh-hippo/ha-home-rules/commit/7266ec18b168074574e09bf48fbdf8f24f969160))
+
+- **ci**: Use correct Copilot reviewer handle
+  ([`700265a`](https://github.com/teh-hippo/ha-home-rules/commit/700265a3d5a2e1cb020252f3fc70ed769b4959ac))
+
+### Build System
+
+- **deps-dev**: Bump ruff in the python-deps group
+  ([`fefb37f`](https://github.com/teh-hippo/ha-home-rules/commit/fefb37f75749f2843295544ab67314d6aceebede))
+
+### Continuous Integration
+
+- Add devcontainer, fix bot CI approval, and Copilot-reviewed Dependabot auto-merge
+  ([`15aba4c`](https://github.com/teh-hippo/ha-home-rules/commit/15aba4ce6b0eb490518ef767099ef292bcf8a408))
+
+### Refactoring
+
+- Use UnitOfPower StrEnum for power unit validation
+  ([#24](https://github.com/teh-hippo/ha-home-rules/pull/24),
+  [`5284970`](https://github.com/teh-hippo/ha-home-rules/commit/5284970f800b19d51ced0730fd53f8484cd44d40))
+
+
 ## v1.2.0 (2026-02-21)
 
 ### Features
