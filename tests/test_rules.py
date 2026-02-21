@@ -11,6 +11,7 @@ from custom_components.home_rules.rules import (
     adjust,
     apply_adjustment,
     current_state,
+    explain,
 )
 
 TEST_PARAMS = RuleParameters(
@@ -497,3 +498,46 @@ def test_apply_adjustment_fails_after_allowed_failures() -> None:
     assert session.failed_to_change == 3
     assert not apply_adjustment(session, HomeOutput.OFF, HomeOutput.COOL)
     assert session.failed_to_change == 4
+
+
+# --- explain() label tests ---
+
+
+def test_explain_manual_no_timer():
+    """Manual mode on grid → reason is just 'Manual'."""
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1, timer=False)
+    assert explain(TEST_PARAMS, home, CachedState()) == "Manual"
+
+
+def test_explain_manual_timer_active():
+    """Manual mode with timer already running → 'No change'."""
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1, timer=True)
+    assert explain(TEST_PARAMS, home, CachedState()) == "No change"
+
+
+def test_explain_timer_expired():
+    """Timer expired while aircon off → 'Timer expired'."""
+    home = default_input(timer=False)
+    assert explain(TEST_PARAMS, home, CachedState(last=HomeOutput.TIMER)) == "Timer expired"
+
+
+def test_explain_grid_usage_too_high():
+    """Auto mode, grid usage exceeded delay → 'Grid usage too high'."""
+    home = default_input(aircon_mode=AirconMode.COOL, auto=True, grid_usage=100.0, generation=0.0)
+    state = CachedState(tolerated=TEST_PARAMS.grid_usage_delay - 1)
+    assert explain(TEST_PARAMS, home, state) == "Grid usage too high"
+
+
+def test_explain_grid_usage_tolerated():
+    """Auto mode, grid usage within tolerance → 'Grid usage tolerated'."""
+    home = default_input(aircon_mode=AirconMode.COOL, auto=True, grid_usage=100.0, generation=0.0)
+    assert explain(TEST_PARAMS, home, CachedState(tolerated=0)) == "Grid usage tolerated"
+
+
+def test_explain_disabled():
+    assert explain(TEST_PARAMS, default_input(enabled=False), CachedState()) == "Disabled"
+
+
+def test_explain_auto_idle():
+    home = default_input(auto=True, generation=0.0)
+    assert explain(TEST_PARAMS, home, CachedState()) == "Auto idle"
