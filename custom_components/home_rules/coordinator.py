@@ -170,7 +170,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         async with self._lock:
             now = dt_util.utcnow().isoformat()
             self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE)
-            home, timer_finishes_at = self._build_home_input()
+            home, evaluated_timer_finishes_at = self._build_home_input()
             current = current_state(home)
 
             if not self._initialized:
@@ -182,6 +182,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             result = adjust(self.parameters, home, self._session)
             adjustment, reason = result.output, result.reason
             await self._execute_adjustment(adjustment)
+            timer_finishes_at = (
+                self._active_aircon_timer() if adjustment is HomeOutput.TIMER else evaluated_timer_finishes_at
+            )
 
             previous = self._session.last
             applied = apply_adjustment(self._session, current, adjustment)

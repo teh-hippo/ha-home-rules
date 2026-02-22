@@ -55,7 +55,6 @@ async def test_timer_countdown_uses_internal_timer_duration(coord_factory) -> No
     coordinator = await coord_factory(climate="cool", grid="100")
     coordinator.control_mode = ControlMode.SOLAR_COOLING
     await coordinator.async_run_evaluation("poll")
-    await coordinator.async_run_evaluation("poll")
     result = coordinator.data.timer_finishes_at
     assert isinstance(result, datetime)
     expected = datetime.now(tz=UTC) + timedelta(minutes=DEFAULT_AIRCON_TIMER_DURATION)

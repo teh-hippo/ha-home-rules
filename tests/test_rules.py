@@ -101,9 +101,23 @@ def test_off_can_auto_dry():
     assert adjust(TEST_PARAMS, home, state).output is HomeOutput.DRY
 
 
-def test_off_aggressive_does_not_switch_to_dry():
+def test_off_aggressive_any_solar_above_cool_setpoint_turns_on_cool():
     state = CachedState()
-    home = default_input(aggressive_cooling=True, generation=TEST_PARAMS.generation_dry_threshold)
+    home = default_input(
+        aggressive_cooling=True,
+        generation=1,
+        temperature=TEST_PARAMS.temperature_cool + 0.1,
+    )
+    assert adjust(TEST_PARAMS, home, state).output is HomeOutput.COOL
+
+
+def test_off_aggressive_at_or_below_cool_setpoint_no_change():
+    state = CachedState()
+    home = default_input(
+        aggressive_cooling=True,
+        generation=TEST_PARAMS.generation_dry_threshold,
+        temperature=TEST_PARAMS.temperature_cool,
+    )
     assert adjust(TEST_PARAMS, home, state).output is HomeOutput.NO_CHANGE
 
 

@@ -118,11 +118,21 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
 
     if home.aircon_mode == AirconMode.OFF:
         state.tolerated = 0
+        if (
+            home.cooling_enabled
+            and home.aggressive_cooling
+            and home.have_solar
+            and home.generation > 0
+            and home.temperature > config.temperature_cool
+        ):
+            return AdjustResult(HomeOutput.COOL, "Boost above cool setpoint")
         if home.cooling_enabled and home.temperature >= config.temperature_threshold and output is not None:
             return AdjustResult(output, reason)
         why = (
             "Cooling disabled"
             if not home.cooling_enabled
+            else "Temperature below cool setpoint"
+            if home.aggressive_cooling and home.temperature <= config.temperature_cool
             else "Temperature below threshold"
             if home.temperature < config.temperature_threshold
             else activation
