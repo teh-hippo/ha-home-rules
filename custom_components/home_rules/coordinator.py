@@ -58,6 +58,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._recent: deque[dict[str, Any]] = deque(maxlen=c.MAX_RECENT_EVALUATIONS)
         self._last_changed: str | None = None
         self._last_record: dict[str, Any] = {}
+        self._aircon_timer_finishes_at: datetime | None = None
         self._store = Store[dict[str, Any]](hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
         interval = int(config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))
         super().__init__(
@@ -136,6 +137,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._auto_mode = bool(stored.get("auto_mode", False))
         self._last_changed = stored.get("last_changed")
         self._recent = deque(stored.get("recent_evaluations", []), maxlen=c.MAX_RECENT_EVALUATIONS)
+        self._aircon_timer_finishes_at = None
+        if timer_finishes_at := stored.get("aircon_timer_finishes_at"):
+            self._aircon_timer_finishes_at = dt_util.parse_datetime(str(timer_finishes_at))
         self._parameters = {}
         for k, v in stored.get("parameters", {}).items():
             with suppress(TypeError, ValueError):
@@ -265,13 +269,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _build_home_input(self) -> tuple[HomeInput, datetime | None]:
         climate = self._entity_state(c.CONF_CLIMATE_ENTITY_ID, "climate")
-        timer = self._entity_state(c.CONF_TIMER_ENTITY_ID, "timer")
         inv_id = self._entity_id(c.CONF_INVERTER_ENTITY_ID, optional=True)
         inv = self._get_state(inv_id, "inverter", allow_unavailable=True) if inv_id else None
         gen = self._entity_state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True)
         grid = self._entity_state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True)
         temp = self._entity_state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True)
         hum = self._entity_state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
+        timer_finishes_at = self._active_aircon_timer()
 
         have_solar = str(inv.state).lower() in {"on", "true", "1", "online"} if inv else not inv_id
         mode = AirconMode.UNKNOWN
@@ -283,7 +287,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 have_solar=have_solar,
                 generation=self._normalized_power(gen, "generation") if have_solar else 0.0,
                 grid_usage=self._normalized_power(grid, "grid") if have_solar else 0.0,
-                timer=str(timer.state).lower() not in {"idle", "cancelled"},
+                timer=timer_finishes_at is not None,
                 temperature=self._normalized_temperature(temp),
                 humidity=self._state_to_float(hum, "humidity"),
                 auto=self._auto_mode,
@@ -291,7 +295,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 enabled=self.control_mode is not c.ControlMode.DISABLED,
                 cooling_enabled=self.cooling_enabled,
             ),
-            self._timer_finishes_at(timer),
+            timer_finishes_at,
         )
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
@@ -330,7 +334,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         elif adjustment is HomeOutput.OFF:
             await self._call_service("climate", "turn_off", {"entity_id": climate})
         elif adjustment is HomeOutput.TIMER:
-            await self._call_service("timer", "start", {"entity_id": str(self._entity_id(c.CONF_TIMER_ENTITY_ID))})
+            duration = max(
+                1,
+                int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION)),
+            )
+            self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=duration)
         if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
             self._auto_mode = True
         elif adjustment is HomeOutput.OFF:
@@ -372,17 +380,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         except ValueError as err:
             raise ValueError(f"invalid numeric {label}: {state.state}") from err
 
-    def _timer_finishes_at(self, timer_state: State) -> datetime | None:
-        if str(timer_state.state).lower() in {"idle", "cancelled"}:
+    def _active_aircon_timer(self) -> datetime | None:
+        if self._aircon_timer_finishes_at is None:
             return None
-        if finishes_at := timer_state.attributes.get("finishes_at"):
-            return dt_util.parse_datetime(str(finishes_at))
-        remaining = timer_state.attributes.get("remaining")
-        if not remaining or len(parts := str(remaining).split(":")) != 3:
+        if self._aircon_timer_finishes_at <= dt_util.utcnow():
+            self._aircon_timer_finishes_at = None
             return None
-        with suppress(ValueError):
-            return dt_util.utcnow() + timedelta(hours=int(parts[0]), minutes=int(parts[1]), seconds=int(parts[2]))
-        return None
+        return self._aircon_timer_finishes_at
 
     def _normalized_power(self, state: State, label: str) -> float:
         value = self._state_to_float(state, label)
@@ -420,6 +424,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 "auto_mode": self._auto_mode,
                 "last_changed": self._last_changed,
                 "recent_evaluations": list(self._recent),
+                "aircon_timer_finishes_at": (
+                    self._aircon_timer_finishes_at.isoformat() if self._aircon_timer_finishes_at else None
+                ),
                 "parameters": dict(self._parameters),
             }
         )

@@ -87,15 +87,18 @@ async def test_below_dry_threshold_no_change(coord_factory) -> None:
 
 async def test_restart_timer_still_active_preserves_timer_state(coord_factory) -> None:
     """After restart with timer still running, session state is preserved as TIMER."""
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+
     from custom_components.home_rules.rules import HomeOutput
 
-    # Simulate session that was in TIMER state, timer is still active in HA.
+    # Simulate session that was in TIMER state, with integration-owned timer still active.
     coordinator = await coord_factory(
         climate="cool",
-        timer="active",
-        timer_attributes={"remaining": "0:02:00"},
         generation="0",  # No solar — reason the timer was running
     )
+    coordinator._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=2)
     # Bootstrap stored state as if we had previously been in TIMER mode.
     coordinator._session.last = HomeOutput.TIMER
     coordinator._initialized = False  # Reset so startup sync runs again.
@@ -111,10 +114,9 @@ async def test_restart_with_stale_timer_state_syncs_to_live(hass, coord_factory)
     """After restart, if stored state was TIMER but timer has expired, sync to live."""
     from custom_components.home_rules.rules import HomeOutput
 
-    # Timer has expired (idle), aircon is off — timer finished while HA was down.
+    # Timer has expired, aircon is off — timer finished while HA was down.
     coordinator = await coord_factory(
         climate="off",
-        timer="idle",
         generation="0",
     )
     # Simulate stale stored state: session said TIMER but reality is now OFF.

@@ -44,22 +44,26 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory
     assert reloaded._session.last is HomeOutput.NO_CHANGE
 
 
-async def test_timer_countdown_uses_remaining_attribute(coord_factory) -> None:
+async def test_timer_countdown_uses_internal_timer_duration(coord_factory) -> None:
     from datetime import UTC, datetime, timedelta
 
-    coordinator = await coord_factory(
-        timer="active",
-        timer_attributes={"remaining": "0:04:59"},
+    from custom_components.home_rules.const import (
+        DEFAULT_AIRCON_TIMER_DURATION,
+        ControlMode,
     )
+
+    coordinator = await coord_factory(climate="cool", grid="100")
+    coordinator.control_mode = ControlMode.SOLAR_COOLING
+    await coordinator.async_run_evaluation("poll")
     await coordinator.async_run_evaluation("poll")
     result = coordinator.data.timer_finishes_at
     assert isinstance(result, datetime)
-    expected = datetime.now(tz=UTC) + timedelta(minutes=4, seconds=59)
+    expected = datetime.now(tz=UTC) + timedelta(minutes=DEFAULT_AIRCON_TIMER_DURATION)
     assert abs((result - expected).total_seconds()) < 5
 
 
 async def test_timer_countdown_is_off_when_timer_idle(coord_factory) -> None:
-    coordinator = await coord_factory()  # timer="idle" by default
+    coordinator = await coord_factory()
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.timer_finishes_at is None
 

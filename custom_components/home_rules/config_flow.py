@@ -20,10 +20,10 @@ _SENSOR_KEYS = {
     c.CONF_HUMIDITY_ENTITY_ID,
 }
 _DOMAIN_CHECKS = {
-    c.CONF_TIMER_ENTITY_ID: ("timer.", "invalid_timer_entity"),
     c.CONF_CLIMATE_ENTITY_ID: ("climate.", "invalid_climate_entity"),
 }
 _DEFAULT_OPTIONS = {
+    c.CONF_AIRCON_TIMER_DURATION: c.DEFAULT_AIRCON_TIMER_DURATION,
     c.CONF_EVAL_INTERVAL: c.DEFAULT_EVAL_INTERVAL,
     c.CONF_GENERATION_COOL_THRESHOLD: c.DEFAULT_GENERATION_COOL_THRESHOLD,
     c.CONF_GENERATION_DRY_THRESHOLD: c.DEFAULT_GENERATION_DRY_THRESHOLD,
@@ -51,7 +51,6 @@ def _number_selector(min_val: float, max_val: float, step: float, unit: str | No
 
 _ENTITY_SELECTORS = {
     c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"),
-    c.CONF_TIMER_ENTITY_ID: _entity_selector("timer"),
     c.CONF_INVERTER_ENTITY_ID: _entity_selector(["sensor", "binary_sensor"]),
     c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"),
     c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"),
@@ -60,6 +59,7 @@ _ENTITY_SELECTORS = {
 }
 
 _NUMBER_FIELDS = (
+    (c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")),
     (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")),
     (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")),
     (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")),
@@ -146,7 +146,7 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         await self.async_set_unique_id(c.DOMAIN)
         self._abort_if_unique_id_configured()
-        return await self._config_step("user", user_input, (c.CONF_CLIMATE_ENTITY_ID, c.CONF_TIMER_ENTITY_ID))
+        return await self._config_step("user", user_input, (c.CONF_CLIMATE_ENTITY_ID,))
 
     async def async_step_solar(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return await self._config_step(
@@ -163,7 +163,6 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 
 _OPTIONS_ENTITY_FIELDS: tuple[tuple[type, str], ...] = (
     (vol.Required, c.CONF_CLIMATE_ENTITY_ID),
-    (vol.Required, c.CONF_TIMER_ENTITY_ID),
     (vol.Optional, c.CONF_INVERTER_ENTITY_ID),
     (vol.Required, c.CONF_GENERATION_ENTITY_ID),
     (vol.Required, c.CONF_GRID_ENTITY_ID),

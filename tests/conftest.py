@@ -38,7 +38,6 @@ else:
             CONF_HUMIDITY_ENTITY_ID,
             CONF_INVERTER_ENTITY_ID,
             CONF_TEMPERATURE_ENTITY_ID,
-            CONF_TIMER_ENTITY_ID,
             DOMAIN,
         )
         from custom_components.home_rules.coordinator import HomeRulesCoordinator
@@ -50,14 +49,11 @@ else:
             temperature: str = "25",
             humidity: str = "40",
             climate: str = "off",
-            timer: str = "idle",
-            timer_attributes: dict | None = None,
             inverter: str | None = None,
             options: dict | None = None,
             extra_data: dict | None = None,
         ) -> HomeRulesCoordinator:
             hass.states.async_set("climate.test", climate)
-            hass.states.async_set("timer.test", timer, timer_attributes or {})
             hass.states.async_set("sensor.generation", generation, {"unit_of_measurement": "W"})
             hass.states.async_set("sensor.grid", grid, {"unit_of_measurement": "W"})
             hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
@@ -65,7 +61,6 @@ else:
 
             data: dict[str, Any] = {
                 CONF_CLIMATE_ENTITY_ID: "climate.test",
-                CONF_TIMER_ENTITY_ID: "timer.test",
                 CONF_GENERATION_ENTITY_ID: "sensor.generation",
                 CONF_GRID_ENTITY_ID: "sensor.grid",
                 CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
@@ -94,12 +89,10 @@ else:
             CONF_GRID_ENTITY_ID,
             CONF_HUMIDITY_ENTITY_ID,
             CONF_TEMPERATURE_ENTITY_ID,
-            CONF_TIMER_ENTITY_ID,
             DOMAIN,
         )
 
         hass.states.async_set("climate.test", "off")
-        hass.states.async_set("timer.test", "idle")
         hass.states.async_set("sensor.generation", "6000", {"unit_of_measurement": "W"})
         hass.states.async_set("sensor.grid", "0", {"unit_of_measurement": "W"})
         hass.states.async_set("sensor.temperature", "25", {"unit_of_measurement": "°C"})
@@ -109,7 +102,6 @@ else:
             domain=DOMAIN,
             data={
                 CONF_CLIMATE_ENTITY_ID: "climate.test",
-                CONF_TIMER_ENTITY_ID: "timer.test",
                 CONF_GENERATION_ENTITY_ID: "sensor.generation",
                 CONF_GRID_ENTITY_ID: "sensor.grid",
                 CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",

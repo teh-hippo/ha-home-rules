@@ -28,6 +28,7 @@ Install through HACS as a custom repository:
 ## Configuration
 
 Add **Home Rules** from Settings -> Devices & Services, select your entities, then tune options.
+Home Rules manages its own aircon timer internally, so you do not need a separate `timer.*` helper entity.
 
 `select.home_rules_control_mode` defaults to **Monitor** for safe setup. Switch to **Solar Cooling** once you're happy with decisions and want the integration to control your climate entity.
 

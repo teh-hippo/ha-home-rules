@@ -13,7 +13,6 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 def _seed_valid_states(hass: HomeAssistant) -> None:
     hass.states.async_set("climate.ac", "off")
-    hass.states.async_set("timer.sleep", "idle")
     hass.states.async_set("sensor.solar_generation", "6000", {"unit_of_measurement": "W"})
     hass.states.async_set("sensor.grid_usage", "0", {"unit_of_measurement": "W"})
     hass.states.async_set("sensor.temp", "25", {"unit_of_measurement": "°C"})
@@ -30,7 +29,7 @@ async def _start_user_flow(hass: HomeAssistant) -> ConfigFlowResult:
 
 
 async def _move_to_solar_step(hass: HomeAssistant) -> ConfigFlowResult:
-    from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID
+    from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID
 
     _seed_valid_states(hass)
     result = await _start_user_flow(hass)
@@ -38,7 +37,6 @@ async def _move_to_solar_step(hass: HomeAssistant) -> ConfigFlowResult:
         result["flow_id"],
         {
             CONF_CLIMATE_ENTITY_ID: "climate.ac",
-            CONF_TIMER_ENTITY_ID: "timer.sleep",
         },
     )
     assert result["type"] is FlowResultType.FORM
@@ -65,6 +63,7 @@ async def _move_to_comfort_step(hass: HomeAssistant) -> ConfigFlowResult:
 async def test_config_flow_happy_path_creates_entry(hass) -> None:
     """The full user -> solar -> comfort flow should create an entry with defaults."""
     from custom_components.home_rules.const import (
+        CONF_AIRCON_TIMER_DURATION,
         CONF_CLIMATE_ENTITY_ID,
         CONF_EVAL_INTERVAL,
         CONF_GENERATION_COOL_THRESHOLD,
@@ -75,7 +74,7 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_HUMIDITY_ENTITY_ID,
         CONF_REACTIVATE_DELAY,
         CONF_TEMPERATURE_ENTITY_ID,
-        CONF_TIMER_ENTITY_ID,
+        DEFAULT_AIRCON_TIMER_DURATION,
         DEFAULT_EVAL_INTERVAL,
         DEFAULT_GENERATION_COOL_THRESHOLD,
         DEFAULT_GENERATION_DRY_THRESHOLD,
@@ -96,13 +95,13 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
     assert result["title"] == "Home Rules"
     assert result["data"] == {
         CONF_CLIMATE_ENTITY_ID: "climate.ac",
-        CONF_TIMER_ENTITY_ID: "timer.sleep",
         CONF_GENERATION_ENTITY_ID: "sensor.solar_generation",
         CONF_GRID_ENTITY_ID: "sensor.grid_usage",
         CONF_TEMPERATURE_ENTITY_ID: "sensor.temp",
         CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
     }
     assert result["options"] == {
+        CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
         CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
         CONF_GENERATION_COOL_THRESHOLD: DEFAULT_GENERATION_COOL_THRESHOLD,
         CONF_GENERATION_DRY_THRESHOLD: DEFAULT_GENERATION_DRY_THRESHOLD,
@@ -113,15 +112,13 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
 
 async def test_config_flow_rejects_missing_entities(hass) -> None:
     """Missing selected entities should return entity_not_found."""
-    from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID
+    from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID
 
-    hass.states.async_set("timer.sleep", "idle")
     result = await _start_user_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
             CONF_CLIMATE_ENTITY_ID: "climate.missing",
-            CONF_TIMER_ENTITY_ID: "timer.sleep",
         },
     )
     assert result["type"] is FlowResultType.FORM
@@ -171,32 +168,23 @@ def test_validate_entities_covers_all_custom_errors(hass) -> None:
         CONF_HUMIDITY_ENTITY_ID,
         CONF_INVERTER_ENTITY_ID,
         CONF_TEMPERATURE_ENTITY_ID,
-        CONF_TIMER_ENTITY_ID,
     )
 
     hass.states.async_set("climate.ok", "off")
-    hass.states.async_set("timer.ok", "idle")
     hass.states.async_set("sensor.ok", "1", {"unit_of_measurement": "W"})
     hass.states.async_set("sensor.home_rules_mode", "off", {"unit_of_measurement": "W"})
     hass.states.async_set("sensor.bad_power", "1", {"unit_of_measurement": "kWh"})
     hass.states.async_set("sensor.temp", "25", {"unit_of_measurement": "°C"})
     hass.states.async_set("sensor.humidity", "40", {"unit_of_measurement": "%"})
-    hass.states.async_set("sensor.not_timer", "idle")
     hass.states.async_set("sensor.not_climate", "off")
     hass.states.async_set("climate.not_inverter", "off")
     hass.states.async_set("timer.not_sensor", "idle")
 
     assert _validate_entities(
         hass,
-        {CONF_CLIMATE_ENTITY_ID: "sensor.not_climate", CONF_TIMER_ENTITY_ID: "timer.ok"},
-        required_keys=[CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID],
+        {CONF_CLIMATE_ENTITY_ID: "sensor.not_climate"},
+        required_keys=[CONF_CLIMATE_ENTITY_ID],
     ) == {"base": "invalid_climate_entity"}
-
-    assert _validate_entities(
-        hass,
-        {CONF_CLIMATE_ENTITY_ID: "climate.ok", CONF_TIMER_ENTITY_ID: "sensor.not_timer"},
-        required_keys=[CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID],
-    ) == {"base": "invalid_timer_entity"}
 
     assert _validate_entities(
         hass,

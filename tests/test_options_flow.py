@@ -10,6 +10,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 def _valid_options_input() -> dict[str, str | int | float]:
     from custom_components.home_rules.const import (
+        CONF_AIRCON_TIMER_DURATION,
         CONF_CLIMATE_ENTITY_ID,
         CONF_EVAL_INTERVAL,
         CONF_GENERATION_COOL_THRESHOLD,
@@ -21,7 +22,7 @@ def _valid_options_input() -> dict[str, str | int | float]:
         CONF_INVERTER_ENTITY_ID,
         CONF_REACTIVATE_DELAY,
         CONF_TEMPERATURE_ENTITY_ID,
-        CONF_TIMER_ENTITY_ID,
+        DEFAULT_AIRCON_TIMER_DURATION,
         DEFAULT_EVAL_INTERVAL,
         DEFAULT_GENERATION_COOL_THRESHOLD,
         DEFAULT_GENERATION_DRY_THRESHOLD,
@@ -31,12 +32,12 @@ def _valid_options_input() -> dict[str, str | int | float]:
 
     return {
         CONF_CLIMATE_ENTITY_ID: "climate.test",
-        CONF_TIMER_ENTITY_ID: "timer.test",
         CONF_INVERTER_ENTITY_ID: "sensor.inverter",
         CONF_GENERATION_ENTITY_ID: "sensor.generation",
         CONF_GRID_ENTITY_ID: "sensor.grid",
         CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
         CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
+        CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
         CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
         CONF_GENERATION_COOL_THRESHOLD: DEFAULT_GENERATION_COOL_THRESHOLD,
         CONF_GENERATION_DRY_THRESHOLD: DEFAULT_GENERATION_DRY_THRESHOLD,
