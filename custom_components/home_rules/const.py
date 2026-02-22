@@ -1,7 +1,7 @@
 from enum import StrEnum
 from logging import Logger, getLogger
 
-from homeassistant.const import Platform
+from homeassistant.const import Platform as Plat
 
 LOGGER: Logger = getLogger(__package__)
 DOMAIN = "home_rules"
@@ -14,48 +14,33 @@ class ControlMode(StrEnum):
     BOOST_COOLING = "boost_cooling"
 
 
-PLATFORMS: list[Platform] = [
-    Platform.SWITCH,
-    Platform.SELECT,
-    Platform.SENSOR,
-    Platform.BINARY_SENSOR,
-    Platform.BUTTON,
-    Platform.NUMBER,
-]
+PLATFORMS: list[Plat] = [Plat.SWITCH, Plat.SELECT, Plat.SENSOR, Plat.BINARY_SENSOR, Plat.BUTTON, Plat.NUMBER]
 
-CONF_CLIMATE_ENTITY_ID = "climate_entity_id"
-CONF_TIMER_ENTITY_ID = "timer_entity_id"
-CONF_INVERTER_ENTITY_ID = "inverter_entity_id"
-CONF_GENERATION_ENTITY_ID = "generation_entity_id"
-CONF_GRID_ENTITY_ID = "grid_entity_id"
-CONF_TEMPERATURE_ENTITY_ID = "temperature_entity_id"
-CONF_HUMIDITY_ENTITY_ID = "humidity_entity_id"
-CONF_GENERATION_COOL_THRESHOLD = "generation_cool_threshold"
-CONF_GENERATION_DRY_THRESHOLD = "generation_dry_threshold"
-CONF_TEMPERATURE_THRESHOLD = "temperature_threshold"
-CONF_HUMIDITY_THRESHOLD = "humidity_threshold"
-CONF_GRID_USAGE_DELAY = "grid_usage_delay"
-CONF_REACTIVATE_DELAY = "reactivate_delay"
-CONF_TEMPERATURE_COOL = "temperature_cool"
-CONF_EVAL_INTERVAL = "eval_interval"
-CONF_AIRCON_TIMER_DURATION = "aircon_timer_duration"
+CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID = "climate_entity_id", "timer_entity_id"
+CONF_INVERTER_ENTITY_ID, CONF_GENERATION_ENTITY_ID = "inverter_entity_id", "generation_entity_id"
+CONF_GRID_ENTITY_ID, CONF_TEMPERATURE_ENTITY_ID = "grid_entity_id", "temperature_entity_id"
+CONF_HUMIDITY_ENTITY_ID, CONF_GENERATION_COOL_THRESHOLD = "humidity_entity_id", "generation_cool_threshold"
+CONF_GENERATION_DRY_THRESHOLD, CONF_TEMPERATURE_THRESHOLD = "generation_dry_threshold", "temperature_threshold"
+CONF_HUMIDITY_THRESHOLD, CONF_GRID_USAGE_DELAY = "humidity_threshold", "grid_usage_delay"
+CONF_REACTIVATE_DELAY, CONF_TEMPERATURE_COOL = "reactivate_delay", "temperature_cool"
+CONF_EVAL_INTERVAL, CONF_AIRCON_TIMER_DURATION = "eval_interval", "aircon_timer_duration"
 CONF_NOTIFICATION_SERVICE = "notification_service"
 
-DEFAULT_GENERATION_COOL_THRESHOLD = 5500.0
-DEFAULT_GENERATION_DRY_THRESHOLD = 3500.0
-DEFAULT_TEMPERATURE_THRESHOLD = 24.0
-DEFAULT_HUMIDITY_THRESHOLD = 65.0
-DEFAULT_GRID_USAGE_DELAY = 2
-DEFAULT_REACTIVATE_DELAY = 2
-DEFAULT_TEMPERATURE_COOL = 22.0
-DEFAULT_EVAL_INTERVAL = 300
-DEFAULT_AIRCON_TIMER_DURATION = 30
+DEFAULT_GENERATION_COOL_THRESHOLD, DEFAULT_GENERATION_DRY_THRESHOLD = 5500.0, 3500.0
+DEFAULT_TEMPERATURE_THRESHOLD, DEFAULT_HUMIDITY_THRESHOLD = 24.0, 65.0
+DEFAULT_GRID_USAGE_DELAY, DEFAULT_REACTIVATE_DELAY = 2, 2
+DEFAULT_TEMPERATURE_COOL, DEFAULT_EVAL_INTERVAL, DEFAULT_AIRCON_TIMER_DURATION = 22.0, 300, 30
 
-MAX_RECENT_EVALUATIONS = 50
-STORAGE_VERSION = 1
+DEFAULT_OPTIONS: dict[str, int | float] = {
+    CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
+    CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
+    CONF_GENERATION_COOL_THRESHOLD: DEFAULT_GENERATION_COOL_THRESHOLD,
+    CONF_GENERATION_DRY_THRESHOLD: DEFAULT_GENERATION_DRY_THRESHOLD,
+    CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
+    CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
+}
+
+MAX_RECENT_EVALUATIONS, STORAGE_VERSION = 50, 1
 EVENT_EVALUATION = "home_rules_evaluation"
-ISSUE_RUNTIME = "runtime_error"
-ISSUE_ENTITY_MISSING = "entity_missing"
-ISSUE_ENTITY_UNAVAILABLE = "entity_unavailable"
-ISSUE_INVALID_UNIT = "invalid_unit"
-ISSUE_NOTIFICATION_SERVICE = "notification_service"
+ISSUE_RUNTIME, ISSUE_ENTITY_MISSING, ISSUE_ENTITY_UNAVAILABLE = "runtime_error", "entity_missing", "entity_unavailable"
+ISSUE_INVALID_UNIT, ISSUE_NOTIFICATION_SERVICE = "invalid_unit", "notification_service"
