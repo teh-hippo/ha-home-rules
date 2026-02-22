@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.4.0 (2026-02-22)
+
+### Features
+
+- **timer**: Internalize aircon timer
+  ([`005f692`](https://github.com/teh-hippo/ha-home-rules/commit/005f692ca6ace5b5ec2564b3bdbe0807e2de1eef))
+
+### Refactoring
+
+- Reduce source code complexity and duplication
+  ([`bd795b5`](https://github.com/teh-hippo/ha-home-rules/commit/bd795b5e5684032814f4e91f82d79cfc5fe5ec0a))
+
+
 ## v1.3.0 (2026-02-21)
 
 ### Features
