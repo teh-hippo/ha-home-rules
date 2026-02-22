@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.4.1 (2026-02-22)
+
+### Bug Fixes
+
+- **boost**: Align activation and reevaluate feedback
+  ([`1a4400b`](https://github.com/teh-hippo/ha-home-rules/commit/1a4400b25841228a216cbe06229d419ab447e8e0))
+
+
 ## v1.4.0 (2026-02-22)
 
 ### Features
