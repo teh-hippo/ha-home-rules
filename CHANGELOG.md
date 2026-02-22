@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.4.2 (2026-02-22)
+
+### Bug Fixes
+
+- Honor timer duration option and reduce source LOC
+  ([`96fcbfb`](https://github.com/teh-hippo/ha-home-rules/commit/96fcbfb46c6cb251098e6234005ede71bfd9e4b5))
+
+
 ## v1.4.1 (2026-02-22)
 
 ### Bug Fixes
