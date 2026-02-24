@@ -51,6 +51,15 @@ async def test_kw_generation_normalised_to_watts(hass, coord_factory) -> None:
     assert coordinator._last_record["generation"] == pytest.approx(6000.0)
 
 
+async def test_inverter_on_line_treated_as_online(coord_factory) -> None:
+    """Hyphenated inverter state (e.g. 'on-line') is treated as online/available."""
+    coordinator = await coord_factory(inverter="on-line")
+    await coordinator.async_run_evaluation("test")
+
+    assert coordinator._last_record["have_solar"] is True
+    assert coordinator.data.solar_available is True
+
+
 async def test_fahrenheit_temperature_normalised_to_celsius(hass, coord_factory) -> None:
     """Temperature sensor reporting in °F is normalised to °C before decisioning."""
     from custom_components.home_rules.rules import HomeOutput

@@ -134,7 +134,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         timer = self._active_aircon_timer(); climate = self._state(c.CONF_CLIMATE_ENTITY_ID, "climate")
         inv_id = self._entity_id(c.CONF_INVERTER_ENTITY_ID, optional=True); inv = self._get_state(inv_id, "inverter", allow_unavailable=True) if inv_id else None
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
-        have_solar = str(inv.state).lower() in {"on", "true", "1", "online"} if inv else not inv_id
+        have_solar = str(inv.state).lower().strip().replace("-", "").replace("_", "").replace(" ", "") in {"on", "true", "1", "online"} if inv else not inv_id
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
