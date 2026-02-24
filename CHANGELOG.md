@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.4.3 (2026-02-24)
+
+### Bug Fixes
+
+- **coordinator**: Recognize on-line inverter
+  ([`193e913`](https://github.com/teh-hippo/ha-home-rules/commit/193e9138be3ca9955911513eb5894e9f83f5a17e))
+
+
 ## v1.4.2 (2026-02-22)
 
 ### Bug Fixes
