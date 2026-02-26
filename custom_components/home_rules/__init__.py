@@ -6,8 +6,28 @@ from . import const as c
 from .coordinator import HomeRulesCoordinator
 
 _LEGACY_SUFFIXES = (
-    "enabled aggressive_cooling dry_run notifications_enabled generation_cool_threshold generation_dry_threshold"
+    "enabled aggressive_cooling dry_run notifications_enabled "
+    "generation_cool_threshold generation_dry_threshold timer_countdown current"
 ).split()
+_TARGET_MINOR_VERSION = 2
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    data = dict(entry.data)
+    options = dict(entry.options)
+    changed = False
+    if data.pop(c.LEGACY_CONF_TIMER_ENTITY_ID, None) is not None:
+        changed = True
+    if options.pop(c.LEGACY_CONF_TIMER_ENTITY_ID, None) is not None:
+        changed = True
+    if entry.minor_version < _TARGET_MINOR_VERSION or changed:
+        hass.config_entries.async_update_entry(
+            entry,
+            data=data,
+            options=options,
+            minor_version=_TARGET_MINOR_VERSION,
+        )
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -28,6 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    if (coordinator := getattr(entry, "runtime_data", None)) is not None:
+        await coordinator.async_shutdown()
     return await hass.config_entries.async_unload_platforms(entry, c.PLATFORMS)
 
 

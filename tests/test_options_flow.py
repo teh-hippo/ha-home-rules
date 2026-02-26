@@ -80,3 +80,23 @@ async def test_options_flow_validates_entities(hass, mock_entry) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "entity_not_found"}
+
+
+async def test_options_flow_drops_legacy_timer_entity_id(hass, mock_entry) -> None:
+    """Saving options strips stale timer_entity_id from existing option payloads."""
+    from custom_components.home_rules.const import LEGACY_CONF_TIMER_ENTITY_ID
+
+    hass.config_entries.async_update_entry(
+        mock_entry,
+        options={LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy"},
+    )
+    hass.states.async_set("sensor.inverter", "online")
+
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        _valid_options_input(),
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert LEGACY_CONF_TIMER_ENTITY_ID not in result["data"]

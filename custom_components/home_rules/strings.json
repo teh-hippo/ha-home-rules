@@ -87,9 +87,6 @@
       "mode": {
         "name": "Mode"
       },
-      "current": {
-        "name": "Current State"
-      },
       "adjustment": {
         "name": "Action"
       },

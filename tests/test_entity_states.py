@@ -11,7 +11,6 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
     """All platform entities should be created when the config entry is set up."""
     entity_ids = [
         "sensor.home_rules_mode",
-        "sensor.home_rules_current_state",
         "sensor.home_rules_action",
         "sensor.home_rules_decision",
         "sensor.home_rules_last_evaluated",
@@ -26,6 +25,7 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
 
     for entity_id in entity_ids:
         assert hass.states.get(entity_id) is not None
+    assert hass.states.get("sensor.home_rules_current_state") is None
 
     assert hass.states.get("select.home_rules_control_mode").state == "monitor"
     assert hass.states.get("switch.home_rules_cooling_enabled").state == "on"

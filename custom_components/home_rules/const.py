@@ -16,7 +16,7 @@ class ControlMode(StrEnum):
 
 PLATFORMS: list[Plat] = [Plat.SWITCH, Plat.SELECT, Plat.SENSOR, Plat.BINARY_SENSOR, Plat.BUTTON, Plat.NUMBER]
 
-CONF_CLIMATE_ENTITY_ID, CONF_TIMER_ENTITY_ID = "climate_entity_id", "timer_entity_id"
+CONF_CLIMATE_ENTITY_ID, LEGACY_CONF_TIMER_ENTITY_ID = "climate_entity_id", "timer_entity_id"
 CONF_INVERTER_ENTITY_ID, CONF_GENERATION_ENTITY_ID = "inverter_entity_id", "generation_entity_id"
 CONF_GRID_ENTITY_ID, CONF_TEMPERATURE_ENTITY_ID = "grid_entity_id", "temperature_entity_id"
 CONF_HUMIDITY_ENTITY_ID, CONF_GENERATION_COOL_THRESHOLD = "humidity_entity_id", "generation_cool_threshold"

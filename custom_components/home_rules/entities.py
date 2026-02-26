@@ -24,7 +24,7 @@ from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 _DIAG, _CONF, _TS = EntityCategory.DIAGNOSTIC, EntityCategory.CONFIG, SensorDeviceClass.TIMESTAMP
 type Entry = HomeRulesConfigEntry
 type Coord = HomeRulesCoordinator
-_OBJECT_IDS = {"current": f"{c.DOMAIN}_current_state", "adjustment": f"{c.DOMAIN}_action", "timer_finishes_at": f"{c.DOMAIN}_timer_countdown", "temperature_cool": f"{c.DOMAIN}_cool_setpoint"}
+_OBJECT_IDS = {"mode": f"{c.DOMAIN}_mode", "adjustment": f"{c.DOMAIN}_action", "timer_finishes_at": f"{c.DOMAIN}_timer_countdown", "temperature_cool": f"{c.DOMAIN}_cool_setpoint"}
 
 
 def _sensor(key: str, **kwargs: Any) -> SensorEntityDescription: return SensorEntityDescription(key=key, translation_key=key, **kwargs)
@@ -32,7 +32,6 @@ def _sensor(key: str, **kwargs: Any) -> SensorEntityDescription: return SensorEn
 
 SENSORS = (
     _sensor("mode"),
-    _sensor("current"),
     _sensor("adjustment"),
     _sensor("decision", entity_category=_DIAG),
     _sensor("last_evaluated", device_class=_TS, entity_category=_DIAG),

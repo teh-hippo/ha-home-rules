@@ -138,6 +138,28 @@ async def test_restart_with_stale_timer_state_syncs_to_live(hass, coord_factory)
     assert coordinator._session.last is HomeOutput.OFF
 
 
+async def test_timer_expiry_callback_triggers_immediate_evaluation(hass, coord_factory) -> None:
+    import asyncio
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(climate="cool", grid="100")
+    coordinator._initialized = True
+    coordinator._session.last = HomeOutput.TIMER
+    coordinator._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(milliseconds=20)
+    coordinator._schedule_timer_expiry()
+
+    await asyncio.sleep(0.1)
+    await hass.async_block_till_done()
+
+    assert coordinator._last_record["trigger"] == "timer_expired"
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    await coordinator.async_shutdown()
+
+
 async def test_restart_first_eval_uses_live_state_when_no_stored_session(coord_factory) -> None:
     """First eval with no stored session initialises session.last from live entity state."""
     # High solar, hot, aircon is already cooling.

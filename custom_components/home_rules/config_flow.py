@@ -1,6 +1,7 @@
 # fmt: off
 # ruff: noqa: E501, E701, E702
 
+from collections.abc import Mapping
 from typing import Any, cast
 
 import voluptuous as vol
@@ -26,6 +27,10 @@ _ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CO
 _NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY, _number_selector(0, 5, 1)))
 _OPTIONS_ENTITY_FIELDS: tuple[tuple[type, str], ...] = ((vol.Required, c.CONF_CLIMATE_ENTITY_ID), (vol.Optional, c.CONF_INVERTER_ENTITY_ID), (vol.Required, c.CONF_GENERATION_ENTITY_ID), (vol.Required, c.CONF_GRID_ENTITY_ID), (vol.Required, c.CONF_TEMPERATURE_ENTITY_ID), (vol.Required, c.CONF_HUMIDITY_ENTITY_ID))
 _OPTIONS_REQUIRED = [key for marker, key in _OPTIONS_ENTITY_FIELDS if marker is vol.Required]
+
+
+def _without_legacy_timer_entity_id(data: Mapping[str, Any]) -> dict[str, Any]:
+    cleaned = dict(data); cleaned.pop(c.LEGACY_CONF_TIMER_ENTITY_ID, None); return cleaned
 
 
 def _schema(required: tuple[str, ...], optional: tuple[str, ...] = ()) -> vol.Schema:
@@ -58,6 +63,7 @@ def _validate_entities(
 
 class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
     VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None: self._data: dict[str, Any] = {}
     @staticmethod
@@ -91,8 +97,8 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors = _validate_entities(self.hass, user_input, _OPTIONS_REQUIRED, allow_inverter=True) if user_input else {}
-        if user_input and not errors: return self.async_create_entry(data={**self.config_entry.options, **user_input})
-        cur = self.config_entry.options
+        if user_input and not errors: return self.async_create_entry(data=_without_legacy_timer_entity_id({**self.config_entry.options, **user_input}))
+        cur = _without_legacy_timer_entity_id(self.config_entry.options)
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {marker(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for marker, key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})

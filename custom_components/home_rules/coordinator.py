@@ -50,7 +50,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self.hass, self.config_entry = hass, config_entry; self._lock, self._session = asyncio.Lock(), CachedState(); self.control_mode, self.cooling_enabled = c.ControlMode.MONITOR, True
-        self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}; self._aircon_timer_finishes_at: datetime | None = None
+        self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}; self._aircon_timer_finishes_at: datetime | None = None; self._timer_expiry_handle: asyncio.TimerHandle | None = None
         self._store = Store[dict[str, Any]](hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
         interval = timedelta(seconds=int(config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))); name = f"{c.DOMAIN} ({config_entry.entry_id})"
         super().__init__(hass, c.LOGGER, name=name, update_interval=interval, always_update=True, config_entry=config_entry); self.data = CoordinatorData()
@@ -86,8 +86,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._parameters = {}
         for k, v in stored.get("parameters", {}).items():
             with suppress(TypeError, ValueError): self._parameters[str(k)] = float(v)
+        self._schedule_timer_expiry()
 
     async def async_set_control(self, key: str, value: bool) -> None: setattr(self, key, value); await self._save_state(); await self.async_run_evaluation("control")
+    async def async_shutdown(self) -> None: self._cancel_timer_expiry()
     async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate(trigger))
 
     async def _async_update_data(self) -> CoordinatorData:
@@ -158,7 +160,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
                 for service, data in (("set_hvac_mode", {"entity_id": climate, "hvac_mode": adjustment.value.lower()}), ("set_temperature", {"entity_id": climate, "temperature": self.parameters.temperature_cool})): await self._call_service("climate", service, data)
             elif adjustment is HomeOutput.OFF: await self._call_service("climate", "turn_off", {"entity_id": climate})
-            elif adjustment is HomeOutput.TIMER: self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION))))
+        if adjustment is HomeOutput.TIMER and self.control_mode is not c.ControlMode.MONITOR:
+            self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION)))); self._schedule_timer_expiry()
+        elif adjustment is HomeOutput.OFF:
+            self._aircon_timer_finishes_at = None; self._schedule_timer_expiry()
         if adjustment in (HomeOutput.COOL, HomeOutput.DRY): self._auto_mode = True
         elif adjustment is HomeOutput.OFF: self._auto_mode = False
 
@@ -183,8 +188,23 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         except ValueError as err: raise ValueError(f"invalid numeric {label}: {state.state}") from err
 
     def _active_aircon_timer(self) -> datetime | None:
-        if self._aircon_timer_finishes_at and self._aircon_timer_finishes_at <= dt_util.utcnow(): self._aircon_timer_finishes_at = None
+        if self._aircon_timer_finishes_at and self._aircon_timer_finishes_at <= dt_util.utcnow(): self._aircon_timer_finishes_at = None; self._schedule_timer_expiry()
         return self._aircon_timer_finishes_at
+
+    def _cancel_timer_expiry(self) -> None:
+        if self._timer_expiry_handle is None: return
+        self._timer_expiry_handle.cancel(); self._timer_expiry_handle = None
+
+    def _schedule_timer_expiry(self) -> None:
+        self._cancel_timer_expiry()
+        if self._aircon_timer_finishes_at is None: return
+        delay = (self._aircon_timer_finishes_at - dt_util.utcnow()).total_seconds()
+        if delay <= 0: self.hass.loop.call_soon(self._async_handle_timer_expiry); return
+        self._timer_expiry_handle = self.hass.loop.call_later(delay, self._async_handle_timer_expiry)
+
+    def _async_handle_timer_expiry(self) -> None:
+        self._timer_expiry_handle = None
+        self.hass.async_create_task(self.async_run_evaluation("timer_expired"))
 
     def _normalized_power(self, state: State, label: str) -> float:
         value = self._state_to_float(state, label); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()

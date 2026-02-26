@@ -332,6 +332,12 @@ def test_manual_cool_grid_usage_with_timer_active_no_change():
     assert adjust(TEST_PARAMS, home, state).output is HomeOutput.NO_CHANGE
 
 
+def test_manual_cool_timer_expired_turns_off():
+    state = CachedState(last=HomeOutput.TIMER)
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1, timer=False)
+    assert adjust(TEST_PARAMS, home, state).output is HomeOutput.OFF
+
+
 def test_when_off_and_timer_active_do_not_reset():
     state = CachedState(last=HomeOutput.TIMER)
     home = default_input(timer=True)
@@ -531,6 +537,12 @@ def test_reason_manual_timer_active():
 def test_reason_timer_expired():
     """Timer expired while aircon off → 'Timer expired'."""
     home = default_input(timer=False)
+    assert adjust(TEST_PARAMS, home, CachedState(last=HomeOutput.TIMER)).reason == "Timer expired"
+
+
+def test_reason_timer_expired_while_manual_on():
+    """Timer expired while manual cooling on grid → 'Timer expired'."""
+    home = default_input(aircon_mode=AirconMode.COOL, grid_usage=0.1, timer=False)
     assert adjust(TEST_PARAMS, home, CachedState(last=HomeOutput.TIMER)).reason == "Timer expired"
 
 

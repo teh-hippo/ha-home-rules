@@ -23,18 +23,20 @@ async def test_setup_and_unload_entry(hass, mock_entry) -> None:
 
 async def test_setup_removes_legacy_entities(hass, mock_entry, entity_registry) -> None:
     """Setup removes legacy entities replaced by the control-mode select."""
-    legacy_unique_ids = {
-        f"{mock_entry.entry_id}_enabled",
-        f"{mock_entry.entry_id}_aggressive_cooling",
-        f"{mock_entry.entry_id}_dry_run",
-        f"{mock_entry.entry_id}_notifications_enabled",
-        f"{mock_entry.entry_id}_generation_cool_threshold",
-        f"{mock_entry.entry_id}_generation_dry_threshold",
+    legacy_entities = {
+        ("switch", f"{mock_entry.entry_id}_enabled"),
+        ("switch", f"{mock_entry.entry_id}_aggressive_cooling"),
+        ("switch", f"{mock_entry.entry_id}_dry_run"),
+        ("switch", f"{mock_entry.entry_id}_notifications_enabled"),
+        ("switch", f"{mock_entry.entry_id}_generation_cool_threshold"),
+        ("switch", f"{mock_entry.entry_id}_generation_dry_threshold"),
+        ("sensor", f"{mock_entry.entry_id}_timer_countdown"),
+        ("sensor", f"{mock_entry.entry_id}_current"),
     }
 
-    for unique_id in legacy_unique_ids:
+    for platform, unique_id in legacy_entities:
         entity_registry.async_get_or_create(
-            "switch",
+            platform,
             "home_rules",
             unique_id,
             suggested_object_id=f"legacy_{unique_id}",
@@ -44,8 +46,30 @@ async def test_setup_removes_legacy_entities(hass, mock_entry, entity_registry) 
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
 
-    for unique_id in legacy_unique_ids:
-        assert entity_registry.async_get_entity_id("switch", "home_rules", unique_id) is None
+    for platform, unique_id in legacy_entities:
+        assert entity_registry.async_get_entity_id(platform, "home_rules", unique_id) is None
+
+
+async def test_migrate_entry_removes_legacy_timer_entity_id(hass) -> None:
+    """Entry migration removes stale timer_entity_id from data and options."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.home_rules import async_migrate_entry
+    from custom_components.home_rules.const import DOMAIN, LEGACY_CONF_TIMER_ENTITY_ID
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy"},
+        options={LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy"},
+        version=1,
+        minor_version=1,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry)
+    assert LEGACY_CONF_TIMER_ENTITY_ID not in entry.data
+    assert LEGACY_CONF_TIMER_ENTITY_ID not in entry.options
+    assert entry.minor_version == 2
 
 
 async def test_options_update_triggers_reload(hass, loaded_entry) -> None:

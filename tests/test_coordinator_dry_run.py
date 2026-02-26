@@ -67,6 +67,18 @@ async def test_timer_countdown_is_off_when_timer_idle(coord_factory) -> None:
     assert coordinator.data.timer_finishes_at is None
 
 
+async def test_timer_adjustment_schedules_expiry_callback(coord_factory) -> None:
+    from custom_components.home_rules.const import ControlMode
+
+    coordinator = await coord_factory(climate="cool", grid="100")
+    coordinator.control_mode = ControlMode.SOLAR_COOLING
+    await coordinator.async_run_evaluation("poll")
+
+    assert coordinator._timer_expiry_handle is not None
+    await coordinator.async_shutdown()
+    assert coordinator._timer_expiry_handle is None
+
+
 async def test_legacy_control_mode_values_migrate_on_reload(hass, coord_factory) -> None:
     """Old string mode values (e.g. 'Dry Run', 'Live') are mapped to new enum values."""
     from homeassistant.helpers.storage import Store

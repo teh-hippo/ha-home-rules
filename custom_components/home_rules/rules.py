@@ -153,7 +153,11 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             state.tolerated = 0
             state.reactivate_delay = config.reactivate_delay
             return AdjustResult(HomeOutput.OFF, "Grid usage too high")
-        return AdjustResult(OUT.TIMER, "Manual") if not h.timer else AdjustResult(OUT.NO_CHANGE, "No change")
+        if h.timer:
+            return AdjustResult(OUT.NO_CHANGE, "No change")
+        if state.last is HomeOutput.TIMER:
+            return AdjustResult(OUT.OFF, "Timer expired")
+        return AdjustResult(OUT.TIMER, "Manual")
 
     if h.auto:
         state.tolerated = 0
