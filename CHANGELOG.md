@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.4.4 (2026-02-26)
+
+### Bug Fixes
+
+- Harden timer expiry and migration behavior
+  ([`793c5cc`](https://github.com/teh-hippo/ha-home-rules/commit/793c5ccec53394b681d9f64fc67f8c3066d32434))
+
+### Continuous Integration
+
+- Publish latest release alias
+  ([`304f6e9`](https://github.com/teh-hippo/ha-home-rules/commit/304f6e99a9d76e2cf1a6716455290ad61c203a9b))
+
+- **release**: Add latest tag update step
+  ([`8c2b65a`](https://github.com/teh-hippo/ha-home-rules/commit/8c2b65a847e77de73f090306675132f7707d1ccd))
+
+
 ## v1.4.3 (2026-02-24)
 
 ### Bug Fixes
