@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.4.6 (2026-03-01)
+
+### Bug Fixes
+
+- **units**: Accept lowercase power units
+  ([`acf33e1`](https://github.com/teh-hippo/ha-home-rules/commit/acf33e1142607953e2ef2d87d9b49dc2548c10d6))
+
+### Continuous Integration
+
+- **codeql**: Upgrade codeql action to v4
+  ([`901dfad`](https://github.com/teh-hippo/ha-home-rules/commit/901dfad5c1884a88abbb908061ec7a7b0643ec0a))
+
+
 ## v1.4.5 (2026-03-01)
 
 ### Bug Fixes
