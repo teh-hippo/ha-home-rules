@@ -49,7 +49,7 @@ def _validate_entities(
         if not (state := hass.states.get(entity_id)): return {"base": "entity_not_found"}
         if entity_id.startswith(_HOME_RULES_PREFIXES): return {"base": "invalid_entity_selection"}
         if key in _POWER_KEYS:
-            try: UnitOfPower(str(state.attributes.get("unit_of_measurement", "")).strip())
+            try: UnitOfPower(c.normalize_power_unit(str(state.attributes.get("unit_of_measurement", ""))))
             except ValueError: return {"base": "invalid_power_unit"}
         if check_domains and key == c.CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("climate."): return {"base": "invalid_climate_entity"}
         if check_domains and key != c.CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("sensor."): return {"base": "invalid_sensor_entity"}

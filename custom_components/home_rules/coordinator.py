@@ -207,7 +207,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.hass.async_create_task(self.async_run_evaluation("timer_expired"))
 
     def _normalized_power(self, state: State, label: str) -> float:
-        value = self._state_to_float(state, label); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
+        value = self._state_to_float(state, label); unit = c.normalize_power_unit(str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")))
         try: return max(0.0, PowerConverter.convert(value, UnitOfPower(unit), UnitOfPower.WATT))
         except ValueError:
             self._create_issue(c.ISSUE_INVALID_UNIT, {"entity_id": state.entity_id, "unit": unit or "(none)"}); raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}") from None

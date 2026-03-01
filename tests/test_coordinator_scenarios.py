@@ -39,12 +39,12 @@ async def test_high_humidity_yields_dry_not_cool(coord_factory) -> None:
 
 
 async def test_kw_generation_normalised_to_watts(hass, coord_factory) -> None:
-    """Generation sensor reporting in kW is normalised to W before decisioning."""
+    """Generation sensor reporting in lowercase kw is normalised to W before decisioning."""
     from custom_components.home_rules.rules import HomeOutput
 
     coordinator = await coord_factory()
-    # Override unit to kW: 6 kW = 6000 W → still above the 5500 W cool threshold
-    hass.states.async_set("sensor.generation", "6", {"unit_of_measurement": "kW"})
+    # Override unit to lowercase kw: 6 kW = 6000 W → still above the 5500 W cool threshold
+    hass.states.async_set("sensor.generation", "6", {"unit_of_measurement": "kw"})
     await coordinator.async_run_evaluation("test")
 
     assert coordinator.data.adjustment is HomeOutput.COOL
