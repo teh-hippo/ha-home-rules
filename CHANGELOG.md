@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.4.5 (2026-03-01)
+
+### Bug Fixes
+
+- **coordinator**: Avoid startup traceback for unavailable climate
+  ([`59c7000`](https://github.com/teh-hippo/ha-home-rules/commit/59c7000487fffd47796ee7c9c8bd59b79e7f26b3))
+
+
 ## v1.4.4 (2026-02-26)
 
 ### Bug Fixes
