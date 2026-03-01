@@ -32,6 +32,20 @@ async def test_unknown_power_sensors_do_not_raise_repairs_issue(hass, coord_fact
     assert registry.async_get_issue("home_rules", f"{coordinator.config_entry.entry_id}_entity_unavailable") is None
 
 
+async def test_required_entity_unavailable_during_startup_is_wrapped_without_runtime_issue(hass, coord_factory) -> None:
+    from homeassistant.helpers import issue_registry as ir
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    from custom_components.home_rules.const import DOMAIN, ISSUE_RUNTIME
+
+    coordinator = await coord_factory(climate="unavailable")
+    with pytest.raises(UpdateFailed, match="Required entity not yet available: climate.test"):
+        await coordinator._async_update_data()
+
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, f"{coordinator.config_entry.entry_id}_{ISSUE_RUNTIME}") is None
+
+
 async def test_unavailable_temperature_uses_below_threshold_default(coord_factory) -> None:
     """Unavailable temperature defaults to threshold-0.1°C so cooling is not triggered."""
     from custom_components.home_rules.rules import HomeOutput

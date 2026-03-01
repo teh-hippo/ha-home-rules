@@ -94,7 +94,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _async_update_data(self) -> CoordinatorData:
         try: return await self._evaluate("poll")
-        except ConfigEntryNotReady: raise
+        except ConfigEntryNotReady as err: raise UpdateFailed(str(err)) from err
         except Exception as err:  # noqa: BLE001
             self._create_issue(c.ISSUE_RUNTIME, {"error": str(err)})
             raise UpdateFailed(translation_domain=c.DOMAIN, translation_key="update_failed", translation_placeholders={"error": str(err)}) from err
