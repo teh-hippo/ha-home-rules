@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.5.0 (2026-03-05)
+
+### Documentation
+
+- **copilot**: Add repository instructions
+  ([`4facf10`](https://github.com/teh-hippo/ha-home-rules/commit/4facf104dbe64c0b493222e75cd56918cb7b764b))
+
+### Features
+
+- Add local brand assets and Python 3.14 support
+  ([`951b95c`](https://github.com/teh-hippo/ha-home-rules/commit/951b95c6a5b916493289917cffb32d164395af56))
+
+
 ## v1.4.6 (2026-03-01)
 
 ### Bug Fixes
