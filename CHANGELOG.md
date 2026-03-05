@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.5.5 (2026-03-05)
+
+### Bug Fixes
+
+- **security**: Pin patched pillow for dev lock
+  ([`4167789`](https://github.com/teh-hippo/ha-home-rules/commit/4167789b5e2a83643c22f2576f7a7ba27fb7c7c7))
+
+
 ## v1.5.4 (2026-03-05)
 
 ### Build System
