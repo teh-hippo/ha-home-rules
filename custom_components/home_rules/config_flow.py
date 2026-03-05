@@ -67,7 +67,7 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 
     def __init__(self) -> None: self._data: dict[str, Any] = {}
     @staticmethod
-    def async_get_options_flow(_config_entry: ConfigEntry) -> "HomeRulesOptionsFlow": return HomeRulesOptionsFlow()
+    def async_get_options_flow(_config_entry: ConfigEntry) -> HomeRulesOptionsFlow: return HomeRulesOptionsFlow()
 
     async def _step(
         self,
