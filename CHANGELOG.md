@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.5.4 (2026-03-05)
+
+### Build System
+
+- Refresh test deps for python 3.14
+  ([`6d457ad`](https://github.com/teh-hippo/ha-home-rules/commit/6d457ad69e9ceec8c528a213981d31b249a90d47))
+
+### Continuous Integration
+
+- Harden dependabot and release flow
+  ([`4ae0360`](https://github.com/teh-hippo/ha-home-rules/commit/4ae03604aa49addb026297bc7483ca78f9fb3650))
+
+
 ## v1.5.3 (2026-03-05)
 
 ### Bug Fixes
