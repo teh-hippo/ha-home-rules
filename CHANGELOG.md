@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.5.3 (2026-03-05)
+
+### Bug Fixes
+
+- Scope major-update label creation to repository
+  ([`f590334`](https://github.com/teh-hippo/ha-home-rules/commit/f590334e13772e0de884e4aa70586728501f4fa9))
+
+
 ## v1.5.2 (2026-03-05)
 
 ### Bug Fixes
