@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.5.1 (2026-03-05)
+
+### Bug Fixes
+
+- Correct Copilot reviewer login
+  ([`255ba82`](https://github.com/teh-hippo/ha-home-rules/commit/255ba82f083eff2932531613d70bcdbdbf6f59dc))
+
+
 ## v1.5.0 (2026-03-05)
 
 ### Documentation
