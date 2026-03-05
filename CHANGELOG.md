@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.5.2 (2026-03-05)
+
+### Bug Fixes
+
+- Bootstrap major-update label in dependabot workflow
+  ([`fb1ff79`](https://github.com/teh-hippo/ha-home-rules/commit/fb1ff799d782f168f7d5d20515d39e9eeaa7aae0))
+
+
 ## v1.5.1 (2026-03-05)
 
 ### Bug Fixes
