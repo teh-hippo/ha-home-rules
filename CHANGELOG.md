@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.6.0 (2026-03-07)
+
+### Features
+
+- Human-friendly notification wording with emoji
+  ([`26a69cc`](https://github.com/teh-hippo/ha-home-rules/commit/26a69ccae5f80b13bba499980e07349fbf0170b3))
+
+
 ## v1.5.5 (2026-03-05)
 
 ### Bug Fixes
