@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v1.7.0 (2026-03-07)
+
+### Build System
+
+- **deps-dev**: Bump ruff in the python-deps group
+  ([`7b5a97d`](https://github.com/teh-hippo/ha-home-rules/commit/7b5a97dfbdb4ff05d840898906798bf56584c558))
+
+### Continuous Integration
+
+- Replace Copilot-gated auto-merge with fastify action
+  ([`af31447`](https://github.com/teh-hippo/ha-home-rules/commit/af314479103d9abbf22500c2ccdba11a90c27e76))
+
+### Features
+
+- Shadow-mode smoothed kW evaluation with diagnostics
+  ([`4b5f814`](https://github.com/teh-hippo/ha-home-rules/commit/4b5f81457f7ecc0c6bd3adb7d86b8690db3ff99a))
+
+
 ## v1.6.0 (2026-03-07)
 
 ### Features
