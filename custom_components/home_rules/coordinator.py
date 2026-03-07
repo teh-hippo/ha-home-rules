@@ -4,7 +4,7 @@
 import asyncio
 from collections import deque
 from contextlib import suppress
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -37,7 +37,7 @@ _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, 
 
 @dataclass
 class CoordinatorData:
-    mode: HomeOutput = HomeOutput.OFF; current: HomeOutput = HomeOutput.OFF; adjustment: HomeOutput = HomeOutput.NO_CHANGE; decision: str = ""; reason: str = ""; solar_available: bool = False; auto_mode: bool = False; dry_run: bool = False; timer_finishes_at: datetime | None = None; last_evaluated: str | None = None; last_changed: str | None = None
+    mode: HomeOutput = HomeOutput.OFF; current: HomeOutput = HomeOutput.OFF; adjustment: HomeOutput = HomeOutput.NO_CHANGE; decision: str = ""; reason: str = ""; solar_available: bool = False; auto_mode: bool = False; dry_run: bool = False; timer_finishes_at: datetime | None = None; last_evaluated: str | None = None; last_changed: str | None = None; smoothing_disagrees: int = 0
 
 
 class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
@@ -111,10 +111,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if previous is not None and previous != self._session.last: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
             mode = self._session.last or current
             record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
+            smoothed = self._run_shadow_smoothed(home, record)
+            record.update(smoothed)
             self._last_record = record; self._recent.appendleft(record); await self._save_state(); self.hass.bus.async_fire(c.EVENT_EVALUATION, record)
             for issue in _CLEAR_ISSUES: self._clear_issue(issue)
             self._first_refresh_done = True
-            return CoordinatorData(mode=mode, current=current, adjustment=adjustment, decision=f"{mode.value} - {reason}", reason=reason, solar_available=home.have_solar and home.generation > 0.0, auto_mode=self._auto_mode, dry_run=is_monitor, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed)
+            disagree_count = sum(1 for r in list(self._recent)[:10] if r.get("decision_differs", False))
+            return CoordinatorData(mode=mode, current=current, adjustment=adjustment, decision=f"{mode.value} - {reason}", reason=reason, solar_available=home.have_solar and home.generation > 0.0, auto_mode=self._auto_mode, dry_run=is_monitor, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed, smoothing_disagrees=disagree_count)
 
     async def _maybe_notify(self, previous: HomeOutput, current: HomeOutput, adjustment: HomeOutput) -> None:
         service = str(self.config_entry.options.get(c.CONF_NOTIFICATION_SERVICE, "")).strip()
@@ -126,6 +129,22 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         new = (self._session.last or current).value; icon = _emoji.get(new, "")
         try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"{icon} Switched from {previous.value} to {new}"}, blocking=False)
         except ServiceValidationError: self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service})
+
+    def _run_shadow_smoothed(self, home: HomeInput, record: dict[str, Any]) -> dict[str, Any]:
+        window = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
+        raw_gen, raw_grid = home.generation, home.grid_usage
+        if window > 1 and self._recent:
+            prev = list(self._recent)[:window - 1]
+            gen_vals = [r.get("raw_generation", r.get("generation", 0.0)) for r in prev] + [raw_gen]
+            grid_vals = [r.get("raw_grid_usage", r.get("grid_usage", 0.0)) for r in prev] + [raw_grid]
+            smoothed_gen = sum(gen_vals) / len(gen_vals); smoothed_grid = sum(grid_vals) / len(grid_vals)
+        else:
+            smoothed_gen, smoothed_grid = raw_gen, raw_grid
+        shadow_home = replace(home, generation=smoothed_gen, grid_usage=smoothed_grid)
+        shadow_session = CachedState(reactivate_delay=self._session.reactivate_delay, tolerated=self._session.tolerated, last=self._session.last, failed_to_change=self._session.failed_to_change)
+        shadow_result = adjust(self.parameters, shadow_home, shadow_session)
+        differs = shadow_result.output.value != record["adjustment"]
+        return {"raw_generation": raw_gen, "raw_grid_usage": raw_grid, "smoothed_generation": round(smoothed_gen, 1), "smoothed_grid_usage": round(smoothed_grid, 1), "smoothed_adjustment": shadow_result.output.value, "smoothed_reason": shadow_result.reason, "decision_differs": differs}
 
     def _entity_id(self, key: str, *, optional: bool = False) -> str | None:
         value = str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip()

@@ -21,6 +21,9 @@
       },
       "timer_finishes_at": {
         "default": "mdi:timer-outline"
+      },
+      "smoothing_disagrees": {
+        "default": "mdi:compare-horizontal"
       }
     },
     "binary_sensor": {

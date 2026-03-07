@@ -73,6 +73,7 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_GRID_USAGE_DELAY,
         CONF_HUMIDITY_ENTITY_ID,
         CONF_REACTIVATE_DELAY,
+        CONF_SMOOTHING_WINDOW,
         CONF_TEMPERATURE_ENTITY_ID,
         DEFAULT_AIRCON_TIMER_DURATION,
         DEFAULT_EVAL_INTERVAL,
@@ -80,6 +81,7 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         DEFAULT_GENERATION_DRY_THRESHOLD,
         DEFAULT_GRID_USAGE_DELAY,
         DEFAULT_REACTIVATE_DELAY,
+        DEFAULT_SMOOTHING_WINDOW,
     )
 
     result = await _move_to_comfort_step(hass)
@@ -107,6 +109,7 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_GENERATION_DRY_THRESHOLD: DEFAULT_GENERATION_DRY_THRESHOLD,
         CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
         CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
+        CONF_SMOOTHING_WINDOW: DEFAULT_SMOOTHING_WINDOW,
     }
 
 

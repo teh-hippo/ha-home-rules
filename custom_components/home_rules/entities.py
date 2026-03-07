@@ -37,6 +37,7 @@ SENSORS = (
     _sensor("last_evaluated", device_class=_TS, entity_category=_DIAG),
     _sensor("last_changed", device_class=_TS, entity_category=_DIAG),
     _sensor("timer_finishes_at", device_class=_TS, entity_category=_DIAG),
+    _sensor("smoothing_disagrees", entity_category=_DIAG),
 )
 BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
@@ -62,7 +63,10 @@ class HomeRulesSensor(HomeRulesEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        return None if self.entity_description.key != "decision" else {**dict(self.coordinator._last_record), "recent": list(self.coordinator._recent)[:10]}
+        key = self.entity_description.key
+        if key == "decision": return {**dict(self.coordinator._last_record), "recent": list(self.coordinator._recent)[:10]}
+        if key == "smoothing_disagrees": return {"disagreements": [r for r in list(self.coordinator._recent)[:10] if r.get("decision_differs", False)]}
+        return None
 
 
 class HomeRulesBinarySensor(HomeRulesEntity, BinarySensorEntity):
