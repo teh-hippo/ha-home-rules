@@ -20,6 +20,8 @@ async def test_notifications_fire_on_mode_change(hass, coord_factory) -> None:
     await coordinator.async_run_evaluation("manual")
 
     assert len(calls) == 1
+    assert calls[0].data["title"] == "❄️ Aircon → Cool"
+    assert calls[0].data["message"] == "❄️ Switched from Off to Cool"
 
     # Re-evaluations while the desired mode hasn't changed should not spam notifications.
     for _ in range(5):

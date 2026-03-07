@@ -122,8 +122,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         domain, name = service.split(".", 1) if "." in service else ("notify", service)
         if not self.hass.services.has_service(domain, name): self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service}); return
         self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE)
-        msg = f"Mode changed: {previous.value} -> {(self._session.last or current).value} (current={current.value}, action={adjustment.value})"
-        try: await self.hass.services.async_call(domain, name, {"title": "Home Rules", "message": msg}, blocking=False)
+        _emoji = {"Cool": "❄️", "Dry": "💧", "Off": "⏹", "Timer": "⏱", "Disabled": "⏸", "Reset": "🔄"}
+        new = (self._session.last or current).value; icon = _emoji.get(new, "")
+        try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"{icon} Switched from {previous.value} to {new}"}, blocking=False)
         except ServiceValidationError: self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service})
 
     def _entity_id(self, key: str, *, optional: bool = False) -> str | None:
