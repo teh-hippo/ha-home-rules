@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.7.3 (2026-03-10)
+
+### Build System
+
+- **deps**: Bump peter-evans/create-pull-request from 7 to 8
+  ([`8dcc989`](https://github.com/teh-hippo/ha-home-rules/commit/8dcc9897417311d4bf01529d0a563accfa6c1c51))
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`3a105d6`](https://github.com/teh-hippo/ha-home-rules/commit/3a105d69298fd13f68ee801a60427676c5307f35))
+
+- **deps**: Weekly lockfile update
+  ([`d9bc9d2`](https://github.com/teh-hippo/ha-home-rules/commit/d9bc9d2e0bb1fe6ffd6652a46769ed37b57b2dac))
+
+
 ## v1.7.2 (2026-03-10)
 
 ### Bug Fixes
