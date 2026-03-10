@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v1.7.1 (2026-03-10)
+
+### Bug Fixes
+
+- Auto-merge exits cleanly when checks still running
+  ([`7566461`](https://github.com/teh-hippo/ha-home-rules/commit/756646106fbd5399f29f7d5af7fbe0f7a6071e1a))
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`1e2926a`](https://github.com/teh-hippo/ha-home-rules/commit/1e2926a8ca0312d1c7eb6bd46572ad65e196a54a))
+
+### Continuous Integration
+
+- Replace dependabot-automerge with smart auto-merge
+  ([`8c35e90`](https://github.com/teh-hippo/ha-home-rules/commit/8c35e90c87cc311fbab05a0831bf200284c09eb2))
+
+
 ## v1.7.0 (2026-03-07)
 
 ### Build System
