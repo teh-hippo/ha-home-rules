@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.7.2 (2026-03-10)
+
+### Bug Fixes
+
+- Exit 1 on real CI failures, exit 0 on pending checks
+  ([`f72e04f`](https://github.com/teh-hippo/ha-home-rules/commit/f72e04f44e0aaa15a2a003909a42679f3f1f4166))
+
+
 ## v1.7.1 (2026-03-10)
 
 ### Bug Fixes
