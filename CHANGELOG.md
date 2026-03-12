@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.7.4 (2026-03-12)
+
+### Bug Fixes
+
+- **rules**: Integrate boost cooling into decision engine and fix premature downgrade
+  ([`bad9551`](https://github.com/teh-hippo/ha-home-rules/commit/bad955137d9f6c67e8c8d4b57c53eff0d742f61a))
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`0de3cc4`](https://github.com/teh-hippo/ha-home-rules/commit/0de3cc430078a7caf38b51a91858079e3faaf5f6))
+
+- **deps**: Weekly lockfile update
+  ([`51fc0f2`](https://github.com/teh-hippo/ha-home-rules/commit/51fc0f2a81b05a37bbac20ad594c173988174184))
+
+
 ## v1.7.3 (2026-03-10)
 
 ### Build System
