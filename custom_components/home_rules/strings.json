@@ -53,6 +53,7 @@
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
+          "generation_boost_threshold": "Boost threshold (W)",
           "grid_usage_delay": "Grid usage delay (evaluations)",
           "reactivate_delay": "Reactivation delay (evaluations)",
           "smoothing_window": "Smoothing window (evaluations)",

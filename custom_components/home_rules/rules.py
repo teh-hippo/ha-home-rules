@@ -85,6 +85,7 @@ class HomeInput:
 class RuleParameters:
     generation_cool_threshold: float
     generation_dry_threshold: float
+    generation_boost_threshold: float
     temperature_threshold: float
     humidity_threshold: float
     grid_usage_delay: int
@@ -131,8 +132,8 @@ def _evaluate_target_mode(config: RuleParameters, home: HomeInput) -> TargetResu
     if not h.have_solar:
         return TargetResult(None, R_NO_SOLAR, True)
 
-    # Boost: any generation → COOL (ignores thresholds + humidity)
-    if h.aggressive_cooling and h.generation > 0:
+    # Boost: generation above boost threshold → COOL (ignores thresholds + humidity)
+    if h.aggressive_cooling and h.generation >= config.generation_boost_threshold:
         if h.aircon_mode != AirconMode.COOL:
             return TargetResult(HomeOutput.COOL, R_BOOST_SOLAR, True)
         return TargetResult(None, R_BOOST_COOLING, False)
@@ -221,7 +222,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
                 state.tolerated = 0
                 return AdjustResult(target.output, target.reason)
             # Boost: tolerate grid draw while solar is available.
-            if h.aggressive_cooling and h.have_solar and h.generation > 0:
+            if h.aggressive_cooling and h.have_solar and h.generation >= config.generation_boost_threshold:
                 state.tolerated = 0
                 return AdjustResult(HomeOutput.NO_CHANGE, R_BOOST_GRID_TOLERATED)
             # Solar: tolerate briefly, then shut off.
