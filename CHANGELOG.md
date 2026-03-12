@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.8.1 (2026-03-12)
+
+### Build System
+
+- Tighten requires-python to >=3.14.2 for HA 2026.3.1 compatibility
+  ([`5e98b9b`](https://github.com/teh-hippo/ha-home-rules/commit/5e98b9b8f6fb6f78781f48685be4a223afb99ede))
+
+
 ## v1.8.0 (2026-03-12)
 
 ### Chores
