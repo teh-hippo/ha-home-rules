@@ -228,14 +228,14 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _normalized_power(self, state: State, label: str) -> float:
         value = self._state_to_float(state, label); unit = c.normalize_power_unit(str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")))
-        try: return max(0.0, PowerConverter.convert(value, UnitOfPower(unit), UnitOfPower.WATT))
+        try: return round(max(0.0, PowerConverter.convert(value, UnitOfPower(unit), UnitOfPower.WATT)), 1)
         except ValueError:
             self._create_issue(c.ISSUE_INVALID_UNIT, {"entity_id": state.entity_id, "unit": unit or "(none)"}); raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}") from None
 
     def _normalized_temperature(self, state: State) -> float:
         value = self._state_to_float(state, "temperature"); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip().upper()
         if unit in {"", "°C", "C"}: return value
-        if unit in {"°F", "F"}: return TemperatureConverter.convert(value, UnitOfTemperature.FAHRENHEIT, UnitOfTemperature.CELSIUS)
+        if unit in {"°F", "F"}: return round(TemperatureConverter.convert(value, UnitOfTemperature.FAHRENHEIT, UnitOfTemperature.CELSIUS), 1)
         raise ValueError(f"unsupported temperature unit: {unit}")
 
     async def _save_state(self) -> None:
