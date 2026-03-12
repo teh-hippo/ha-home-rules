@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.8.0 (2026-03-12)
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`caa7e48`](https://github.com/teh-hippo/ha-home-rules/commit/caa7e48788fc5b1769e0695f4d23b2923f53e063))
+
+### Features
+
+- **rules**: Add configurable boost generation threshold (default 500W)
+  ([`a3e50d3`](https://github.com/teh-hippo/ha-home-rules/commit/a3e50d3e1dc793cd96a7a0f5bd2f36b59f52a694))
+
+
 ## v1.7.4 (2026-03-12)
 
 ### Bug Fixes
