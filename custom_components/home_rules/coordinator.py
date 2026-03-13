@@ -130,7 +130,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE)
         _emoji = {"Cool": "❄️", "Dry": "💧", "Off": "⏹", "Timer": "⏱", "Disabled": "⏸", "Reset": "🔄"}
         new = (self._session.last or current).value; icon = _emoji.get(new, "")
-        try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"{icon} Switched from {previous.value} to {new}"}, blocking=False)
+        try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"Switched from {previous.value} to {new}"}, blocking=False)
         except ServiceValidationError: self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service})
 
     def _run_shadow_smoothed(self, home: HomeInput, record: dict[str, Any]) -> dict[str, Any]:
