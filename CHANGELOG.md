@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.9.1 (2026-03-13)
+
+### Bug Fixes
+
+- **notifications**: Keep emoji in title only
+  ([`99f5a58`](https://github.com/teh-hippo/ha-home-rules/commit/99f5a58158c957d25694c22619f05376b618ed28))
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`1464685`](https://github.com/teh-hippo/ha-home-rules/commit/1464685b9e8c41dc1f9d299f51a31bdbab54c0a3))
+
+- **deps**: Weekly lockfile update
+  ([`5bf6c6a`](https://github.com/teh-hippo/ha-home-rules/commit/5bf6c6a8815d6d17a2802444be9edbf5a86dfe80))
+
+
 ## v1.9.0 (2026-03-13)
 
 ### Chores
