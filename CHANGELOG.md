@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.9.0 (2026-03-13)
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`83c4ca5`](https://github.com/teh-hippo/ha-home-rules/commit/83c4ca52c7957e005823e3416c45729eaf967dbc))
+
+- **deps**: Weekly lockfile update
+  ([`721a2d5`](https://github.com/teh-hippo/ha-home-rules/commit/721a2d57c9667c417e076f7aeae4b197d68b56fe))
+
+### Features
+
+- **rules**: Add dry mode switch and fixed humidity cutoff
+  ([`f4a814f`](https://github.com/teh-hippo/ha-home-rules/commit/f4a814f432f2ce2f0ad3e82f418c5bc1c0346725))
+
+
 ## v1.8.1 (2026-03-12)
 
 ### Build System
