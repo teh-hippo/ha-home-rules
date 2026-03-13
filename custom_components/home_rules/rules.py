@@ -26,6 +26,8 @@ R_BOOST_COOLING = "Boost cooling on solar"
 R_BOOST_GRID_TOLERATED = "Boost grid tolerated"
 R_SOLAR_COOL = "Solar above cool threshold"
 R_SOLAR_DRY = "Solar above dry threshold"
+R_DRY_DISABLED = "Dry mode disabled"
+R_HUMIDITY_TOO_LOW = "Humidity too low for dry mode"
 R_ALREADY_COOLING = "Already cooling on solar"
 R_ALREADY_DRYING = "Already drying on solar"
 R_GRID_TOLERATED = "Grid usage tolerated"
@@ -87,7 +89,8 @@ class RuleParameters:
     generation_dry_threshold: float
     generation_boost_threshold: float
     temperature_threshold: float
-    humidity_threshold: float
+    dry_mode_humidity_cutoff: float
+    dry_mode_enabled: bool
     grid_usage_delay: int
     reactivate_delay: int
     temperature_cool: float
@@ -138,17 +141,21 @@ def _evaluate_target_mode(config: RuleParameters, home: HomeInput) -> TargetResu
             return TargetResult(HomeOutput.COOL, R_BOOST_SOLAR, True)
         return TargetResult(None, R_BOOST_COOLING, False)
 
-    # Solar COOL: generation above cool threshold + humidity OK
-    if h.generation >= config.generation_cool_threshold and h.humidity <= config.humidity_threshold:
+    # Solar COOL: generation above cool threshold
+    if h.generation >= config.generation_cool_threshold:
         if h.aircon_mode != AirconMode.COOL:
             return TargetResult(HomeOutput.COOL, R_SOLAR_COOL, True)
         return TargetResult(None, R_ALREADY_COOLING, False)
 
-    # Solar DRY: generation above dry threshold
+    # Solar DRY: generation above dry threshold, if dry mode is allowed and useful.
     if h.generation >= config.generation_dry_threshold:
-        if h.aircon_mode != AirconMode.DRY:
-            return TargetResult(HomeOutput.DRY, R_SOLAR_DRY, True)
-        return TargetResult(None, R_ALREADY_DRYING, False)
+        if h.aircon_mode == AirconMode.DRY:
+            return TargetResult(None, R_ALREADY_DRYING, False)
+        if not config.dry_mode_enabled:
+            return TargetResult(None, R_DRY_DISABLED, True)
+        if h.humidity < config.dry_mode_humidity_cutoff:
+            return TargetResult(None, R_HUMIDITY_TOO_LOW, True)
+        return TargetResult(HomeOutput.DRY, R_SOLAR_DRY, True)
 
     return TargetResult(None, R_INSUFFICIENT_SOLAR, False)
 

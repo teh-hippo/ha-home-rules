@@ -27,15 +27,24 @@ async def test_no_solar_generation_yields_no_change(coord_factory) -> None:
     assert coordinator.data.solar_available is False
 
 
-async def test_high_humidity_yields_dry_not_cool(coord_factory) -> None:
-    """Humidity above threshold with high solar → DRY, not COOL."""
+async def test_high_humidity_still_yields_cool_when_solar_allows(coord_factory) -> None:
+    """Humidity above the DRY cutoff should not block COOL at the cool threshold."""
     from custom_components.home_rules.rules import HomeOutput
 
     coordinator = await coord_factory(humidity="70")  # above 65% threshold
     await coordinator.async_run_evaluation("test")
 
-    assert coordinator.data.adjustment is HomeOutput.DRY
+    assert coordinator.data.adjustment is HomeOutput.COOL
     assert coordinator._last_record["humidity"] == pytest.approx(70.0)
+
+
+async def test_dry_band_with_high_humidity_yields_dry(coord_factory) -> None:
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(generation="3500", humidity="70")
+    await coordinator.async_run_evaluation("test")
+
+    assert coordinator.data.adjustment is HomeOutput.DRY
 
 
 async def test_kw_generation_normalised_to_watts(hass, coord_factory) -> None:

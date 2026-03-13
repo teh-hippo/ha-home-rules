@@ -18,8 +18,10 @@ from custom_components.home_rules.rules import (
     R_BOOST_SOLAR,
     R_COOLING_DISABLED,
     R_DISABLED,
+    R_DRY_DISABLED,
     R_GRID_TOLERATED,
     R_GRID_TOO_HIGH,
+    R_HUMIDITY_TOO_LOW,
     R_INSUFFICIENT_SOLAR,
     R_MANUAL,
     R_NO_CHANGE,
@@ -50,7 +52,8 @@ TEST_PARAMS = RuleParameters(
     generation_dry_threshold=3500,
     generation_boost_threshold=500,
     temperature_threshold=24,
-    humidity_threshold=65,
+    dry_mode_humidity_cutoff=65,
+    dry_mode_enabled=True,
     grid_usage_delay=2,
     reactivate_delay=2,
     temperature_cool=22,
@@ -65,7 +68,7 @@ def home(**overrides) -> HomeInput:
         grid_usage=0.0,
         timer=False,
         temperature=TEST_PARAMS.temperature_threshold,
-        humidity=TEST_PARAMS.humidity_threshold,
+        humidity=TEST_PARAMS.dry_mode_humidity_cutoff,
         auto=False,
         aggressive_cooling=False,
         enabled=True,
@@ -103,7 +106,7 @@ class TestEvaluateTargetMode:
         assert r == TargetResult(None, R_BOOST_COOLING, False)
 
     def test_c1_solar_cool_not_cool(self):
-        """gen>=cool + humid<=thresh + not COOL -> COOL, R_SOLAR_COOL, actionable."""
+        """gen>=cool + not COOL -> COOL, R_SOLAR_COOL, actionable."""
         r = _evaluate_target_mode(
             TEST_PARAMS,
             home(generation=5500, humidity=65, aircon_mode=AirconMode.OFF),
@@ -111,7 +114,7 @@ class TestEvaluateTargetMode:
         assert r == TargetResult(OUT.COOL, R_SOLAR_COOL, True)
 
     def test_c2_solar_cool_already_cool(self):
-        """gen>=cool + humid<=thresh + already COOL -> None, R_ALREADY_COOLING."""
+        """gen>=cool + already COOL -> None, R_ALREADY_COOLING."""
         r = _evaluate_target_mode(
             TEST_PARAMS,
             home(generation=5500, humidity=65, aircon_mode=AirconMode.COOL),
@@ -120,13 +123,27 @@ class TestEvaluateTargetMode:
 
     def test_d1_solar_dry_not_dry(self):
         """gen>=dry + not DRY -> DRY, R_SOLAR_DRY, actionable."""
-        r = _evaluate_target_mode(TEST_PARAMS, home(generation=3500, aircon_mode=AirconMode.OFF))
+        r = _evaluate_target_mode(TEST_PARAMS, home(generation=3500, humidity=66, aircon_mode=AirconMode.OFF))
         assert r == TargetResult(OUT.DRY, R_SOLAR_DRY, True)
 
     def test_d2_solar_dry_already_dry(self):
         """gen>=dry + already DRY -> None, R_ALREADY_DRYING, not actionable."""
-        r = _evaluate_target_mode(TEST_PARAMS, home(generation=3500, aircon_mode=AirconMode.DRY))
+        r = _evaluate_target_mode(TEST_PARAMS, home(generation=3500, humidity=66, aircon_mode=AirconMode.DRY))
         assert r == TargetResult(None, R_ALREADY_DRYING, False)
+
+    def test_d3_solar_dry_disabled(self):
+        r = _evaluate_target_mode(
+            RuleParameters(**{**TEST_PARAMS.__dict__, "dry_mode_enabled": False}),
+            home(generation=3500, humidity=66, aircon_mode=AirconMode.OFF),
+        )
+        assert r == TargetResult(None, R_DRY_DISABLED, True)
+
+    def test_d4_solar_dry_low_humidity(self):
+        r = _evaluate_target_mode(
+            TEST_PARAMS,
+            home(generation=3500, humidity=64, aircon_mode=AirconMode.OFF),
+        )
+        assert r == TargetResult(None, R_HUMIDITY_TOO_LOW, True)
 
     def test_e_insufficient_solar(self):
         """gen<dry -> None, R_INSUFFICIENT_SOLAR, not actionable."""
@@ -154,21 +171,21 @@ class TestEvaluateTargetMode:
         assert r.reason == R_SOLAR_DRY
 
     def test_boundary_humidity_at_threshold_allows_cool(self):
-        """humidity exactly == threshold (<= check) -> COOL allowed."""
+        """humidity exactly == cutoff does not block COOL."""
         r = _evaluate_target_mode(
             TEST_PARAMS,
             home(generation=6000, humidity=65, aircon_mode=AirconMode.OFF),
         )
         assert r.output is OUT.COOL
 
-    def test_boundary_humidity_above_threshold_forces_dry(self):
-        """humidity == threshold+1 -> DRY instead of COOL."""
+    def test_boundary_humidity_above_cutoff_still_allows_cool(self):
+        """High humidity should not block COOL when solar can support it."""
         r = _evaluate_target_mode(
             TEST_PARAMS,
             home(generation=6000, humidity=66, aircon_mode=AirconMode.OFF),
         )
-        assert r.output is OUT.DRY
-        assert r.reason == R_SOLAR_DRY
+        assert r.output is OUT.COOL
+        assert r.reason == R_SOLAR_COOL
 
     def test_boost_ignores_humidity(self):
         """Boost + gen>=boost_threshold + high humidity -> still COOL."""
@@ -363,7 +380,7 @@ class TestAdjustReactivateDelay:
 
 class TestAdjustOffSolar:
     def test_cool_activation(self):
-        """gen>=cool + humid<=thresh + temp>=threshold -> COOL."""
+        """gen>=cool + temp>=threshold -> COOL."""
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
@@ -372,25 +389,36 @@ class TestAdjustOffSolar:
         )
         assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
 
-    def test_dry_activation_humidity_gate(self):
-        """gen>=cool but humid>thresh -> DRY (humidity prevents COOL)."""
+    def test_high_humidity_does_not_block_cool(self):
+        """High humidity should not force DRY when COOL solar is available."""
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
             home(generation=6000, humidity=66, temperature=24, auto=True),
             state,
         )
-        assert r == AdjustResult(OUT.DRY, R_SOLAR_DRY)
+        assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
 
     def test_dry_activation_gen_above_dry(self):
         """gen>=dry + temp>=threshold -> DRY."""
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(generation=3500, temperature=24, auto=True),
+            home(generation=3500, humidity=66, temperature=24, auto=True),
             state,
         )
         assert r == AdjustResult(OUT.DRY, R_SOLAR_DRY)
+
+    def test_dry_disabled_leaves_auto_idle(self):
+        state = CachedState()
+        params = RuleParameters(**{**TEST_PARAMS.__dict__, "dry_mode_enabled": False})
+        r = adjust(params, home(generation=3500, humidity=66, temperature=24, auto=True), state)
+        assert r == AdjustResult(OUT.OFF, R_DRY_DISABLED)
+
+    def test_low_humidity_blocks_dry_activation(self):
+        state = CachedState()
+        r = adjust(TEST_PARAMS, home(generation=3500, humidity=64, temperature=24, auto=True), state)
+        assert r == AdjustResult(OUT.OFF, R_HUMIDITY_TOO_LOW)
 
     def test_insufficient_solar_no_change(self):
         """gen<dry, auto=False -> NO_CHANGE."""

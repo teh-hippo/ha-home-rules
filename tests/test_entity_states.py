@@ -20,6 +20,7 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
         "binary_sensor.home_rules_auto_mode",
         "select.home_rules_control_mode",
         "switch.home_rules_cooling_enabled",
+        "switch.home_rules_dry_mode_enabled",
         "button.home_rules_evaluate_now",
     ]
 
@@ -29,6 +30,7 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
 
     assert hass.states.get("select.home_rules_control_mode").state == "monitor"
     assert hass.states.get("switch.home_rules_cooling_enabled").state == "on"
+    assert hass.states.get("switch.home_rules_dry_mode_enabled").state == "on"
 
 
 async def test_all_entities_use_translation_key_not_name(hass, loaded_entry) -> None:

@@ -58,13 +58,18 @@ async def test_unavailable_temperature_uses_below_threshold_default(coord_factor
     assert coordinator._last_record["temperature"] < coordinator.parameters.temperature_threshold
 
 
-async def test_unavailable_humidity_uses_above_threshold_default(coord_factory) -> None:
-    """Unavailable humidity defaults to threshold+1% so COOL mode is not chosen (DRY instead)."""
+async def test_unavailable_humidity_biases_away_from_dry(coord_factory) -> None:
+    """Unavailable humidity falls below the DRY cutoff so COOL can still be chosen."""
     from custom_components.home_rules.rules import HomeOutput
 
-    # High generation, humidity unknown: fallback exceeds humidity threshold, so DRY not COOL.
+    # High generation should still allow COOL, and mid generation should avoid DRY.
     coordinator = await coord_factory(humidity="unavailable")
     await coordinator.async_run_evaluation("poll")
 
-    assert coordinator.data.adjustment is HomeOutput.DRY
-    assert coordinator._last_record["humidity"] > coordinator.parameters.humidity_threshold
+    assert coordinator.data.adjustment is HomeOutput.COOL
+    assert coordinator._last_record["humidity"] < coordinator.parameters.dry_mode_humidity_cutoff
+
+    coordinator = await coord_factory(generation="3500", humidity="unavailable")
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator.data.reason == "Humidity too low for dry mode"

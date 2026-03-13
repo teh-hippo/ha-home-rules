@@ -103,9 +103,6 @@
       },
       "timer_finishes_at": {
         "name": "Timer Countdown"
-      },
-      "smoothing_disagrees": {
-        "name": "Smoothing Disagrees"
       }
     },
     "binary_sensor": {
@@ -130,6 +127,9 @@
     "switch": {
       "cooling_enabled": {
         "name": "Cooling Enabled"
+      },
+      "dry_mode_enabled": {
+        "name": "Dry Mode Enabled"
       }
     },
     "button": {
@@ -143,9 +143,6 @@
       },
       "temperature_cool": {
         "name": "Cool Setpoint"
-      },
-      "humidity_threshold": {
-        "name": "Humidity Threshold"
       }
     }
   },

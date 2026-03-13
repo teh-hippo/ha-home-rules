@@ -21,9 +21,6 @@
       },
       "timer_finishes_at": {
         "default": "mdi:timer-outline"
-      },
-      "smoothing_disagrees": {
-        "default": "mdi:compare-horizontal"
       }
     },
     "binary_sensor": {
@@ -42,6 +39,9 @@
     "switch": {
       "cooling_enabled": {
         "default": "mdi:snowflake"
+      },
+      "dry_mode_enabled": {
+        "default": "mdi:water-off-outline"
       }
     },
     "button": {
@@ -55,9 +55,6 @@
       },
       "temperature_cool": {
         "default": "mdi:thermometer-chevron-down"
-      },
-      "humidity_threshold": {
-        "default": "mdi:water-percent-alert"
       }
     }
   }

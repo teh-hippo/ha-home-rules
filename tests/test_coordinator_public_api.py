@@ -70,6 +70,17 @@ async def test_async_set_control_disables_cooling(coord_factory) -> None:
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
 
 
+async def test_async_set_control_disables_dry_mode(coord_factory) -> None:
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(generation="3500", humidity="70")
+    await coordinator.async_set_control("dry_mode_enabled", False)
+
+    assert coordinator.dry_mode_enabled is False
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator.data.reason == "Dry mode disabled"
+
+
 async def test_evaluation_fires_ha_event(hass, coord_factory) -> None:
     """Each evaluation fires an EVENT_EVALUATION event on the HA event bus."""
     from custom_components.home_rules.const import EVENT_EVALUATION

@@ -11,9 +11,10 @@ async def test_number_entities_register_on_setup(hass, loaded_entry) -> None:
     for entity_id in (
         "number.home_rules_temperature_threshold",
         "number.home_rules_cool_setpoint",
-        "number.home_rules_humidity_threshold",
     ):
         assert hass.states.get(entity_id) is not None, f"{entity_id} not found"
+
+    assert hass.states.get("number.home_rules_humidity_threshold") is None
 
     # Generation thresholds are options-only, not number entities
     assert hass.states.get("number.home_rules_cool_generation_threshold") is None
@@ -22,14 +23,12 @@ async def test_number_entities_register_on_setup(hass, loaded_entry) -> None:
 
 async def test_number_entities_show_default_values(hass, loaded_entry) -> None:
     from custom_components.home_rules.const import (
-        DEFAULT_HUMIDITY_THRESHOLD,
         DEFAULT_TEMPERATURE_COOL,
         DEFAULT_TEMPERATURE_THRESHOLD,
     )
 
     assert float(hass.states.get("number.home_rules_temperature_threshold").state) == DEFAULT_TEMPERATURE_THRESHOLD
     assert float(hass.states.get("number.home_rules_cool_setpoint").state) == DEFAULT_TEMPERATURE_COOL
-    assert float(hass.states.get("number.home_rules_humidity_threshold").state) == DEFAULT_HUMIDITY_THRESHOLD
 
 
 async def test_set_number_entity_updates_parameter(hass, loaded_entry) -> None:

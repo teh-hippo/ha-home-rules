@@ -7,7 +7,7 @@ from .coordinator import HomeRulesCoordinator
 
 _LEGACY_SUFFIXES = (
     "enabled aggressive_cooling dry_run notifications_enabled "
-    "generation_cool_threshold generation_dry_threshold timer_countdown current"
+    "generation_cool_threshold generation_dry_threshold timer_countdown current humidity_threshold"
 ).split()
 _TARGET_MINOR_VERSION = 2
 

@@ -25,6 +25,7 @@ from .rules import (
     HomeInput,
     HomeOutput,
     RuleParameters,
+    _evaluate_target_mode,
     adjust,
     apply_adjustment,
     current_state,
@@ -47,10 +48,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     _recent: deque[dict[str, Any]]
     _last_record: dict[str, Any]
     _last_changed: str | None
+    _fallback_inputs: dict[str, str]
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        self.hass, self.config_entry = hass, config_entry; self._lock, self._session = asyncio.Lock(), CachedState(); self.control_mode, self.cooling_enabled = c.ControlMode.MONITOR, True
-        self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}; self._aircon_timer_finishes_at: datetime | None = None; self._timer_expiry_handle: asyncio.TimerHandle | None = None
+        self.hass, self.config_entry = hass, config_entry; self._lock, self._session = asyncio.Lock(), CachedState(); self.control_mode, self.cooling_enabled, self.dry_mode_enabled = c.ControlMode.MONITOR, True, True
+        self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record, self._fallback_inputs = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}, {}; self._aircon_timer_finishes_at: datetime | None = None; self._timer_expiry_handle: asyncio.TimerHandle | None = None
         self._store = Store[dict[str, Any]](hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
         interval = timedelta(seconds=int(config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))); name = f"{c.DOMAIN} ({config_entry.entry_id})"
         super().__init__(hass, c.LOGGER, name=name, update_interval=interval, always_update=True, config_entry=config_entry); self.data = CoordinatorData()
@@ -61,7 +63,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     @property
     def parameters(self) -> RuleParameters:
         g, o = self.get_parameter, self.config_entry.options
-        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_GENERATION_BOOST_THRESHOLD, c.DEFAULT_GENERATION_BOOST_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), g(c.CONF_HUMIDITY_THRESHOLD, c.DEFAULT_HUMIDITY_THRESHOLD), int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), int(o.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL))
+        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_GENERATION_BOOST_THRESHOLD, c.DEFAULT_GENERATION_BOOST_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), int(o.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL))
 
     async def async_set_mode(self, mode: c.ControlMode) -> None: self.control_mode = mode; await self._save_state(); await self.async_run_evaluation("control_mode")
 
@@ -77,7 +79,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         stored = await self._store.async_load()
         if not stored: return
         controls, session = stored.get("controls", {}), stored.get("session", {})
-        self.control_mode, self.cooling_enabled = self._control_mode_from_storage(controls), bool(controls.get("cooling_enabled", True))
+        self.control_mode, self.cooling_enabled, self.dry_mode_enabled = self._control_mode_from_storage(controls), bool(controls.get("cooling_enabled", True)), bool(controls.get(c.CONF_DRY_MODE_ENABLED, True))
         last = session.get("last"); last = HomeOutput.NO_CHANGE.value if last == "NoChange" else last
         self._session = CachedState(reactivate_delay=int(session.get("reactivate_delay", 0)), tolerated=int(session.get("tolerated", 0)), last=HomeOutput(last) if last else None, failed_to_change=int(session.get("failed_to_change", 0)))
         self._auto_mode, self._last_changed = bool(stored.get("auto_mode", False)), stored.get("last_changed")
@@ -85,6 +87,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._aircon_timer_finishes_at = dt_util.parse_datetime(str(v)) if (v := stored.get("aircon_timer_finishes_at")) else None
         self._parameters = {}
         for k, v in stored.get("parameters", {}).items():
+            if str(k) == "humidity_threshold": continue
             with suppress(TypeError, ValueError): self._parameters[str(k)] = float(v)
         self._schedule_timer_expiry()
 
@@ -101,16 +104,16 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:
-            now = dt_util.utcnow().isoformat(); self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, evaluated_timer = self._build_home_input(); current = current_state(home)
+            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, evaluated_timer = self._build_home_input(); current = current_state(home); params = self.parameters; target = _evaluate_target_mode(params, home)
             if not self._initialized: self._initialized = True; self._sync_on_startup(current, home)
             elif self._session.last is None: self._session.last = current
-            result = adjust(self.parameters, home, self._session); adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer() if adjustment is HomeOutput.TIMER else evaluated_timer
+            result = adjust(params, home, self._session); adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer() if adjustment is HomeOutput.TIMER else evaluated_timer
             previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
             if is_monitor: self._session.failed_to_change, applied = 0, True
             if not applied: raise HomeAssistantError("failed to apply adjustment")
             if previous is not None and previous != self._session.last: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
             mode = self._session.last or current
-            record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
+            record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "target_adjustment": target.output.value if target.output is not None else None, "target_reason": target.reason, "target_actionable": target.is_actionable, "blocked_reasons": [target.reason] if target.output is None and target.is_actionable else [], "fallback_inputs": dict(self._fallback_inputs), "controls_snapshot": {"control_mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled, "dry_mode_enabled": self.dry_mode_enabled}, "policy_snapshot": {"dry_mode_humidity_cutoff": params.dry_mode_humidity_cutoff}} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
             smoothed = self._run_shadow_smoothed(home, record)
             record.update(smoothed)
             self._last_record = record; self._recent.appendleft(record); await self._save_state(); self.hass.bus.async_fire(c.EVENT_EVALUATION, record)
@@ -197,9 +200,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if not allow_unavailable:
             if not self._first_refresh_done: raise ConfigEntryNotReady(f"Required entity not yet available: {entity_id}")
             self._create_issue(c.ISSUE_ENTITY_UNAVAILABLE, {"entity_id": entity_id, "label": label}); raise ValueError(f"entity unavailable: {entity_id}")
+        self._fallback_inputs[label] = raw
         if label in self._FALLBACK_DEFAULTS: return State(entity_id, self._FALLBACK_DEFAULTS[label], state.attributes)
         if label == "temperature": return State(entity_id, str(self.parameters.temperature_threshold - 0.1), state.attributes)
-        if label == "humidity": return State(entity_id, str(self.parameters.humidity_threshold + 1.0), state.attributes)
+        if label == "humidity": return State(entity_id, str(c.DRY_MODE_HUMIDITY_CUTOFF - 1.0), state.attributes)
         return state
 
     @staticmethod
@@ -240,7 +244,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _save_state(self) -> None:
         session = asdict(self._session); session["last"] = self._session.last.value if self._session.last else None
-        await self._store.async_save({"controls": {"mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent), "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "parameters": dict(self._parameters)})
+        await self._store.async_save({"controls": {"mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent), "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "parameters": dict(self._parameters)})
 
     def _create_issue(self, issue: str, placeholders: dict[str, str]) -> None:
         ir.async_create_issue(self.hass, c.DOMAIN, f"{self.config_entry.entry_id}_{issue}", is_fixable=False, is_persistent=False, severity=ir.IssueSeverity.ERROR, translation_key=issue, translation_placeholders=placeholders)

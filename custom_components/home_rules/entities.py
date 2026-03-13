@@ -37,7 +37,6 @@ SENSORS = (
     _sensor("last_evaluated", device_class=_TS, entity_category=_DIAG),
     _sensor("last_changed", device_class=_TS, entity_category=_DIAG),
     _sensor("timer_finishes_at", device_class=_TS, entity_category=_DIAG),
-    _sensor("smoothing_disagrees", entity_category=_DIAG),
 )
 BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
@@ -65,7 +64,6 @@ class HomeRulesSensor(HomeRulesEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         key = self.entity_description.key
         if key == "decision": return {**dict(self.coordinator._last_record), "recent": list(self.coordinator._recent)[:10]}
-        if key == "smoothing_disagrees": return {"disagreements": [r for r in list(self.coordinator._recent)[:10] if r.get("decision_differs", False)]}
         return None
 
 
@@ -99,6 +97,17 @@ class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: object) -> None: await self.coordinator.async_set_control("cooling_enabled", False)
 
 
+class HomeRulesDryModeEnabledSwitch(HomeRulesEntity, SwitchEntity):
+    _attr_translation_key = "dry_mode_enabled"
+    _attr_entity_category = _CONF
+
+    def __init__(self, entry: Entry, coordinator: Coord) -> None: super().__init__(entry, coordinator, "dry_mode_enabled")
+    @property
+    def is_on(self) -> bool: return bool(self.coordinator.dry_mode_enabled)
+    async def async_turn_on(self, **kwargs: object) -> None: await self.coordinator.async_set_control("dry_mode_enabled", True)
+    async def async_turn_off(self, **kwargs: object) -> None: await self.coordinator.async_set_control("dry_mode_enabled", False)
+
+
 class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
     _attr_translation_key = "evaluate_now"
 
@@ -121,7 +130,6 @@ NUMBERS = tuple(
     for spec in (
         ("temperature_threshold", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD),
         ("temperature_cool", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL),
-        ("humidity_threshold", 0, 100, 1, "%", c.CONF_HUMIDITY_THRESHOLD, c.DEFAULT_HUMIDITY_THRESHOLD),
     )
 )
 
@@ -141,6 +149,6 @@ class HomeRulesNumberEntity(HomeRulesEntity, NumberEntity):
 async def async_setup_sensor_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesSensor(entry, entry.runtime_data, description) for description in SENSORS)
 async def async_setup_binary_sensor_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesBinarySensor(entry, entry.runtime_data, description) for description in BINARY_SENSORS)
 async def async_setup_select_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesModeSelect(entry, entry.runtime_data)])
-async def async_setup_switch_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesCoolingEnabledSwitch(entry, entry.runtime_data)])
+async def async_setup_switch_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesCoolingEnabledSwitch(entry, entry.runtime_data), HomeRulesDryModeEnabledSwitch(entry, entry.runtime_data)])
 async def async_setup_button_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesEvaluateButton(entry, entry.runtime_data)])
 async def async_setup_number_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesNumberEntity(entry, entry.runtime_data, description) for description in NUMBERS)

@@ -32,6 +32,7 @@ async def test_setup_removes_legacy_entities(hass, mock_entry, entity_registry) 
         ("switch", f"{mock_entry.entry_id}_generation_dry_threshold"),
         ("sensor", f"{mock_entry.entry_id}_timer_countdown"),
         ("sensor", f"{mock_entry.entry_id}_current"),
+        ("number", f"{mock_entry.entry_id}_humidity_threshold"),
     }
 
     for platform, unique_id in legacy_entities:
