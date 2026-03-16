@@ -104,10 +104,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:
-            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, evaluated_timer = self._build_home_input(); current = current_state(home); params = self.parameters; target = _evaluate_target_mode(params, home)
+            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, evaluated_timer = self._build_home_input(); current = current_state(home); params = self.parameters; target = _evaluate_target_mode(params, home); decision_home = replace(home, generation=self._smoothed_generation(home.generation))
             if not self._initialized: self._initialized = True; self._sync_on_startup(current, home)
             elif self._session.last is None: self._session.last = current
-            result = adjust(params, home, self._session); adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer() if adjustment is HomeOutput.TIMER else evaluated_timer
+            result = adjust(params, decision_home, self._session); adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer() if adjustment is HomeOutput.TIMER else evaluated_timer
             previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
             if is_monitor: self._session.failed_to_change, applied = 0, True
             if not applied: raise HomeAssistantError("failed to apply adjustment")
@@ -133,6 +133,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"Switched from {previous.value} to {new}"}, blocking=False)
         except ServiceValidationError: self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service})
 
+    def _smoothed_generation(self, raw_gen: float) -> float:
+        window = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
+        if window <= 1 or not self._recent: return raw_gen
+        vals: list[float] = [r.get("raw_generation", r.get("generation", 0.0)) for r in list(self._recent)[:window - 1]] + [raw_gen]
+        return sum(vals) / len(vals)
+
     def _run_shadow_smoothed(self, home: HomeInput, record: dict[str, Any]) -> dict[str, Any]:
         window = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
         raw_gen, raw_grid = home.generation, home.grid_usage
@@ -143,9 +149,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             smoothed_gen = sum(gen_vals) / len(gen_vals); smoothed_grid = sum(grid_vals) / len(grid_vals)
         else:
             smoothed_gen, smoothed_grid = raw_gen, raw_grid
-        shadow_home = replace(home, generation=smoothed_gen, grid_usage=smoothed_grid)
         shadow_session = CachedState(reactivate_delay=self._session.reactivate_delay, tolerated=self._session.tolerated, last=self._session.last, failed_to_change=self._session.failed_to_change)
-        shadow_result = adjust(self.parameters, shadow_home, shadow_session)
+        shadow_result = adjust(self.parameters, home, shadow_session)
         differs = shadow_result.output.value != record["adjustment"]
         return {"raw_generation": raw_gen, "raw_grid_usage": raw_grid, "smoothed_generation": round(smoothed_gen, 1), "smoothed_grid_usage": round(smoothed_grid, 1), "smoothed_adjustment": shadow_result.output.value, "smoothed_reason": shadow_result.reason, "decision_differs": differs}
 
