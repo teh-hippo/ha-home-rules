@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v1.10.0 (2026-03-16)
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`d144f8e`](https://github.com/teh-hippo/ha-home-rules/commit/d144f8e94a07f015fa166a4f443121436d57143c))
+
+- **deps**: Weekly lockfile update
+  ([`cc148c8`](https://github.com/teh-hippo/ha-home-rules/commit/cc148c8ecbcaab135de971fb243428dbd5dfb0b4))
+
+### Continuous Integration
+
+- Stop cascade of lockfile/release chore commits
+  ([`fef4b66`](https://github.com/teh-hippo/ha-home-rules/commit/fef4b662ef56b04f62ed99b63eb07544ea0c66d4))
+
+### Features
+
+- Use smoothed generation for decisions to dampen oscillation
+  ([`4017820`](https://github.com/teh-hippo/ha-home-rules/commit/40178208cc5b40ac7e1e19f72015bb936dcbe3a4))
+
+
 ## v1.9.1 (2026-03-13)
 
 ### Bug Fixes
