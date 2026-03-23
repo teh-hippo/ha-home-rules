@@ -1,6 +1,59 @@
 # CHANGELOG
 
 
+## v1.10.1 (2026-03-23)
+
+### Bug Fixes
+
+- **ci**: Pass RELEASE_TOKEN to checkout for git push auth
+  ([`09a1b7c`](https://github.com/teh-hippo/ha-home-rules/commit/09a1b7cf106ae79c38556b287268feb430eb6c02))
+
+- **ci**: Use RELEASE_TOKEN for semantic-release push
+  ([`4997f39`](https://github.com/teh-hippo/ha-home-rules/commit/4997f39daef4869f4138071777137859b3bff45d))
+
+### Build System
+
+- Loosen dev dependency version constraints
+  ([`3921b02`](https://github.com/teh-hippo/ha-home-rules/commit/3921b02587fcfe74982c51e3ee863a09a35459ca))
+
+- **deps**: Bump pyopenssl from 25.3.0 to 26.0.0
+  ([`0c2f98a`](https://github.com/teh-hippo/ha-home-rules/commit/0c2f98a4c84c28cbab41920ba39c2e46d5980b2a))
+
+- **deps**: Update actions/checkout action to v6
+  ([`6523b55`](https://github.com/teh-hippo/ha-home-rules/commit/6523b5533b8e7ef95da832b4a1a489a2ce0ff7ad))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python Docker tag to v3.14
+  ([`48b8fad`](https://github.com/teh-hippo/ha-home-rules/commit/48b8fad707ec6c706bd8138392ab545eb7e38f47))
+
+- **deps**: Upgrade
+  ([`a13da53`](https://github.com/teh-hippo/ha-home-rules/commit/a13da5359b505de7f0d34943eecd9ab91e655eb1))
+
+- **deps**: Upgrade
+  ([`831ded6`](https://github.com/teh-hippo/ha-home-rules/commit/831ded6fad5bf36c049e1af38d1f842761c06979))
+
+- **deps-dev**: Bump the python-deps group with 2 updates
+  ([`31d6722`](https://github.com/teh-hippo/ha-home-rules/commit/31d67225b933bb5c43489c47d34e8c455850ca61))
+
+### Chores
+
+- **deps**: Weekly lockfile update
+  ([`53c5f4c`](https://github.com/teh-hippo/ha-home-rules/commit/53c5f4c529d720b50553024cee98d24db476cdf4))
+
+### Continuous Integration
+
+- Fix automerge config for all update types
+  ([`41bbb5d`](https://github.com/teh-hippo/ha-home-rules/commit/41bbb5d00ff6c8f61cb0dc1a5f3411eb5219ad06))
+
+- Fix build_command, remove lockfile-update workflow
+  ([`6518e24`](https://github.com/teh-hippo/ha-home-rules/commit/6518e24ae0945494cf034e964da159a6ace1b6d9))
+
+- Migrate from Dependabot to Renovate
+  ([`63a8f4c`](https://github.com/teh-hippo/ha-home-rules/commit/63a8f4c9a9776ff83868b45b65ba021e0a14a5ef))
+
+- Standardise renovate.json with forkProcessing
+  ([`5a6c930`](https://github.com/teh-hippo/ha-home-rules/commit/5a6c93006006e8b2a15fe3c3ee1ed7fab512318d))
+
+
 ## v1.10.0 (2026-03-16)
 
 ### Chores
