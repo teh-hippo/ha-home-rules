@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.10.2 (2026-03-30)
+
+### Build System
+
+- **deps**: Upgrade
+  ([`0852382`](https://github.com/teh-hippo/ha-home-rules/commit/0852382f1c4dcf9c50e786af471059128ebb4693))
+
+### Continuous Integration
+
+- Enable global automerge and fix semantic-release patch_tags
+  ([`6800502`](https://github.com/teh-hippo/ha-home-rules/commit/6800502ca9a4e01d2e4266ca3fb9cc3e05f9a02e))
+
+
 ## v1.10.1 (2026-03-23)
 
 ### Bug Fixes
