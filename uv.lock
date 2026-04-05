@@ -854,7 +854,7 @@ wheels = [
 
 [[package]]
 name = "ha-home-rules"
-version = "1.10.7"
+version = "1.10.8"
 source = { virtual = "." }
 
 [package.dev-dependencies]
