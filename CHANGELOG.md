@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.6 (2026-04-05)
+
+### Build System
+
+- Update Renovate config for weekly grouped updates
+  ([`3c0d9f1`](https://github.com/teh-hippo/ha-home-rules/commit/3c0d9f1be3371947f4af80f1188a485b1347039c))
+
+
 ## v1.10.5 (2026-03-30)
 
 ### Build System
