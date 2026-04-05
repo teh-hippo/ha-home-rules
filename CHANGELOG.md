@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.9 (2026-04-05)
+
+### Build System
+
+- **deps**: Upgrade
+  ([`2c4a5b9`](https://github.com/teh-hippo/ha-home-rules/commit/2c4a5b9c11d6edc76d4415bf7a6dfd5ac52a1057))
+
+
 ## v1.10.8 (2026-04-05)
 
 ### Build System
