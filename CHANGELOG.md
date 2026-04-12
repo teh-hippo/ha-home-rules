@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v1.10.10 (2026-04-12)
+
+### Build System
+
+- **deps**: Update softprops/action-gh-release action to v3
+  ([`90efc5e`](https://github.com/teh-hippo/ha-home-rules/commit/90efc5e179e3508341e8dd6e639206b7977999da))
+
+- **deps**: Upgrade
+  ([`b7f0f7e`](https://github.com/teh-hippo/ha-home-rules/commit/b7f0f7e8b36c52208733d0ead8163455f0d7954d))
+
+
 ## v1.10.9 (2026-04-05)
 
 ### Build System
