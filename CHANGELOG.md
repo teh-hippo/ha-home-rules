@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.13 (2026-04-14)
+
+### Build System
+
+- **deps**: Update dependency pytest to v9.0.3 [SECURITY]
+  ([`f1949ba`](https://github.com/teh-hippo/ha-home-rules/commit/f1949ba23064f3421618d8ccc652342dfd7520fa))
+
+
 ## v1.10.12 (2026-04-12)
 
 ### Build System
