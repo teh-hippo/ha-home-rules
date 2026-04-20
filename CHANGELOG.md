@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.16 (2026-04-20)
+
+### Bug Fixes
+
+- **entities**: Convert timer_finishes_at sensor to DURATION (seconds)
+  ([`d7085c7`](https://github.com/teh-hippo/ha-home-rules/commit/d7085c725a8fce56219366bdf42de547e83cef05))
+
+
 ## v1.10.15 (2026-04-19)
 
 ### Build System
