@@ -11,7 +11,7 @@ from homeassistant.components.number import NumberEntity, NumberEntityDescriptio
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -21,7 +21,7 @@ from homeassistant.util import dt as dt_util
 from . import const as c
 from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 
-_DIAG, _CONF, _TS = EntityCategory.DIAGNOSTIC, EntityCategory.CONFIG, SensorDeviceClass.TIMESTAMP
+_DIAG, _CONF, _TS, _DUR = EntityCategory.DIAGNOSTIC, EntityCategory.CONFIG, SensorDeviceClass.TIMESTAMP, SensorDeviceClass.DURATION
 type Entry = HomeRulesConfigEntry
 type Coord = HomeRulesCoordinator
 _OBJECT_IDS = {"mode": f"{c.DOMAIN}_mode", "adjustment": f"{c.DOMAIN}_action", "timer_finishes_at": f"{c.DOMAIN}_timer_countdown", "temperature_cool": f"{c.DOMAIN}_cool_setpoint"}
@@ -36,7 +36,7 @@ SENSORS = (
     _sensor("decision", entity_category=_DIAG),
     _sensor("last_evaluated", device_class=_TS, entity_category=_DIAG),
     _sensor("last_changed", device_class=_TS, entity_category=_DIAG),
-    _sensor("timer_finishes_at", device_class=_TS, entity_category=_DIAG),
+    _sensor("timer_finishes_at", device_class=_DUR, native_unit_of_measurement=UnitOfTime.SECONDS, entity_category=_DIAG),
 )
 BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
@@ -56,9 +56,15 @@ class HomeRulesSensor(HomeRulesEntity, SensorEntity):
         super().__init__(entry, coordinator, description.key); self.entity_description = description
 
     @property
-    def native_value(self) -> str | datetime | None:
-        value: object = getattr(self.coordinator.data, self.entity_description.key)
-        return str(value.value if hasattr(value, "value") else value) if self.entity_description.device_class != _TS else (None if value is None else value if isinstance(value, datetime) else dt_util.parse_datetime(str(value)))
+    def native_value(self) -> str | int | datetime | None:
+        key = self.entity_description.key
+        value: object = getattr(self.coordinator.data, key)
+        if key == "timer_finishes_at":
+            if not isinstance(value, datetime): return 0
+            return max(0, int((value - dt_util.utcnow()).total_seconds()))
+        if self.entity_description.device_class == _TS:
+            return None if value is None else value if isinstance(value, datetime) else dt_util.parse_datetime(str(value))
+        return str(value.value if hasattr(value, "value") else value)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
