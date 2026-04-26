@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v1.10.17 (2026-04-26)
+
+### Build System
+
+- **deps**: Update astral-sh/setup-uv action to v8
+  ([`2a45430`](https://github.com/teh-hippo/ha-home-rules/commit/2a45430ac2af3bb49630532ec0ccdce692f5b67d))
+
+- **deps**: Upgrade
+  ([`50e291e`](https://github.com/teh-hippo/ha-home-rules/commit/50e291e229c37a6e5fac49608ebad62e4552c244))
+
+
 ## v1.10.16 (2026-04-20)
 
 ### Bug Fixes
