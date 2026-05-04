@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.22 (2026-05-04)
+
+### Build System
+
+- Drop redundant pytest/pytest-asyncio/coverage pins
+  ([`d6ed7be`](https://github.com/teh-hippo/ha-home-rules/commit/d6ed7be8cc077f4189fba149446e0baaca14ae5d))
+
+
 ## v1.10.21 (2026-05-03)
 
 ### Build System
