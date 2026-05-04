@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.23 (2026-05-04)
+
+### Build System
+
+- **renovate**: Group and auto-merge major updates
+  ([`4b5c61c`](https://github.com/teh-hippo/ha-home-rules/commit/4b5c61c42a33dfc59980ad9a321da5fd3b211864))
+
+
 ## v1.10.22 (2026-05-04)
 
 ### Build System
