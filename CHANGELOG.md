@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.24 (2026-05-04)
+
+### Bug Fixes
+
+- **deps**: Force PyJWT>=2.12.0 and pytest>=9.0.3 via uv overrides
+  ([`9046bd7`](https://github.com/teh-hippo/ha-home-rules/commit/9046bd79166180c135511d1f16b62f1991d50d9c))
+
+
 ## v1.10.23 (2026-05-04)
 
 ### Build System
