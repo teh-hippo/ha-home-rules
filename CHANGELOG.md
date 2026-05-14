@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.10.25 (2026-05-14)
+
+### Build System
+
+- **deps**: Bump urllib3 in the uv group across 1 directory
+  ([`3762f0a`](https://github.com/teh-hippo/ha-home-rules/commit/3762f0a0f87cd716aaa658e327dbe3b86aecfecd))
+
+### Continuous Integration
+
+- Stagger cron and pin floating action refs
+  ([`b8d1d83`](https://github.com/teh-hippo/ha-home-rules/commit/b8d1d83dbe29f4f5014d74a7799d364d1eb7edfc))
+
+
 ## v1.10.24 (2026-05-04)
 
 ### Bug Fixes
