@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.26 (2026-05-17)
+
+### Build System
+
+- **deps**: Pin dependencies
+  ([`c81ac03`](https://github.com/teh-hippo/ha-home-rules/commit/c81ac03da0560b1cec10c0877556ef797bcdc134))
+
+
 ## v1.10.25 (2026-05-14)
 
 ### Build System
