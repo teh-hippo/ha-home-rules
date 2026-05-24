@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.27 (2026-05-24)
+
+### Build System
+
+- **deps**: Update all non-major
+  ([`96a1f72`](https://github.com/teh-hippo/ha-home-rules/commit/96a1f72ee0a9607b2efe4948f7d280f4f481f560))
+
+
 ## v1.10.26 (2026-05-17)
 
 ### Build System
