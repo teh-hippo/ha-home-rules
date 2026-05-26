@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v1.10.28 (2026-05-26)
+
+### Build System
+
+- **deps**: Adopt shared Renovate preset
+  ([`f01c9a6`](https://github.com/teh-hippo/ha-home-rules/commit/f01c9a6cd528560f50b10364225e1b1267a09614))
+
+- **deps**: Bump idna in the uv group across 1 directory
+  ([`d1502f6`](https://github.com/teh-hippo/ha-home-rules/commit/d1502f69929bd1b9a628fb6bd4d11635e5fb1320))
+
+
 ## v1.10.27 (2026-05-24)
 
 ### Build System
