@@ -208,3 +208,123 @@ async def test_online_inverter_without_telemetry_arms_overnight_timer(coord_fact
     assert coordinator.data.adjustment is HomeOutput.TIMER
     assert coordinator._aircon_timer_finishes_at is not None
     await coordinator.async_shutdown()
+
+
+async def test_live_zero_generation_with_stuck_online_inverter_caps_manual_run(coord_factory) -> None:
+    """H2: a live 0 W reading (not 'unknown') with a stuck-online inverter is confirmed no-solar.
+
+    have_solar must be False (requires generation > 0) and solar_unknown False, so a manual run
+    enters the timer branch and is capped, so the original overnight bug cannot recur via a real 0.
+    """
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(inverter="on-line", generation="0", grid="0", climate="heat")
+    await coordinator.async_run_evaluation("poll")
+
+    assert coordinator._last_record["have_solar"] is False
+    assert coordinator._last_record["solar_unknown"] is False
+    assert coordinator.data.adjustment is HomeOutput.TIMER
+
+
+async def test_auto_cooling_holds_on_unknown_generation(coord_factory) -> None:
+    """H1: an active auto-cooling run holds (does not shut off) when solar telemetry is missing."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(inverter="on-line", generation="unknown", grid="unknown", climate="cool")
+    coordinator._auto_mode = True
+    coordinator._session.last = HomeOutput.COOL
+    coordinator._initialized = True  # skip startup sync so the simulated auto run persists
+
+    await coordinator.async_run_evaluation("poll")
+
+    assert coordinator._last_record["solar_unknown"] is True
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator.data.reason == "Solar telemetry unavailable"
+
+
+async def test_auto_cooling_shuts_off_on_measured_grid_despite_unknown_solar(coord_factory) -> None:
+    """H1 boundary: a real measured grid import still shuts an auto run off (not held)."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(inverter="on-line", generation="unknown", grid="200", climate="cool")
+    coordinator._auto_mode = True
+    coordinator._session.last = HomeOutput.COOL
+    coordinator._initialized = True
+
+    await coordinator.async_run_evaluation("poll")  # tolerated=1
+    await coordinator.async_run_evaluation("poll")  # tolerated=grid_usage_delay -> OFF
+
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    assert coordinator.data.reason == "Grid usage too high"
+
+
+async def test_restart_with_expired_timer_and_aircon_on_turns_off(coord_factory) -> None:
+    """M1: HA down when the cap elapsed, aircon still heating -> restart issues OFF, not a re-arm."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(climate="heat", generation="unknown", grid="unknown")
+    coordinator._session.last = HomeOutput.TIMER
+    coordinator._aircon_timer_finishes_at = None  # elapsed while HA was down
+    coordinator._initialized = False  # startup sync runs
+
+    await coordinator.async_run_evaluation("restart")
+
+    assert coordinator.data.adjustment is HomeOutput.OFF  # cap issues OFF instead of re-arming a fresh timer
+    assert coordinator.data.reason == "Timer expired"
+
+
+async def test_offline_inverter_is_confirmed_no_solar_not_unknown(coord_factory) -> None:
+    """An offline inverter is confirmed no-solar (not 'unknown'): an auto run shuts off, is not held."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(inverter="off-line", generation="unknown", grid="unknown", climate="cool")
+    coordinator._auto_mode = True
+    coordinator._session.last = HomeOutput.COOL
+    coordinator._initialized = True
+
+    await coordinator.async_run_evaluation("poll")  # tolerated=1
+    assert coordinator._last_record["solar_unknown"] is False
+    assert coordinator.data.reason == "Grid usage tolerated"
+
+    await coordinator.async_run_evaluation("poll")  # tolerated=grid_usage_delay -> OFF
+    assert coordinator.data.adjustment is HomeOutput.OFF
+
+
+async def test_free_solar_reset_of_stale_timer_does_not_notify(coord_factory) -> None:
+    """Clearing a stale expired cap under genuine free solar is internal: no notify, no last_changed bump."""
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(inverter="on-line", generation="6000", grid="0", climate="cool")
+    coordinator._session.last = HomeOutput.TIMER
+    coordinator._aircon_timer_finishes_at = None  # cap elapsed
+    coordinator._initialized = True
+    coordinator._last_changed = "sentinel"
+
+    await coordinator.async_run_evaluation("poll")
+
+    assert coordinator.data.adjustment is HomeOutput.RESET
+    assert coordinator._session.last is HomeOutput.COOL  # stale TIMER cleared to live state
+    assert coordinator._last_changed == "sentinel"  # RESET is internal, so no spurious mode-change notification
+
+
+async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling(coord_factory) -> None:
+    """M1/hardening: a cap that elapsed while HA was down issues OFF via the first eval and does not
+    schedule a second, racing expiry callback that could re-arm."""
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(climate="heat", generation="unknown", grid="unknown")
+    coordinator._session.last = HomeOutput.TIMER
+    coordinator._aircon_timer_finishes_at = dt_util.utcnow() - timedelta(minutes=5)  # elapsed while HA was down
+    coordinator._schedule_timer_expiry()  # as async_initialize would on restart
+
+    assert coordinator._timer_expiry_handle is None  # an already-elapsed cap must not schedule a racing callback
+
+    coordinator._initialized = False  # startup sync runs on the first evaluation
+    await coordinator.async_run_evaluation("restart")
+
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    assert coordinator._aircon_timer_finishes_at is None

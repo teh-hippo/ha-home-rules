@@ -29,8 +29,10 @@ from custom_components.home_rules.rules import (
     R_REACTIVATE_WAIT,
     R_SOLAR_COOL,
     R_SOLAR_DRY,
+    R_SOLAR_UNKNOWN,
     R_TIMER_EXPIRED,
     R_UNKNOWN_MODE,
+    UNKNOWN_HOLD_LIMIT,
     AdjustResult,
     AirconMode,
     CachedState,
@@ -1422,3 +1424,92 @@ class TestReasonConstants:
             CachedState(),
         )
         assert r.reason == R_BELOW_THRESHOLD
+
+
+class TestAdjustSolarUnknown:
+    """Auto runs with missing solar telemetry hold (bounded), never shut off on missing data."""
+
+    def _unknown_auto(self, grid_usage: float = 0.0, **overrides):
+        return home(
+            aircon_mode=AirconMode.COOL,
+            have_solar=False,
+            solar_unknown=True,
+            grid_usage=grid_usage,
+            auto=True,
+            **overrides,
+        )
+
+    def test_holds_when_unknown_and_no_measured_grid(self):
+        r = adjust(TEST_PARAMS, self._unknown_auto(), CachedState(last=OUT.COOL))
+        assert r == AdjustResult(OUT.NO_CHANGE, R_SOLAR_UNKNOWN)
+
+    def test_bounded_hold_then_fails_safe_off(self):
+        state = CachedState(last=OUT.COOL)
+        h = self._unknown_auto()
+        for _ in range(UNKNOWN_HOLD_LIMIT - 1):
+            assert adjust(TEST_PARAMS, h, state) == AdjustResult(OUT.NO_CHANGE, R_SOLAR_UNKNOWN)
+        assert adjust(TEST_PARAMS, h, state) == AdjustResult(OUT.OFF, R_GRID_TOO_HIGH)
+
+    def test_measured_grid_still_shuts_off_despite_unknown(self):
+        state = CachedState(last=OUT.COOL)
+        h = self._unknown_auto(grid_usage=100.0)
+        assert adjust(TEST_PARAMS, h, state).reason == R_GRID_TOLERATED
+        assert adjust(TEST_PARAMS, h, state) == AdjustResult(OUT.OFF, R_GRID_TOO_HIGH)
+
+    def test_prior_unknown_holds_shorten_later_measured_grid_tolerance(self):
+        """Shared tolerated counter: unknown holds carry over so a later measured grid trips OFF
+        sooner, bounded and in the safe (shut-off) direction."""
+        state = CachedState(last=OUT.COOL)
+        assert adjust(TEST_PARAMS, self._unknown_auto(), state).reason == R_SOLAR_UNKNOWN  # tolerated=1
+        assert adjust(TEST_PARAMS, self._unknown_auto(), state).reason == R_SOLAR_UNKNOWN  # tolerated=2
+        # A real measured import now trips OFF immediately (tolerated already >= grid_usage_delay).
+        r = adjust(TEST_PARAMS, self._unknown_auto(grid_usage=100.0), state)
+        assert r == AdjustResult(OUT.OFF, R_GRID_TOO_HIGH)
+
+
+class TestAdjustManualFreeSolar:
+    """A manual run genuinely on free solar is left uncapped; a stale expired cap is cleared."""
+
+    def test_free_solar_manual_stays_uncapped(self):
+        r = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.COOL, have_solar=True, generation=6000, auto=False),
+            CachedState(last=OUT.COOL),
+        )
+        assert r == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+
+    def test_free_solar_manual_resets_stale_expired_timer(self):
+        r = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.COOL, have_solar=True, generation=6000, auto=False),
+            CachedState(last=OUT.TIMER),
+        )
+        assert r == AdjustResult(OUT.RESET, R_TIMER_EXPIRED)
+
+
+class TestManualOvernightCapLifecycle:
+    """End-to-end pure-engine arm -> hold -> expire -> OFF for a manual no-solar run."""
+
+    def test_arm_hold_expire_off(self):
+        state = CachedState(last=OUT.OFF)
+        armed = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.HEAT, have_solar=False, grid_usage=0.0, timer=False, auto=False),
+            state,
+        )
+        assert armed == AdjustResult(OUT.TIMER, R_MANUAL)
+        assert apply_adjustment(state, OUT.COOL, OUT.TIMER) is True  # session.last -> TIMER
+
+        holding = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.HEAT, have_solar=False, grid_usage=0.0, timer=True, auto=False),
+            state,
+        )
+        assert holding == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+
+        expired = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.HEAT, have_solar=False, grid_usage=0.0, timer=False, auto=False),
+            state,
+        )
+        assert expired == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
