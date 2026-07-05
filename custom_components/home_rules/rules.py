@@ -17,6 +17,8 @@ from enum import StrEnum
 from typing import NamedTuple
 
 ALLOWED_FAILURES = 3
+# Evaluations to keep an auto run alive while solar telemetry is missing before failing safe to OFF.
+UNKNOWN_HOLD_LIMIT = 6
 
 # Reason constants — every decision path has a named reason.
 R_NO_SOLAR = "No solar available"
@@ -42,6 +44,7 @@ R_NO_CHANGE = "No change"
 R_COOLING_DISABLED = "Cooling disabled"
 R_BELOW_COOL_SETPOINT = "Temperature below cool setpoint"
 R_BELOW_THRESHOLD = "Temperature below threshold"
+R_SOLAR_UNKNOWN = "Solar telemetry unavailable"
 
 
 class AirconMode(StrEnum):
@@ -81,6 +84,7 @@ class HomeInput:
     aggressive_cooling: bool
     enabled: bool
     cooling_enabled: bool
+    solar_unknown: bool = False
 
 
 @dataclass
@@ -232,6 +236,15 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             if h.aggressive_cooling and h.have_solar and h.generation >= config.generation_boost_threshold:
                 state.tolerated = 0
                 return AdjustResult(HomeOutput.NO_CHANGE, R_BOOST_GRID_TOLERATED)
+            # Telemetry gap: no live solar data and no measured grid draw, so hold rather than shut
+            # off active cooling on missing data. Bounded so a sustained outage still fails safe to OFF.
+            if h.solar_unknown and h.grid_usage <= 0:
+                state.tolerated += 1
+                if state.tolerated < UNKNOWN_HOLD_LIMIT:
+                    return AdjustResult(HomeOutput.NO_CHANGE, R_SOLAR_UNKNOWN)
+                state.tolerated = 0
+                state.reactivate_delay = config.reactivate_delay
+                return AdjustResult(HomeOutput.OFF, R_GRID_TOO_HIGH)
             # Solar: tolerate briefly, then shut off.
             state.tolerated += 1
             if state.tolerated < config.grid_usage_delay:
@@ -252,6 +265,9 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return AdjustResult(target.output, target.reason)
         return AdjustResult(HomeOutput.NO_CHANGE, activation or R_NO_CHANGE)
 
+    # Manual run confirmed on genuine free solar: clear a now-stale expired cap.
+    if state.last is HomeOutput.TIMER and not h.timer:
+        return AdjustResult(HomeOutput.RESET, R_TIMER_EXPIRED)
     return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
 
 

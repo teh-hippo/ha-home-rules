@@ -37,7 +37,7 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "auto")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "solar_unknown", "auto", "aircon_mode")
 _SESSION_RECORD_FIELDS = ("tolerated", "reactivate_delay")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
@@ -117,7 +117,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
             if is_monitor: self._session.failed_to_change, applied = 0, True
             if not applied: raise HomeAssistantError("failed to apply adjustment")
-            if previous is not None and previous != self._session.last: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
+            if previous is not None and previous != self._session.last and adjustment is not HomeOutput.RESET: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
             mode = self._session.last or current
             record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "target_adjustment": target.output.value if target.output is not None else None, "target_reason": target.reason, "target_actionable": target.is_actionable, "blocked_reasons": [target.reason] if target.output is None and target.is_actionable else [], "fallback_inputs": dict(self._fallback_inputs), "controls_snapshot": {"control_mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled, "dry_mode_enabled": self.dry_mode_enabled}, "policy_snapshot": {"dry_mode_humidity_cutoff": params.dry_mode_humidity_cutoff}} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
             smoothed = self._run_shadow_smoothed(home, record)
@@ -126,7 +126,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             for issue in _CLEAR_ISSUES: self._clear_issue(issue)
             self._first_refresh_done = True
             disagree_count = sum(1 for r in list(self._recent)[:10] if r.get("decision_differs", False))
-            return CoordinatorData(mode=mode, current=current, adjustment=adjustment, decision=f"{mode.value} - {reason}", reason=reason, solar_available=home.have_solar and home.generation > 0.0, auto_mode=self._auto_mode, dry_run=is_monitor, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed, smoothing_disagrees=disagree_count)
+            return CoordinatorData(mode=mode, current=current, adjustment=adjustment, decision=f"{mode.value} - {reason}", reason=reason, solar_available=home.have_solar, auto_mode=self._auto_mode, dry_run=is_monitor, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed, smoothing_disagrees=disagree_count)
 
     async def _maybe_notify(self, previous: HomeOutput, current: HomeOutput, adjustment: HomeOutput) -> None:
         service = str(self.config_entry.options.get(c.CONF_NOTIFICATION_SERVICE, "")).strip()
@@ -170,16 +170,20 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         timer = self._active_aircon_timer(); climate = self._state(c.CONF_CLIMATE_ENTITY_ID, "climate")
         inv_id = self._entity_id(c.CONF_INVERTER_ENTITY_ID, optional=True); inv = self._get_state(inv_id, "inverter", allow_unavailable=True) if inv_id else None
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
-        have_solar = (c.is_inverter_online(str(inv.state)) if inv else True) and "generation" not in self._fallback_inputs  # a stuck/stale online status with no live generation telemetry (asleep inverter) is not solar
+        gen_live = "generation" not in self._fallback_inputs; grid_live = "grid" not in self._fallback_inputs  # a fallback means the sensor is unknown/unavailable (e.g. inverter asleep)
+        generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid") if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
+        inverter_online = c.is_inverter_online(str(inv.state)) if inv else True
+        have_solar = inverter_online and gen_live and generation > 0.0  # solar present: inverter up AND live, positive generation
+        solar_unknown = inverter_online and not gen_live  # inverter claims online but no telemetry, so solar cannot be confirmed (vs offline = confirmed no solar)
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
-        generation = self._normalized_power(gen, "generation") if have_solar else 0.0; grid_usage = self._normalized_power(grid, "grid") if have_solar else 0.0
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled), timer
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, solar_unknown), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if self._session.last is None: self._session.last = current
         elif home.timer and self._session.last is HomeOutput.TIMER: return
+        elif self._session.last is HomeOutput.TIMER and home.aircon_mode is not AirconMode.OFF: return  # cap elapsed while down but aircon still on: keep TIMER so adjust() issues OFF, don't re-arm
         elif self._session.last != current: c.LOGGER.info("Startup sync: restoring from %s to live state %s", self._session.last.value, current.value); self._session.last = current
 
     async def _call_service(self, domain: str, service: str, data: dict[str, Any]) -> None:
@@ -234,7 +238,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._cancel_timer_expiry()
         if self._aircon_timer_finishes_at is None: return
         delay = (self._aircon_timer_finishes_at - dt_util.utcnow()).total_seconds()
-        if delay <= 0: self.hass.loop.call_soon(self._async_handle_timer_expiry); return
+        if delay <= 0: return  # already elapsed (e.g. a cap loaded on restart): the imminent evaluation clears it and issues OFF, avoiding a second racing eval that could re-arm
         self._timer_expiry_handle = self.hass.loop.call_later(delay, self._async_handle_timer_expiry)
 
     def _async_handle_timer_expiry(self) -> None:
