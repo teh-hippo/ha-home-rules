@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.31 (2026-07-05)
+
+### Bug Fixes
+
+- **tests**: Cancel lingering aircon timer on coordinator fixture teardown
+  ([`fd400af`](https://github.com/teh-hippo/ha-home-rules/commit/fd400af6cd5a9e3adb083eb9bad0311bf4d5bf65))
+
+
 ## v1.10.30 (2026-07-05)
 
 ### Bug Fixes
