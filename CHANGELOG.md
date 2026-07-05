@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.30 (2026-07-05)
+
+### Bug Fixes
+
+- **coordinator**: Harden overnight cap against missing solar telemetry and restarts
+  ([`b296a93`](https://github.com/teh-hippo/ha-home-rules/commit/b296a93f2a350a2b6bd5716b79ce0fd6bf482c0b))
+
+
 ## v1.10.29 (2026-07-05)
 
 ### Bug Fixes
