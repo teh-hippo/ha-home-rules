@@ -20,7 +20,7 @@ else:
         """Enable custom component loading in HA tests."""
 
     @pytest.fixture
-    def coord_factory(hass):
+    async def coord_factory(hass):
         """Factory fixture: creates an initialized HomeRulesCoordinator with configurable HA states.
 
         Usage::
@@ -28,6 +28,9 @@ else:
             async def test_something(coord_factory) -> None:
                 coordinator = await coord_factory()           # default high-solar scenario
                 coordinator = await coord_factory(generation="0")  # no solar
+
+        Coordinators are shut down on teardown so scheduled timers do not linger
+        past the test, mirroring config-entry unload.
         """
         from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -41,6 +44,8 @@ else:
             DOMAIN,
         )
         from custom_components.home_rules.coordinator import HomeRulesCoordinator
+
+        created: list[HomeRulesCoordinator] = []
 
         async def _make(
             *,
@@ -74,9 +79,13 @@ else:
             entry.add_to_hass(hass)
             coordinator = HomeRulesCoordinator(hass, entry)
             await coordinator.async_initialize()
+            created.append(coordinator)
             return coordinator
 
-        return _make
+        yield _make
+
+        for coordinator in created:
+            await coordinator.async_shutdown()
 
     @pytest.fixture
     def mock_entry(hass):
