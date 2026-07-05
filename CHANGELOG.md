@@ -1,6 +1,48 @@
 # CHANGELOG
 
 
+## v1.10.29 (2026-07-05)
+
+### Bug Fixes
+
+- **coordinator**: Require live generation telemetry for solar availability
+  ([`317cc3e`](https://github.com/teh-hippo/ha-home-rules/commit/317cc3ec58a3de94c9d72559a23ca2d3ccd4b6a9))
+
+### Chores
+
+- **deps**: Update actions/checkout action to v7
+  ([`e5f5175`](https://github.com/teh-hippo/ha-home-rules/commit/e5f51759879708024d6d4b149c0361a19b8a7660))
+
+- **deps**: Update actions/checkout digest to df4cb1c
+  ([`0333c61`](https://github.com/teh-hippo/ha-home-rules/commit/0333c6171f27718efb74e6d24761dae58b6c318d))
+
+- **deps**: Update astral-sh/setup-uv action to v8.2.0
+  ([`d65b027`](https://github.com/teh-hippo/ha-home-rules/commit/d65b02765528b9878702e0854d790d5e25368b8b))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 66af9ee
+  ([`edccf55`](https://github.com/teh-hippo/ha-home-rules/commit/edccf55839a22d709ba8ef094035c26c416c3f91))
+
+- **deps**: Update softprops/action-gh-release digest to 718ea10
+  ([`c9e67ac`](https://github.com/teh-hippo/ha-home-rules/commit/c9e67ac1e5d70e1f89d7a3db77ef8dd70bb57727))
+
+- **deps**: Update teh-hippo/common-repo-configs digest to b3d0a78
+  ([`32f7528`](https://github.com/teh-hippo/ha-home-rules/commit/32f7528019e3019f0ed33420dc81b57609bf72ca))
+
+### Continuous Integration
+
+- Adopt shared CodeQL workflow
+  ([`5d15c95`](https://github.com/teh-hippo/ha-home-rules/commit/5d15c95cc14fe9d330a96b454e8ccef35ab30672))
+
+- Adopt uv sync --locked pattern
+  ([`1a924d6`](https://github.com/teh-hippo/ha-home-rules/commit/1a924d61144a0be94bd78c071ce989a4f3f76fb0))
+
+- **release**: Commit uv.lock from build_command via assets
+  ([`b144312`](https://github.com/teh-hippo/ha-home-rules/commit/b14431254a1245583e6072a9da15d0996421cd20))
+
+- **validate**: Drop daily cron and Dependabot/Copilot branch push triggers
+  ([`de7d645`](https://github.com/teh-hippo/ha-home-rules/commit/de7d645b76dc9cb9929cd2382aabf906598248fa))
+
+
 ## v1.10.28 (2026-05-26)
 
 ### Build System
