@@ -9,7 +9,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfPower, UnitOfTemperature
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    UnitOfPower,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
@@ -164,7 +170,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         timer = self._active_aircon_timer(); climate = self._state(c.CONF_CLIMATE_ENTITY_ID, "climate")
         inv_id = self._entity_id(c.CONF_INVERTER_ENTITY_ID, optional=True); inv = self._get_state(inv_id, "inverter", allow_unavailable=True) if inv_id else None
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
-        have_solar = str(inv.state).lower().strip().replace("-", "").replace("_", "").replace(" ", "") in {"on", "true", "1", "online"} if inv else not inv_id
+        have_solar = (c.is_inverter_online(str(inv.state)) if inv else True) and "generation" not in self._fallback_inputs  # a stuck/stale online status with no live generation telemetry (asleep inverter) is not solar
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
@@ -201,7 +207,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if not allow_unavailable and not self._first_refresh_done: raise ConfigEntryNotReady(f"Required entity not yet available: {entity_id}")
             self._create_issue(c.ISSUE_ENTITY_MISSING, {"entity_id": entity_id, "label": label}); raise ValueError(f"missing entity: {entity_id}")
         raw = str(state.state).lower()
-        if raw not in {"unknown", "unavailable"}: return state
+        if raw not in {STATE_UNKNOWN, STATE_UNAVAILABLE}: return state
         if not allow_unavailable:
             if not self._first_refresh_done: raise ConfigEntryNotReady(f"Required entity not yet available: {entity_id}")
             self._create_issue(c.ISSUE_ENTITY_UNAVAILABLE, {"entity_id": entity_id, "label": label}); raise ValueError(f"entity unavailable: {entity_id}")
