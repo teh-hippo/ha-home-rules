@@ -181,3 +181,30 @@ async def test_restart_first_eval_uses_live_state_when_no_stored_session(coord_f
 
     # Session must be initialised from live state, not left as None.
     assert coordinator._session.last is not None
+
+
+async def test_online_inverter_without_generation_telemetry_is_not_solar(coord_factory) -> None:
+    """An inverter stuck 'on-line' with no generation telemetry (asleep at night) is not solar.
+
+    Regression: a stale online status previously masked the sleeping inverter, so a manually
+    run aircon was treated as running on free solar and never capped by the overnight timer.
+    """
+    coordinator = await coord_factory(inverter="on-line", generation="unknown", grid="unknown", climate="heat")
+    await coordinator.async_run_evaluation("poll")
+
+    assert coordinator._last_record["have_solar"] is False
+    assert coordinator.data.solar_available is False
+
+
+async def test_online_inverter_without_telemetry_arms_overnight_timer(coord_factory) -> None:
+    """With no live solar telemetry, a manually run aircon is capped by the overnight timer."""
+    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(inverter="on-line", generation="unknown", grid="unknown", climate="heat")
+    await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
+
+    assert coordinator._last_record["have_solar"] is False
+    assert coordinator.data.adjustment is HomeOutput.TIMER
+    assert coordinator._aircon_timer_finishes_at is not None
+    await coordinator.async_shutdown()

@@ -45,6 +45,14 @@ def normalize_power_unit(unit: str) -> str:
     return _POWER_UNITS.get(cleaned.lower(), cleaned)
 
 
+INVERTER_ONLINE_STATES = frozenset({"on", "true", "1", "online"})
+
+
+def is_inverter_online(state: str) -> bool:
+    """True when an inverter status string denotes an online, producing inverter."""
+    return state.lower().strip().replace("-", "").replace("_", "").replace(" ", "") in INVERTER_ONLINE_STATES
+
+
 DEFAULT_OPTIONS: dict[str, int | float] = {
     CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
     CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
