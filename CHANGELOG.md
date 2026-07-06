@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v1.10.32 (2026-07-06)
+
+### Build System
+
+- **deps**: Pin hub reusable workflows to v2
+  ([`bb9a789`](https://github.com/teh-hippo/ha-home-rules/commit/bb9a7896a745f0cf5553c8e745de0e02446e2864))
+
+### Chores
+
+- **deps**: Lock file maintenance
+  ([`9d9a147`](https://github.com/teh-hippo/ha-home-rules/commit/9d9a1472adcd5694abb4e7362e2e8d831362703c))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 1c3a630
+  ([`38f7c2d`](https://github.com/teh-hippo/ha-home-rules/commit/38f7c2dc19806f03bafd194480e9d87bd8b94788))
+
+- **deps**: Update python-semantic-release/python-semantic-release digest to 37a30a7
+  ([`a0d1fc5`](https://github.com/teh-hippo/ha-home-rules/commit/a0d1fc52dfc6e21e0c0e39a9402074892c023bb1))
+
+- **renovate**: Extend base preset directly (retire weekly slot)
+  ([`d83a3cc`](https://github.com/teh-hippo/ha-home-rules/commit/d83a3cc0a2bda4fcaafd0e4a7a8cdfc8b2cfbca4))
+
+
 ## v1.10.31 (2026-07-05)
 
 ### Bug Fixes
