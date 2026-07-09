@@ -61,6 +61,7 @@ class AirconMode(StrEnum):
 class HomeOutput(StrEnum):
     NO_CHANGE = "No Change"
     OFF = "Off"
+    ON = "On"
     COOL = "Cool"
     DRY = "Dry"
     TIMER = "Timer"
@@ -172,7 +173,7 @@ def current_state(home: HomeInput) -> HomeOutput:
         return HomeOutput.TIMER
     return {AirconMode.COOL: HomeOutput.COOL, AirconMode.DRY: HomeOutput.DRY}.get(
         home.aircon_mode,
-        HomeOutput.OFF if home.aircon_mode in (AirconMode.OFF, AirconMode.UNKNOWN) else HomeOutput.COOL,
+        HomeOutput.OFF if home.aircon_mode in (AirconMode.OFF, AirconMode.UNKNOWN) else HomeOutput.ON,
     )
 
 
@@ -225,7 +226,17 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return AdjustResult(HomeOutput.RESET, R_TIMER_EXPIRED)
         return AdjustResult(HomeOutput.NO_CHANGE, _idle_reason(config, h, activation, R_NO_CHANGE))
 
-    # --- Aircon is ON + grid draw (or no solar) ---
+    # --- Aircon is ON in a mode home-rules never commands (heat/heat_cool/fan_only/auto) ---
+    # Such a run is external by definition: cap it and turn it off at expiry, independent of
+    # solar. Only COOL/DRY runs follow the solar economics below.
+    if h.aircon_mode not in (AirconMode.COOL, AirconMode.DRY):
+        if h.timer:
+            return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
+        if state.last is HomeOutput.TIMER:
+            return AdjustResult(HomeOutput.OFF, R_TIMER_EXPIRED)
+        return AdjustResult(HomeOutput.TIMER, R_MANUAL)
+
+    # --- Cooling run + grid draw (or no solar) ---
     if not h.have_solar or h.grid_usage > 0:
         if h.auto:
             # If a mode transition is available (e.g. COOL→DRY downgrade), apply immediately.
@@ -258,14 +269,14 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
         return AdjustResult(OUT.TIMER, R_MANUAL)
 
-    # --- Aircon is ON + free solar ---
+    # --- Cooling run + free solar ---
     if h.auto:
         state.tolerated = 0
         if target.output is not None:
             return AdjustResult(target.output, target.reason)
         return AdjustResult(HomeOutput.NO_CHANGE, activation or R_NO_CHANGE)
 
-    # Manual run confirmed on genuine free solar: clear a now-stale expired cap.
+    # Manual cooling run confirmed on genuine free solar: clear a now-stale expired cap.
     if state.last is HomeOutput.TIMER and not h.timer:
         return AdjustResult(HomeOutput.RESET, R_TIMER_EXPIRED)
     return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)

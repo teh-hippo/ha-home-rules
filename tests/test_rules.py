@@ -241,17 +241,17 @@ class TestCurrentState:
     def test_unknown(self):
         assert current_state(home(aircon_mode=AirconMode.UNKNOWN)) is OUT.OFF
 
-    def test_fan_only_fallback_to_cool(self):
-        assert current_state(home(aircon_mode=AirconMode.FAN_ONLY)) is OUT.COOL
+    def test_fan_only_maps_to_on(self):
+        assert current_state(home(aircon_mode=AirconMode.FAN_ONLY)) is OUT.ON
 
-    def test_heat_fallback_to_cool(self):
-        assert current_state(home(aircon_mode=AirconMode.HEAT)) is OUT.COOL
+    def test_heat_maps_to_on(self):
+        assert current_state(home(aircon_mode=AirconMode.HEAT)) is OUT.ON
 
-    def test_heat_cool_fallback_to_cool(self):
-        assert current_state(home(aircon_mode=AirconMode.HEAT_COOL)) is OUT.COOL
+    def test_heat_cool_maps_to_on(self):
+        assert current_state(home(aircon_mode=AirconMode.HEAT_COOL)) is OUT.ON
 
-    def test_auto_fallback_to_cool(self):
-        assert current_state(home(aircon_mode=AirconMode.AUTO)) is OUT.COOL
+    def test_auto_maps_to_on(self):
+        assert current_state(home(aircon_mode=AirconMode.AUTO)) is OUT.ON
 
 
 # ---------------------------------------------------------------------------
@@ -1513,3 +1513,78 @@ class TestManualOvernightCapLifecycle:
             state,
         )
         assert expired == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+
+class TestManualHeatFreeSolarCap:
+    """Incident regression: a heat run on FREE solar must still be capped and turned OFF.
+
+    Before the mode-aware fix, a heat run on free solar was never capped (start) and its
+    expired cap was cleared with RESET (kept running), so the heater ran all day.
+    """
+
+    def _heat(self, **kw) -> HomeInput:
+        base = dict(aircon_mode=AirconMode.HEAT, have_solar=True, generation=2016.0, grid_usage=0.0, auto=False)
+        base.update(kw)
+        return home(**base)
+
+    def test_free_solar_heat_starts_cap(self):
+        """Defect A: manual heat on free solar arms the cap (previously NO_CHANGE)."""
+        r = adjust(TEST_PARAMS, self._heat(timer=False), CachedState(last=OUT.OFF))
+        assert r == AdjustResult(OUT.TIMER, R_MANUAL)
+
+    def test_free_solar_heat_holds_while_capped(self):
+        r = adjust(TEST_PARAMS, self._heat(timer=True), CachedState(last=OUT.TIMER))
+        assert r == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+
+    def test_free_solar_heat_expiry_turns_off(self):
+        """The incident: expired cap on free solar turns OFF (previously RESET/keep-running)."""
+        r = adjust(TEST_PARAMS, self._heat(timer=False), CachedState(last=OUT.TIMER))
+        assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+    def test_grid_heat_expiry_still_turns_off(self):
+        """No regression: expiry on grid draw still turns OFF."""
+        r = adjust(TEST_PARAMS, self._heat(grid_usage=300.0, timer=False), CachedState(last=OUT.TIMER))
+        assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+    def test_lifecycle_arm_hold_expire_off_rearm(self):
+        """Full user story on free solar: arm -> hold -> expire OFF -> manual on again -> re-arm."""
+        state = CachedState(last=OUT.OFF)
+        assert adjust(TEST_PARAMS, self._heat(timer=False), state) == AdjustResult(OUT.TIMER, R_MANUAL)
+        apply_adjustment(state, OUT.ON, OUT.TIMER)  # session.last -> TIMER
+        assert adjust(TEST_PARAMS, self._heat(timer=True), state) == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+        assert adjust(TEST_PARAMS, self._heat(timer=False), state) == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+        apply_adjustment(state, OUT.ON, OUT.OFF)  # session.last -> OFF
+        assert adjust(TEST_PARAMS, self._heat(timer=False), state) == AdjustResult(OUT.TIMER, R_MANUAL)
+
+    def test_recorded_free_solar_expiries_turn_off(self):
+        """Real generation readings recorded at the free-solar cap expiries (grid=0)."""
+        for generation in (2016.0, 5596.0, 1210.0):
+            r = adjust(
+                TEST_PARAMS,
+                self._heat(generation=generation, timer=False),
+                CachedState(last=OUT.TIMER),
+            )
+            assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+
+class TestStaleAutoHeat:
+    """A stale auto=True (home-rules ran cool, user switched to heat) must not keep a heat run
+    alive or flip it back to COOL. The mode-first branch treats any non-cool run as external."""
+
+    def test_stale_auto_heat_expiry_turns_off(self):
+        r = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.HEAT, have_solar=True, generation=2016.0, grid_usage=0.0, auto=True),
+            CachedState(last=OUT.TIMER),
+        )
+        assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+    def test_stale_auto_heat_strong_sun_never_flips_to_cool(self):
+        """Generation above the cool threshold must not command COOL on a heat run."""
+        r = adjust(
+            TEST_PARAMS,
+            home(aircon_mode=AirconMode.HEAT, have_solar=True, generation=6000.0, grid_usage=0.0, auto=True),
+            CachedState(last=OUT.OFF),
+        )
+        assert r.output is OUT.TIMER
+        assert r.output is not OUT.COOL
