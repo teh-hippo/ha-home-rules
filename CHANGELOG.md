@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v1.10.33 (2026-07-09)
+
+### Bug Fixes
+
+- Cap and turn off manual heat runs regardless of solar
+  ([`a9f8a93`](https://github.com/teh-hippo/ha-home-rules/commit/a9f8a93e6169513af42e31e1d3e4c6b79d454110))
+
+### Chores
+
+- **deps**: Lock file maintenance
+  ([`7e51626`](https://github.com/teh-hippo/ha-home-rules/commit/7e51626851d49338198e1b08f5ac794c49182e23))
+
+- **deps**: Lock file maintenance
+  ([`97061e0`](https://github.com/teh-hippo/ha-home-rules/commit/97061e0e269746dea745378e96accf3eddf52ec9))
+
+- **deps**: Update astral-sh/setup-uv action to v8.3.0
+  ([`6e74eed`](https://github.com/teh-hippo/ha-home-rules/commit/6e74eedb40562446e7a8006a1e861872b3fd8a2e))
+
+- **deps**: Update python-semantic-release/python-semantic-release digest to 39dd205
+  ([`366bb33`](https://github.com/teh-hippo/ha-home-rules/commit/366bb334a1887a2693420d0bc3ae051c9e107a50))
+
+### Continuous Integration
+
+- Remove CodeQL advanced workflow in favour of default setup
+  ([`7766712`](https://github.com/teh-hippo/ha-home-rules/commit/7766712b3c5f9dddbd10579f8bf06dd5a65e4912))
+
+
 ## v1.10.32 (2026-07-06)
 
 ### Build System
