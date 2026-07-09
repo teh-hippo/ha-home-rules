@@ -134,7 +134,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         domain, name = service.split(".", 1) if "." in service else ("notify", service)
         if not self.hass.services.has_service(domain, name): self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service}); return
         self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE)
-        _emoji = {"Cool": "❄️", "Dry": "💧", "Off": "⏹", "Timer": "⏱", "Disabled": "⏸", "Reset": "🔄"}
+        _emoji = {"Cool": "❄️", "Dry": "💧", "Off": "⏹", "On": "🔛", "Timer": "⏱", "Disabled": "⏸", "Reset": "🔄"}
         new = (self._session.last or current).value; icon = _emoji.get(new, "")
         try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"Switched from {previous.value} to {new}"}, blocking=False)
         except ServiceValidationError: self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service})
@@ -177,6 +177,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         solar_unknown = inverter_online and not gen_live  # inverter claims online but no telemetry, so solar cannot be confirmed (vs offline = confirmed no solar)
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
+        if mode not in (AirconMode.COOL, AirconMode.DRY): self._auto_mode = False  # self-heal: only COOL/DRY are home-rules-owned runs; a user-switched mode is external
         aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
         return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, solar_unknown), timer
 
