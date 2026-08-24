@@ -1,6 +1,78 @@
 # CHANGELOG
 
 
+## v1.10.34 (2026-08-24)
+
+### Bug Fixes
+
+- **deps**: Override vulnerable cryptography pin
+  ([`0c34843`](https://github.com/teh-hippo/ha-home-rules/commit/0c348434f1485b289f60893503e3b610aa1cdff9))
+
+### Chores
+
+- **deps**: Lock file maintenance
+  ([`cc89d66`](https://github.com/teh-hippo/ha-home-rules/commit/cc89d66eec67fce5fe349a3e066bc826a2adc404))
+
+- **deps**: Lock file maintenance
+  ([`a7c1d89`](https://github.com/teh-hippo/ha-home-rules/commit/a7c1d89748672a34e20110bc563c1c94a5e61e77))
+
+- **deps**: Lock file maintenance
+  ([`82d01b8`](https://github.com/teh-hippo/ha-home-rules/commit/82d01b87ae2255d2027ce7df9cd5e97130cb38ac))
+
+- **deps**: Lock file maintenance
+  ([`400917b`](https://github.com/teh-hippo/ha-home-rules/commit/400917b004d9918385cf2d8bf194fe36b5ebbe6e))
+
+- **deps**: Lock file maintenance
+  ([`428f879`](https://github.com/teh-hippo/ha-home-rules/commit/428f879cd01fe89478509c3f6e6cc616744887ec))
+
+- **deps**: Lock file maintenance
+  ([`f21fc49`](https://github.com/teh-hippo/ha-home-rules/commit/f21fc4965413ad2a3cbb479164132caefda45230))
+
+- **deps**: Lock file maintenance
+  ([`9686795`](https://github.com/teh-hippo/ha-home-rules/commit/968679549c1b81fa1ac1cb063e7463254cb18317))
+
+- **deps**: Lock file maintenance
+  ([`e98c30f`](https://github.com/teh-hippo/ha-home-rules/commit/e98c30f066675c984d1e3770fe417149adeb8266))
+
+- **deps**: Lock file maintenance
+  ([`444bbdc`](https://github.com/teh-hippo/ha-home-rules/commit/444bbdc8836572d172bef51bd4c2bee36c0c8bcb))
+
+- **deps**: Lock file maintenance
+  ([`3a76539`](https://github.com/teh-hippo/ha-home-rules/commit/3a765399d72430097abf19cf5422aa317baf542f))
+
+- **deps**: Lock file maintenance
+  ([`e0c7550`](https://github.com/teh-hippo/ha-home-rules/commit/e0c7550b3b0e1161515c2e7afd46b9317670e8ac))
+
+- **deps**: Update actions/checkout digest to 3d3c42e
+  ([`aa06a19`](https://github.com/teh-hippo/ha-home-rules/commit/aa06a19bf46ac9585b986f503e9a5285558b14b9))
+
+- **deps**: Update astral-sh/setup-uv action to v10
+  ([`73d0302`](https://github.com/teh-hippo/ha-home-rules/commit/73d030239a8ec4734bf6e1d9a9734c42bc3c7bd4))
+
+- **deps**: Update astral-sh/setup-uv action to v10.0.1
+  ([`4db92f5`](https://github.com/teh-hippo/ha-home-rules/commit/4db92f5ba9a314e1d6d6f323423f730ce1facf87))
+
+- **deps**: Update astral-sh/setup-uv action to v8.3.1
+  ([`33df547`](https://github.com/teh-hippo/ha-home-rules/commit/33df5478ede6e82a2ff8cebb0787a752e8a8ecc7))
+
+- **deps**: Update astral-sh/setup-uv action to v8.3.2
+  ([`a741fa9`](https://github.com/teh-hippo/ha-home-rules/commit/a741fa921b901141189e4f1014cd43717ca6293a))
+
+- **deps**: Update astral-sh/setup-uv action to v9
+  ([`ee21bdb`](https://github.com/teh-hippo/ha-home-rules/commit/ee21bdbc791c09eec14832b38bb2931eaa9c2f36))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to f04a1e9
+  ([`3f04310`](https://github.com/teh-hippo/ha-home-rules/commit/3f04310517a82c378afc02a1e7eb5c62b1ad1dac))
+
+- **deps**: Update softprops/action-gh-release digest to 3d0d988
+  ([`a223e5b`](https://github.com/teh-hippo/ha-home-rules/commit/a223e5b8bf59abba5600b1ab8c92c0f97eb34c2e))
+
+### Documentation
+
+- Add security policy
+  ([`5255b68`](https://github.com/teh-hippo/ha-home-rules/commit/5255b68e11fc389db74a3a98ee7728ea4c045888))
+
+
 ## v1.10.33 (2026-07-09)
 
 ### Bug Fixes
