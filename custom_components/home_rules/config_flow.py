@@ -4,7 +4,7 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
-import voluptuous as vol
+import probatio as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import UnitOfPower
 from homeassistant.core import HomeAssistant
