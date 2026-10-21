@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.11.0 (2026-10-21)
+
+### Features
+
+- **rules**: Add afternoon cooling switch and start hour option
+  ([`7312bb4`](https://github.com/teh-hippo/ha-home-rules/commit/7312bb451be07c26d5406d97c49f4b6240d55513))
+
+
 ## v1.10.36 (2026-10-21)
 
 ### Bug Fixes
