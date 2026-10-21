@@ -40,6 +40,7 @@ R_MANUAL = "Manual"
 R_AUTO_IDLE = "Auto idle"
 R_NO_CHANGE = "No change"
 R_COOLING_DISABLED = "Cooling disabled"
+R_BEFORE_AFTERNOON = "Before afternoon cooling time"
 R_BELOW_COOL_SETPOINT = "Temperature below cool setpoint"
 R_BELOW_THRESHOLD = "Temperature below threshold"
 
@@ -82,6 +83,7 @@ class HomeInput:
     aggressive_cooling: bool
     enabled: bool
     cooling_enabled: bool
+    before_afternoon: bool = False
 
 
 @dataclass
@@ -180,6 +182,8 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
     """
     if not home.cooling_enabled:
         return R_COOLING_DISABLED
+    if home.before_afternoon:
+        return R_BEFORE_AFTERNOON
     if home.aggressive_cooling and home.temperature <= config.temperature_cool:
         return R_BELOW_COOL_SETPOINT
     if home.temperature < config.temperature_threshold:
@@ -214,7 +218,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             if h.aggressive_cooling
             else h.temperature >= config.temperature_threshold
         )
-        if h.cooling_enabled and temp_ok and target.output is not None:
+        if h.cooling_enabled and not h.before_afternoon and temp_ok and target.output is not None:
             return AdjustResult(target.output, target.reason)
         if h.auto:
             return AdjustResult(HomeOutput.OFF, _idle_reason(config, h, activation, R_AUTO_IDLE))

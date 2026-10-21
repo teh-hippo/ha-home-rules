@@ -81,6 +81,28 @@ async def test_async_set_control_disables_dry_mode(coord_factory) -> None:
     assert coordinator._last_record["reason"] == "Dry mode disabled"
 
 
+async def test_afternoon_cooling_gates_before_start_hour(coord_factory, monkeypatch) -> None:
+    from datetime import UTC, datetime
+
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(generation="6000", temperature="26")
+    monkeypatch.setattr(dt_util, "now", lambda *a, **kw: datetime(2026, 3, 15, 13, 59, tzinfo=UTC))
+    await coordinator.async_set_control("afternoon_cooling", True)
+
+    assert coordinator.afternoon_cooling is True
+    assert (coordinator.data.adjustment, coordinator._last_record["reason"]) == (
+        HomeOutput.NO_CHANGE,
+        "Before afternoon cooling time",
+    )
+
+    monkeypatch.setattr(dt_util, "now", lambda *a, **kw: datetime(2026, 3, 15, 14, 0, tzinfo=UTC))
+    await coordinator.async_run_evaluation("test")
+    assert coordinator.data.adjustment is HomeOutput.COOL
+
+
 async def test_evaluation_fires_ha_event(hass, coord_factory) -> None:
     """Each evaluation fires an EVENT_EVALUATION event on the HA event bus."""
     from custom_components.home_rules.const import EVENT_EVALUATION

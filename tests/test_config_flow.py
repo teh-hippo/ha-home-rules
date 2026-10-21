@@ -63,6 +63,7 @@ async def _move_to_comfort_step(hass: HomeAssistant) -> ConfigFlowResult:
 async def test_config_flow_happy_path_creates_entry(hass) -> None:
     """The full user -> solar -> comfort flow should create an entry with defaults."""
     from custom_components.home_rules.const import (
+        CONF_AFTERNOON_COOLING_HOUR,
         CONF_AIRCON_TIMER_DURATION,
         CONF_CLIMATE_ENTITY_ID,
         CONF_EVAL_INTERVAL,
@@ -76,6 +77,7 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_REACTIVATE_DELAY,
         CONF_SMOOTHING_WINDOW,
         CONF_TEMPERATURE_ENTITY_ID,
+        DEFAULT_AFTERNOON_COOLING_HOUR,
         DEFAULT_AIRCON_TIMER_DURATION,
         DEFAULT_EVAL_INTERVAL,
         DEFAULT_GENERATION_BOOST_THRESHOLD,
@@ -105,6 +107,7 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
     }
     assert result["options"] == {
+        CONF_AFTERNOON_COOLING_HOUR: DEFAULT_AFTERNOON_COOLING_HOUR,
         CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
         CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
         CONF_GENERATION_BOOST_THRESHOLD: DEFAULT_GENERATION_BOOST_THRESHOLD,

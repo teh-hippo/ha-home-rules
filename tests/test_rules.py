@@ -11,6 +11,7 @@ from custom_components.home_rules.rules import (
     R_ALREADY_COOLING,
     R_ALREADY_DRYING,
     R_AUTO_IDLE,
+    R_BEFORE_AFTERNOON,
     R_BELOW_COOL_SETPOINT,
     R_BELOW_THRESHOLD,
     R_BOOST_COOLING,
@@ -262,11 +263,21 @@ class TestIdleReason:
         """cooling_enabled=False wins even if other conditions match."""
         r = _idle_reason(
             TEST_PARAMS,
-            home(cooling_enabled=False, aggressive_cooling=True, temperature=20),
+            home(cooling_enabled=False, before_afternoon=True, aggressive_cooling=True, temperature=20),
             "activation",
             "default",
         )
         assert r == R_COOLING_DISABLED
+
+    def test_before_afternoon_priority(self):
+        """before_afternoon=True blocks activation before temperature/solar checks."""
+        r = _idle_reason(
+            TEST_PARAMS,
+            home(before_afternoon=True, aggressive_cooling=True, temperature=20),
+            "activation",
+            "default",
+        )
+        assert r == R_BEFORE_AFTERNOON
 
     def test_boost_below_cool_setpoint(self):
         """aggressive + temp <= cool_setpoint -> R_BELOW_COOL_SETPOINT."""
@@ -388,6 +399,16 @@ class TestAdjustOffSolar:
             state,
         )
         assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
+
+    def test_before_afternoon_blocks_activation(self):
+        """before_afternoon=True blocks activation when aircon is OFF."""
+        state = CachedState()
+        r = adjust(
+            TEST_PARAMS,
+            home(generation=6000, humidity=65, temperature=26, before_afternoon=True),
+            state,
+        )
+        assert r == AdjustResult(OUT.NO_CHANGE, R_BEFORE_AFTERNOON)
 
     def test_high_humidity_does_not_block_cool(self):
         """High humidity should not force DRY when COOL solar is available."""

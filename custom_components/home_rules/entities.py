@@ -10,7 +10,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -42,6 +42,7 @@ BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
     BinarySensorEntityDescription(key="auto_mode", translation_key="auto_mode", entity_category=_DIAG),
 )
+SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", "afternoon_cooling"))
 
 
 class HomeRulesEntity(CoordinatorEntity[HomeRulesCoordinator]):
@@ -92,26 +93,14 @@ class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None: await self.coordinator.async_set_mode(c.ControlMode(option))
 
 
-class HomeRulesCoolingEnabledSwitch(HomeRulesEntity, SwitchEntity):
-    _attr_translation_key = "cooling_enabled"
-    _attr_entity_category = _CONF
+class HomeRulesSwitch(HomeRulesEntity, SwitchEntity):
+    def __init__(self, entry: Entry, coordinator: Coord, description: SwitchEntityDescription) -> None:
+        super().__init__(entry, coordinator, description.key); self.entity_description = description
 
-    def __init__(self, entry: Entry, coordinator: Coord) -> None: super().__init__(entry, coordinator, "cooling_enabled")
     @property
-    def is_on(self) -> bool: return bool(self.coordinator.cooling_enabled)
-    async def async_turn_on(self, **kwargs: object) -> None: await self.coordinator.async_set_control("cooling_enabled", True)
-    async def async_turn_off(self, **kwargs: object) -> None: await self.coordinator.async_set_control("cooling_enabled", False)
-
-
-class HomeRulesDryModeEnabledSwitch(HomeRulesEntity, SwitchEntity):
-    _attr_translation_key = "dry_mode_enabled"
-    _attr_entity_category = _CONF
-
-    def __init__(self, entry: Entry, coordinator: Coord) -> None: super().__init__(entry, coordinator, "dry_mode_enabled")
-    @property
-    def is_on(self) -> bool: return bool(self.coordinator.dry_mode_enabled)
-    async def async_turn_on(self, **kwargs: object) -> None: await self.coordinator.async_set_control("dry_mode_enabled", True)
-    async def async_turn_off(self, **kwargs: object) -> None: await self.coordinator.async_set_control("dry_mode_enabled", False)
+    def is_on(self) -> bool: return bool(getattr(self.coordinator, self.entity_description.key))
+    async def async_turn_on(self, **kwargs: object) -> None: await self.coordinator.async_set_control(self.entity_description.key, True)
+    async def async_turn_off(self, **kwargs: object) -> None: await self.coordinator.async_set_control(self.entity_description.key, False)
 
 
 class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
@@ -155,6 +144,6 @@ class HomeRulesNumberEntity(HomeRulesEntity, NumberEntity):
 async def async_setup_sensor_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesSensor(entry, entry.runtime_data, description) for description in SENSORS)
 async def async_setup_binary_sensor_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesBinarySensor(entry, entry.runtime_data, description) for description in BINARY_SENSORS)
 async def async_setup_select_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesModeSelect(entry, entry.runtime_data)])
-async def async_setup_switch_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesCoolingEnabledSwitch(entry, entry.runtime_data), HomeRulesDryModeEnabledSwitch(entry, entry.runtime_data)])
+async def async_setup_switch_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesSwitch(entry, entry.runtime_data, description) for description in SWITCHES)
 async def async_setup_button_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesEvaluateButton(entry, entry.runtime_data)])
 async def async_setup_number_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesNumberEntity(entry, entry.runtime_data, description) for description in NUMBERS)

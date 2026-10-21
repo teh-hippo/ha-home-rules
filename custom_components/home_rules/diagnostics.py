@@ -17,6 +17,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "enabled": coordinator.control_mode is not c.ControlMode.DISABLED,
             "cooling_enabled": coordinator.cooling_enabled,
             "dry_mode_enabled": coordinator.dry_mode_enabled,
+            "afternoon_cooling": coordinator.afternoon_cooling,
             "aggressive_cooling": coordinator.control_mode is c.ControlMode.BOOST_COOLING,
             "dry_run": coordinator.control_mode is c.ControlMode.MONITOR,
         },
