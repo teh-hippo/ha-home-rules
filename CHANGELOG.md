@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.11.1 (2026-10-21)
+
+### Bug Fixes
+
+- **timer**: Maintain configured countdown in monitor mode
+  ([`cf811f0`](https://github.com/teh-hippo/ha-home-rules/commit/cf811f072cba4e91d6c1e756b752a979736f490a))
+
+
 ## v1.11.0 (2026-10-21)
 
 ### Features
