@@ -168,7 +168,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
                 for service, data in (("set_hvac_mode", {"entity_id": climate, "hvac_mode": adjustment.value.lower()}), ("set_temperature", {"entity_id": climate, "temperature": self.parameters.temperature_cool})): await self._call_service("climate", service, data)
             elif adjustment is HomeOutput.OFF: await self._call_service("climate", "turn_off", {"entity_id": climate})
-        if adjustment is HomeOutput.TIMER and self.control_mode is not c.ControlMode.MONITOR:
+        if adjustment is HomeOutput.TIMER:
             self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION)))); self._schedule_timer_expiry()
         elif adjustment is HomeOutput.OFF:
             self._aircon_timer_finishes_at = None; self._schedule_timer_expiry()

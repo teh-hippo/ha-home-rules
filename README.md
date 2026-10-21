@@ -32,6 +32,8 @@ Home Rules manages its own aircon timer internally, so you do not need a separat
 
 `select.home_rules_control_mode` defaults to **Monitor** for safe setup. Switch to **Solar Cooling** once you're happy with decisions and want the integration to control your climate entity.
 
+Monitor runs the internal timer for the configured duration and exposes its remaining seconds through `sensor.home_rules_timer_countdown`, without controlling the aircon.
+
 ## Development
 
 ```bash
