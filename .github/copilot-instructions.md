@@ -18,8 +18,6 @@
 
 - **Home Assistant entry lifecycle** is in `custom_components/home_rules/__init__.py`:
   - `async_setup_entry` creates `HomeRulesCoordinator`, runs first refresh, stores it in `entry.runtime_data`, and forwards setup for all platforms.
-  - `async_migrate_entry` removes legacy `timer_entity_id` and `inverter_entity_id` from both `entry.data` and `entry.options`.
-  - Setup also removes legacy entity registry entries by unique_id suffix.
 - **Configuration flow and options** are in `custom_components/home_rules/config_flow.py`:
   - Initial setup is multi-step (`user -> solar -> comfort`).
   - Options flow owns thresholds, delays, notification service, and aircon timer duration.

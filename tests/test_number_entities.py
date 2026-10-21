@@ -70,4 +70,4 @@ async def test_parameter_override_affects_evaluation(coord_factory) -> None:
     assert coordinator.data.adjustment is HomeOutput.COOL
 
     await coordinator.async_set_parameter(CONF_TEMPERATURE_THRESHOLD, 30.0)
-    assert coordinator.data.reason == "Temperature below threshold"
+    assert coordinator._last_record["reason"] == "Temperature below threshold"

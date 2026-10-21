@@ -4,9 +4,6 @@
       "mode": {
         "default": "mdi:home-automation"
       },
-      "current": {
-        "default": "mdi:information-outline"
-      },
       "adjustment": {
         "default": "mdi:flash"
       },

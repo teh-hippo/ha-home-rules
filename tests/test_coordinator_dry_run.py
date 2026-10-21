@@ -6,8 +6,6 @@ when running only the pure rules-engine unit tests.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
@@ -21,10 +19,6 @@ def test_timer_countdown_sensor_is_registered() -> None:
 
 async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory) -> None:
     """Dry-run mode must not trip the failed_to_change safety counter."""
-    from homeassistant.helpers.storage import Store
-
-    from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION
-    from custom_components.home_rules.coordinator import HomeRulesCoordinator
     from custom_components.home_rules.rules import HomeOutput
 
     coordinator = await coord_factory()
@@ -32,16 +26,6 @@ async def test_dry_run_does_not_fail_on_repeated_adjustments(hass, coord_factory
     for _ in range(10):
         await coordinator.async_run_evaluation("poll")
         assert coordinator.data.adjustment is HomeOutput.COOL
-
-    # Verify that the old "NoChange" string stored in previous versions
-    # is migrated to HomeOutput.NO_CHANGE on reload.
-    key = f"{DOMAIN}_{coordinator.config_entry.entry_id}"
-    store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, key)
-    await store.async_save({"session": {"last": "NoChange"}})
-
-    reloaded = HomeRulesCoordinator(hass, coordinator.config_entry)
-    await reloaded.async_initialize()
-    assert reloaded._session.last is HomeOutput.NO_CHANGE
 
 
 async def test_timer_countdown_uses_internal_timer_duration(coord_factory) -> None:
@@ -77,26 +61,3 @@ async def test_timer_adjustment_schedules_expiry_callback(coord_factory) -> None
     assert coordinator._timer_expiry_handle is not None
     await coordinator.async_shutdown()
     assert coordinator._timer_expiry_handle is None
-
-
-async def test_legacy_control_mode_values_migrate_on_reload(hass, coord_factory) -> None:
-    """Old string mode values (e.g. 'Dry Run', 'Live') are mapped to new enum values."""
-    from homeassistant.helpers.storage import Store
-
-    from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION, ControlMode
-    from custom_components.home_rules.coordinator import HomeRulesCoordinator
-
-    coordinator = await coord_factory()
-    key = f"{DOMAIN}_{coordinator.config_entry.entry_id}"
-    store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, key)
-
-    for old, expected in [
-        ("Dry Run", ControlMode.MONITOR),
-        ("Live", ControlMode.SOLAR_COOLING),
-        ("Aggressive", ControlMode.BOOST_COOLING),
-        ("Disabled", ControlMode.DISABLED),
-    ]:
-        await store.async_save({"controls": {"mode": old}})
-        reloaded = HomeRulesCoordinator(hass, coordinator.config_entry)
-        await reloaded.async_initialize()
-        assert reloaded.control_mode is expected, f"'{old}' should migrate to {expected}"

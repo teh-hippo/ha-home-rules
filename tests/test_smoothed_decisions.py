@@ -81,28 +81,3 @@ async def test_oscillation_dampened_at_cool_threshold(hass, coord_factory) -> No
     # Should stay in COOL (smoothed is above threshold), no downgrade to DRY
     assert coordinator._last_record["adjustment"] == "No Change"
     assert coordinator._last_record["smoothed_generation"] > 5500
-
-
-async def test_shadow_shows_raw_alternative(hass, coord_factory) -> None:
-    """Shadow run uses raw values and decision_differs shows when smoothing matters."""
-    from custom_components.home_rules.const import CONF_SMOOTHING_WINDOW
-
-    coordinator = await coord_factory(
-        generation="1000",
-        grid="0",
-        humidity="70",
-        options={CONF_SMOOTHING_WINDOW: 3},
-    )
-
-    await coordinator.async_run_evaluation("poll")
-    hass.states.async_set("sensor.generation", "1000", {"unit_of_measurement": "W"})
-    await coordinator.async_run_evaluation("poll")
-
-    # Spike: raw says DRY (4000>3500), smoothed says NO (avg 2000<3500)
-    hass.states.async_set("sensor.generation", "4000", {"unit_of_measurement": "W"})
-    await coordinator.async_run_evaluation("poll")
-
-    record = coordinator._last_record
-    assert record["adjustment"] == "No Change"  # actual (smoothed) decision
-    assert record["smoothed_adjustment"] == "Dry"  # raw alternative
-    assert record["decision_differs"] is True

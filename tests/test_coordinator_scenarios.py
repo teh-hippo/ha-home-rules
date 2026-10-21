@@ -212,7 +212,7 @@ async def test_restart_with_expired_timer_and_aircon_on_turns_off(coord_factory)
     await coordinator.async_run_evaluation("restart")
 
     assert coordinator.data.adjustment is HomeOutput.OFF  # cap issues OFF instead of re-arming a fresh timer
-    assert coordinator.data.reason == "Timer expired"
+    assert coordinator._last_record["reason"] == "Timer expired"
 
 
 async def test_free_solar_reset_of_stale_timer_does_not_notify(coord_factory) -> None:

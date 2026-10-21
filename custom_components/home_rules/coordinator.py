@@ -31,7 +31,6 @@ from .rules import (
     HomeInput,
     HomeOutput,
     RuleParameters,
-    _evaluate_target_mode,
     adjust,
     apply_adjustment,
     current_state,
@@ -44,12 +43,11 @@ _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, 
 
 @dataclass
 class CoordinatorData:
-    mode: HomeOutput = HomeOutput.OFF; current: HomeOutput = HomeOutput.OFF; adjustment: HomeOutput = HomeOutput.NO_CHANGE; decision: str = ""; reason: str = ""; solar_available: bool = False; auto_mode: bool = False; dry_run: bool = False; timer_finishes_at: datetime | None = None; last_evaluated: str | None = None; last_changed: str | None = None; smoothing_disagrees: int = 0
+    mode: HomeOutput = HomeOutput.OFF; adjustment: HomeOutput = HomeOutput.NO_CHANGE; decision: str = ""; solar_available: bool = False; auto_mode: bool = False; timer_finishes_at: datetime | None = None; last_evaluated: str | None = None; last_changed: str | None = None
 
 
 class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     config_entry: ConfigEntry
-    _LEGACY_MODES: dict[str, str] = {"Disabled": "disabled", "Dry Run": "monitor", "Live": "solar_cooling", "Aggressive": "boost_cooling"}
     _FALLBACK_DEFAULTS = {"generation": "0", "grid": "0"}
     _recent: deque[dict[str, Any]]
     _last_record: dict[str, Any]
@@ -73,27 +71,19 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def async_set_mode(self, mode: c.ControlMode) -> None: self.control_mode = mode; await self._save_state(); await self.async_run_evaluation("control_mode")
 
-    def _control_mode_from_storage(self, controls: dict[str, Any]) -> c.ControlMode:
-        if (mode_raw := controls.get("mode")) is not None:
-            mapped = self._LEGACY_MODES.get(str(mode_raw), str(mode_raw))
-            with suppress(ValueError): return c.ControlMode(mapped)
-        if not controls.get("enabled", True): return c.ControlMode.DISABLED
-        if controls.get("dry_run", True): return c.ControlMode.MONITOR
-        return c.ControlMode.BOOST_COOLING if controls.get("aggressive_cooling", False) else c.ControlMode.SOLAR_COOLING
-
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
         if not stored: return
         controls, session = stored.get("controls", {}), stored.get("session", {})
-        self.control_mode, self.cooling_enabled, self.dry_mode_enabled = self._control_mode_from_storage(controls), bool(controls.get("cooling_enabled", True)), bool(controls.get(c.CONF_DRY_MODE_ENABLED, True))
-        last = session.get("last"); last = HomeOutput.NO_CHANGE.value if last == "NoChange" else last
+        with suppress(ValueError): self.control_mode = c.ControlMode(str(controls.get("mode", c.ControlMode.MONITOR)))
+        self.cooling_enabled, self.dry_mode_enabled = bool(controls.get("cooling_enabled", True)), bool(controls.get(c.CONF_DRY_MODE_ENABLED, True))
+        last = session.get("last")
         self._session = CachedState(reactivate_delay=int(session.get("reactivate_delay", 0)), tolerated=int(session.get("tolerated", 0)), last=HomeOutput(last) if last else None, failed_to_change=int(session.get("failed_to_change", 0)))
         self._auto_mode, self._last_changed = bool(stored.get("auto_mode", False)), stored.get("last_changed")
         self._recent = deque(stored.get("recent_evaluations", []), maxlen=c.MAX_RECENT_EVALUATIONS)
         self._aircon_timer_finishes_at = dt_util.parse_datetime(str(v)) if (v := stored.get("aircon_timer_finishes_at")) else None
         self._parameters = {}
         for k, v in stored.get("parameters", {}).items():
-            if str(k) == "humidity_threshold": continue
             with suppress(TypeError, ValueError): self._parameters[str(k)] = float(v)
         self._schedule_timer_expiry()
 
@@ -110,7 +100,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _evaluate(self, trigger: str) -> CoordinatorData:
         async with self._lock:
-            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, evaluated_timer = self._build_home_input(); current = current_state(home); params = self.parameters; target = _evaluate_target_mode(params, home); decision_home = replace(home, generation=self._smoothed_generation(home.generation))
+            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, evaluated_timer = self._build_home_input(); current = current_state(home); params = self.parameters; smoothed_gen = self._smoothed_generation(home.generation); decision_home = replace(home, generation=smoothed_gen)
             if not self._initialized: self._initialized = True; self._sync_on_startup(current, home)
             elif self._session.last is None: self._session.last = current
             result = adjust(params, decision_home, self._session); adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer() if adjustment is HomeOutput.TIMER else evaluated_timer
@@ -119,14 +109,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if not applied: raise HomeAssistantError("failed to apply adjustment")
             if previous is not None and previous != self._session.last and adjustment is not HomeOutput.RESET: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
             mode = self._session.last or current
-            record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "target_adjustment": target.output.value if target.output is not None else None, "target_reason": target.reason, "target_actionable": target.is_actionable, "blocked_reasons": [target.reason] if target.output is None and target.is_actionable else [], "fallback_inputs": dict(self._fallback_inputs), "controls_snapshot": {"control_mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled, "dry_mode_enabled": self.dry_mode_enabled}, "policy_snapshot": {"dry_mode_humidity_cutoff": params.dry_mode_humidity_cutoff}} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
-            smoothed = self._run_shadow_smoothed(home, record)
-            record.update(smoothed)
+            record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "raw_generation": home.generation, "smoothed_generation": round(smoothed_gen, 1), "fallback_inputs": dict(self._fallback_inputs)} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
             self._last_record = record; self._recent.appendleft(record); await self._save_state(); self.hass.bus.async_fire(c.EVENT_EVALUATION, record)
             for issue in _CLEAR_ISSUES: self._clear_issue(issue)
             self._first_refresh_done = True
-            disagree_count = sum(1 for r in list(self._recent)[:10] if r.get("decision_differs", False))
-            return CoordinatorData(mode=mode, current=current, adjustment=adjustment, decision=f"{mode.value} - {reason}", reason=reason, solar_available=home.have_solar, auto_mode=self._auto_mode, dry_run=is_monitor, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed, smoothing_disagrees=disagree_count)
+            return CoordinatorData(mode=mode, adjustment=adjustment, decision=f"{mode.value} - {reason}", solar_available=home.have_solar, auto_mode=self._auto_mode, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed)
 
     async def _maybe_notify(self, previous: HomeOutput, current: HomeOutput, adjustment: HomeOutput) -> None:
         service = str(self.config_entry.options.get(c.CONF_NOTIFICATION_SERVICE, "")).strip()
@@ -144,21 +131,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if window <= 1 or not self._recent: return raw_gen
         vals: list[float] = [r.get("raw_generation", r.get("generation", 0.0)) for r in list(self._recent)[:window - 1]] + [raw_gen]
         return sum(vals) / len(vals)
-
-    def _run_shadow_smoothed(self, home: HomeInput, record: dict[str, Any]) -> dict[str, Any]:
-        window = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
-        raw_gen, raw_grid = home.generation, home.grid_usage
-        if window > 1 and self._recent:
-            prev = list(self._recent)[:window - 1]
-            gen_vals = [r.get("raw_generation", r.get("generation", 0.0)) for r in prev] + [raw_gen]
-            grid_vals = [r.get("raw_grid_usage", r.get("grid_usage", 0.0)) for r in prev] + [raw_grid]
-            smoothed_gen = sum(gen_vals) / len(gen_vals); smoothed_grid = sum(grid_vals) / len(grid_vals)
-        else:
-            smoothed_gen, smoothed_grid = raw_gen, raw_grid
-        shadow_session = CachedState(reactivate_delay=self._session.reactivate_delay, tolerated=self._session.tolerated, last=self._session.last, failed_to_change=self._session.failed_to_change)
-        shadow_result = adjust(self.parameters, home, shadow_session)
-        differs = shadow_result.output.value != record["adjustment"]
-        return {"raw_generation": raw_gen, "raw_grid_usage": raw_grid, "smoothed_generation": round(smoothed_gen, 1), "smoothed_grid_usage": round(smoothed_grid, 1), "smoothed_adjustment": shadow_result.output.value, "smoothed_reason": shadow_result.reason, "decision_differs": differs}
 
     def _entity_id(self, key: str) -> str:
         return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip() or str(self.config_entry.data[key])

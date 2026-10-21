@@ -25,7 +25,7 @@ async def test_evaluation_produces_coordinator_data(coord_factory) -> None:
     await coordinator.async_run_evaluation("test")
 
     assert coordinator.data.adjustment is HomeOutput.COOL
-    assert coordinator.data.dry_run is True  # safety default
+    assert coordinator._last_record["dry_run"] is True  # safety default
     assert coordinator._last_record["generation"] == 6000.0
     assert coordinator._last_record["have_solar"] is True
 
@@ -46,7 +46,7 @@ async def test_async_set_mode_solar_cooling(coord_factory) -> None:
     await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
 
     assert coordinator.control_mode is ControlMode.SOLAR_COOLING
-    assert coordinator.data.dry_run is False
+    assert coordinator._last_record["dry_run"] is False
 
 
 async def test_async_set_mode_disabled(coord_factory) -> None:
@@ -78,7 +78,7 @@ async def test_async_set_control_disables_dry_mode(coord_factory) -> None:
 
     assert coordinator.dry_mode_enabled is False
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
-    assert coordinator.data.reason == "Dry mode disabled"
+    assert coordinator._last_record["reason"] == "Dry mode disabled"
 
 
 async def test_evaluation_fires_ha_event(hass, coord_factory) -> None:

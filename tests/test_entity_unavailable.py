@@ -71,4 +71,4 @@ async def test_unavailable_humidity_biases_away_from_dry(coord_factory) -> None:
     coordinator = await coord_factory(generation="3500", humidity="unavailable")
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
-    assert coordinator.data.reason == "Humidity too low for dry mode"
+    assert coordinator._last_record["reason"] == "Humidity too low for dry mode"

@@ -1,7 +1,6 @@
 # fmt: off
 # ruff: noqa: E501, E701, E702
 
-from collections.abc import Mapping
 from typing import Any, cast
 
 import voluptuous as vol
@@ -28,10 +27,6 @@ _NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION
 _OPTIONS_ENTITY_FIELDS: tuple[str, ...] = (c.CONF_CLIMATE_ENTITY_ID, c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)
 
 
-def _without_legacy_keys(data: Mapping[str, Any]) -> dict[str, Any]:
-    cleaned = dict(data); cleaned.pop(c.LEGACY_CONF_TIMER_ENTITY_ID, None); cleaned.pop(c.LEGACY_CONF_INVERTER_ENTITY_ID, None); return cleaned
-
-
 def _schema(required: tuple[str, ...]) -> vol.Schema:
     return vol.Schema({vol.Required(key): _ENTITY_SELECTORS[key] for key in required})
 
@@ -56,7 +51,6 @@ def _validate_entities(
 
 class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
     VERSION = 1
-    MINOR_VERSION = 3
 
     def __init__(self) -> None: self._data: dict[str, Any] = {}
     @staticmethod
@@ -88,8 +82,8 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors = _validate_entities(self.hass, user_input, list(_OPTIONS_ENTITY_FIELDS)) if user_input else {}
-        if user_input and not errors: return self.async_create_entry(data=_without_legacy_keys({**self.config_entry.options, **user_input}))
-        cur = _without_legacy_keys(self.config_entry.options)
+        if user_input and not errors: return self.async_create_entry(data={**self.config_entry.options, **user_input})
+        cur = self.config_entry.options
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
