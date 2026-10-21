@@ -1,6 +1,133 @@
 # CHANGELOG
 
 
+## v1.10.35 (2026-10-21)
+
+### Bug Fixes
+
+- Retire legacy inverter entity, solar_unknown hold, and lowercase unit workarounds
+  ([`9b56611`](https://github.com/teh-hippo/ha-home-rules/commit/9b56611c8616b12d5e8bfe6d402a27d46c75e7f4))
+
+### Chores
+
+- **deps**: Lock file maintenance
+  ([`6543519`](https://github.com/teh-hippo/ha-home-rules/commit/65435191a3bad045eb52669cae1333cbce33932e))
+
+- **deps**: Lock file maintenance
+  ([`f9aa445`](https://github.com/teh-hippo/ha-home-rules/commit/f9aa4458d00e0442fa41857399c76679b5eacce9))
+
+- **deps**: Lock file maintenance
+  ([`aa35d56`](https://github.com/teh-hippo/ha-home-rules/commit/aa35d56a4be8b1a1758b469a3668bc1ca8cc1a41))
+
+- **deps**: Lock file maintenance
+  ([`98e9bfb`](https://github.com/teh-hippo/ha-home-rules/commit/98e9bfb39b7464d1e9fbed613a51645dbb9aae17))
+
+- **deps**: Lock file maintenance
+  ([`c937f4b`](https://github.com/teh-hippo/ha-home-rules/commit/c937f4b12ee30a040613f62feefff80fe3614680))
+
+- **deps**: Lock file maintenance
+  ([`c7389b1`](https://github.com/teh-hippo/ha-home-rules/commit/c7389b1ecf7c25d66713c71ab58f1e6ce1e9e5f7))
+
+- **deps**: Lock file maintenance
+  ([`05305e8`](https://github.com/teh-hippo/ha-home-rules/commit/05305e8753ae507695a88b4eae3625c19a04d3f6))
+
+- **deps**: Lock file maintenance
+  ([`5f14fd2`](https://github.com/teh-hippo/ha-home-rules/commit/5f14fd24021b545223d1f2c2f4949af76dbae18b))
+
+- **deps**: Lock file maintenance
+  ([`76f795f`](https://github.com/teh-hippo/ha-home-rules/commit/76f795f37ca5ff251a9b9f222c5af12d0e3d3a4d))
+
+- **deps**: Lock file maintenance
+  ([`b145e17`](https://github.com/teh-hippo/ha-home-rules/commit/b145e17c3c95a6e3f92d31219e2d8ed6280585df))
+
+- **deps**: Lock file maintenance
+  ([`fa27058`](https://github.com/teh-hippo/ha-home-rules/commit/fa2705890793c6602a39762083b8145cfcaecb5d))
+
+- **deps**: Lock file maintenance
+  ([`b50ea6c`](https://github.com/teh-hippo/ha-home-rules/commit/b50ea6c3bde4bd30d0b958a6e5f8a2a3b2ebbc33))
+
+- **deps**: Lock file maintenance
+  ([`856f435`](https://github.com/teh-hippo/ha-home-rules/commit/856f435adaa486f6e98e0d0c4f8330954d91214d))
+
+- **deps**: Lock file maintenance
+  ([`8056296`](https://github.com/teh-hippo/ha-home-rules/commit/8056296c5b9ede643788144071de6b67d501db40))
+
+- **deps**: Lock file maintenance
+  ([`19904dd`](https://github.com/teh-hippo/ha-home-rules/commit/19904ddc0844fc4599841cd921565527edba10c8))
+
+- **deps**: Lock file maintenance
+  ([`fc26970`](https://github.com/teh-hippo/ha-home-rules/commit/fc2697023fc3db7be09808c82ce11a74a7cc30d3))
+
+- **deps**: Lock file maintenance
+  ([`36e3bc3`](https://github.com/teh-hippo/ha-home-rules/commit/36e3bc3d4517f05abc3962d2acf7cf8906e9c77e))
+
+- **deps**: Lock file maintenance
+  ([`5efbd73`](https://github.com/teh-hippo/ha-home-rules/commit/5efbd732521dac618e4126324a16736969538986))
+
+- **deps**: Lock file maintenance
+  ([`ccec855`](https://github.com/teh-hippo/ha-home-rules/commit/ccec85589ed7f4e86a73cd12660508add524b5e6))
+
+- **deps**: Lock file maintenance
+  ([`4b6937d`](https://github.com/teh-hippo/ha-home-rules/commit/4b6937dcf5333bd2e720333d8cb263884c7e80f5))
+
+- **deps**: Lock file maintenance
+  ([`39bc857`](https://github.com/teh-hippo/ha-home-rules/commit/39bc857efccdd0673035c030604a5478e2dad178))
+
+- **deps**: Lock file maintenance
+  ([`0d0b067`](https://github.com/teh-hippo/ha-home-rules/commit/0d0b0678df3452254007ab8d42912b06c66f5d20))
+
+- **deps**: Lock file maintenance
+  ([`79bbe94`](https://github.com/teh-hippo/ha-home-rules/commit/79bbe9420b7a1daeeff97b9ec00cd7134291ecec))
+
+- **deps**: Lock file maintenance
+  ([`7d5a94e`](https://github.com/teh-hippo/ha-home-rules/commit/7d5a94e73dfc0db79fbcccce70d6621fc4754968))
+
+- **deps**: Lock file maintenance
+  ([`bedb571`](https://github.com/teh-hippo/ha-home-rules/commit/bedb5712a764a96ee38d2a7f647b42ea911255a5))
+
+- **deps**: Lock file maintenance
+  ([`61dfd11`](https://github.com/teh-hippo/ha-home-rules/commit/61dfd11bd93aa50b97245ba4a6472703eb65588b))
+
+- **deps**: Lock file maintenance
+  ([`1a0597a`](https://github.com/teh-hippo/ha-home-rules/commit/1a0597a35a238912e568a9fc9121801403e62384))
+
+- **deps**: Lock file maintenance
+  ([`4bad5d1`](https://github.com/teh-hippo/ha-home-rules/commit/4bad5d1b49f41dcd06438b103a42032553997c53))
+
+- **deps**: Update astral-sh/setup-uv action to v10.1.0
+  ([`d4555ed`](https://github.com/teh-hippo/ha-home-rules/commit/d4555ed59e2b6eba088834e4b9b7647f46c16f6e))
+
+- **deps**: Update astral-sh/setup-uv action to v10.2.0
+  ([`fe609b2`](https://github.com/teh-hippo/ha-home-rules/commit/fe609b22b198bf8251f4efb6db75e8996715e9d4))
+
+- **deps**: Update astral-sh/setup-uv action to v10.3.0
+  ([`547a1bd`](https://github.com/teh-hippo/ha-home-rules/commit/547a1bd0e56ee7e7da9495674410d80b43f311ef))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 28835c1
+  ([`8b076e5`](https://github.com/teh-hippo/ha-home-rules/commit/8b076e5678b175827bd9f4fef4ab43aa2c0fca97))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 3b3c455
+  ([`694a61a`](https://github.com/teh-hippo/ha-home-rules/commit/694a61afd76caf4007fc0634c21d17313c53762f))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 42ca12e
+  ([`7db8213`](https://github.com/teh-hippo/ha-home-rules/commit/7db821317399844792d36c10ce02b6c6b4b002ce))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 824bd18
+  ([`39e1c13`](https://github.com/teh-hippo/ha-home-rules/commit/39e1c13d7e9c53e4d41b43785f51e53ee7970fe3))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 97152d7
+  ([`2571f7f`](https://github.com/teh-hippo/ha-home-rules/commit/2571f7fd6a682df15af29e5c2e1ed766cdcc99fe))
+
+- **deps**: Update python-semantic-release/python-semantic-release digest to 9a026e9
+  ([`cd2d75f`](https://github.com/teh-hippo/ha-home-rules/commit/cd2d75f0c7990b136404834f6946d5de89608022))
+
+- **deps**: Update python-semantic-release/python-semantic-release digest to b700dbe
+  ([`65b3404`](https://github.com/teh-hippo/ha-home-rules/commit/65b3404e047b949d4f35bf52b8fc884227b4adfc))
+
+- **deps**: Update softprops/action-gh-release digest to efb3536
+  ([`e625b60`](https://github.com/teh-hippo/ha-home-rules/commit/e625b60d9cbfa6f081de9ad92bb94db0aebfaab2))
+
+
 ## v1.10.34 (2026-08-24)
 
 ### Bug Fixes
