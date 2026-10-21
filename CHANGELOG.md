@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.36 (2026-10-21)
+
+### Bug Fixes
+
+- Remove stale shadow smoothing pass, dead coordinator fields, and completed migrations
+  ([`94d9d79`](https://github.com/teh-hippo/ha-home-rules/commit/94d9d79a7f4c1aa3ea97f4efceea9bec5ad22346))
+
+
 ## v1.10.35 (2026-10-21)
 
 ### Bug Fixes
