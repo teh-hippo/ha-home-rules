@@ -22,7 +22,6 @@ async def test_unknown_power_sensors_do_not_raise_repairs_issue(hass, coord_fact
     from homeassistant.helpers import issue_registry as ir
 
     coordinator = await coord_factory(
-        inverter="off-line",
         generation="unknown",
         grid="unknown",
     )

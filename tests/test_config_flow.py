@@ -150,27 +150,6 @@ async def test_config_flow_rejects_invalid_power_unit(hass) -> None:
     assert invalid_power["errors"] == {"base": "invalid_power_unit"}
 
 
-async def test_config_flow_accepts_lowercase_power_units(hass) -> None:
-    """Solar step should accept valid power units even when lowercased."""
-    from custom_components.home_rules.const import (
-        CONF_GENERATION_ENTITY_ID,
-        CONF_GRID_ENTITY_ID,
-    )
-
-    result = await _move_to_solar_step(hass)
-    hass.states.async_set("sensor.lower_gen", "6", {"unit_of_measurement": "kw"})
-    hass.states.async_set("sensor.lower_grid", "250", {"unit_of_measurement": "w"})
-    lower_case_units = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            CONF_GENERATION_ENTITY_ID: "sensor.lower_gen",
-            CONF_GRID_ENTITY_ID: "sensor.lower_grid",
-        },
-    )
-    assert lower_case_units["type"] is FlowResultType.FORM
-    assert lower_case_units["step_id"] == "comfort"
-
-
 async def test_config_flow_aborts_when_already_configured(hass) -> None:
     """Single entry integration should abort additional user flows."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -193,7 +172,6 @@ def test_validate_entities_covers_all_custom_errors(hass) -> None:
         CONF_GENERATION_ENTITY_ID,
         CONF_GRID_ENTITY_ID,
         CONF_HUMIDITY_ENTITY_ID,
-        CONF_INVERTER_ENTITY_ID,
         CONF_TEMPERATURE_ENTITY_ID,
     )
 
@@ -204,7 +182,6 @@ def test_validate_entities_covers_all_custom_errors(hass) -> None:
     hass.states.async_set("sensor.temp", "25", {"unit_of_measurement": "°C"})
     hass.states.async_set("sensor.humidity", "40", {"unit_of_measurement": "%"})
     hass.states.async_set("sensor.not_climate", "off")
-    hass.states.async_set("climate.not_inverter", "off")
     hass.states.async_set("timer.not_sensor", "idle")
 
     assert _validate_entities(
@@ -224,17 +201,6 @@ def test_validate_entities_covers_all_custom_errors(hass) -> None:
         {CONF_GENERATION_ENTITY_ID: "sensor.bad_power", CONF_GRID_ENTITY_ID: "sensor.ok"},
         required_keys=[CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID],
     ) == {"base": "invalid_power_unit"}
-
-    assert _validate_entities(
-        hass,
-        {
-            CONF_GENERATION_ENTITY_ID: "sensor.ok",
-            CONF_GRID_ENTITY_ID: "sensor.ok",
-            CONF_INVERTER_ENTITY_ID: "climate.not_inverter",
-        },
-        required_keys=[CONF_GENERATION_ENTITY_ID, CONF_GRID_ENTITY_ID],
-        allow_inverter=True,
-    ) == {"base": "invalid_inverter_entity"}
 
     assert _validate_entities(
         hass,

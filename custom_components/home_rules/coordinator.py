@@ -37,7 +37,7 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "solar_unknown", "auto", "aircon_mode")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "auto", "aircon_mode")
 _SESSION_RECORD_FIELDS = ("tolerated", "reactivate_delay")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
@@ -50,7 +50,7 @@ class CoordinatorData:
 class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     config_entry: ConfigEntry
     _LEGACY_MODES: dict[str, str] = {"Disabled": "disabled", "Dry Run": "monitor", "Live": "solar_cooling", "Aggressive": "boost_cooling"}
-    _FALLBACK_DEFAULTS = {"generation": "0", "grid": "0", "inverter": "offline"}
+    _FALLBACK_DEFAULTS = {"generation": "0", "grid": "0"}
     _recent: deque[dict[str, Any]]
     _last_record: dict[str, Any]
     _last_changed: str | None
@@ -160,26 +160,22 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         differs = shadow_result.output.value != record["adjustment"]
         return {"raw_generation": raw_gen, "raw_grid_usage": raw_grid, "smoothed_generation": round(smoothed_gen, 1), "smoothed_grid_usage": round(smoothed_grid, 1), "smoothed_adjustment": shadow_result.output.value, "smoothed_reason": shadow_result.reason, "decision_differs": differs}
 
-    def _entity_id(self, key: str, *, optional: bool = False) -> str | None:
-        value = str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip()
-        return (value or None) if optional else value or str(self.config_entry.data[key])
+    def _entity_id(self, key: str) -> str:
+        return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip() or str(self.config_entry.data[key])
 
-    def _state(self, conf_key: str, label: str, *, allow_unavailable: bool = False) -> State: return self._get_state(str(self._entity_id(conf_key)), label, allow_unavailable=allow_unavailable)
+    def _state(self, conf_key: str, label: str, *, allow_unavailable: bool = False) -> State: return self._get_state(self._entity_id(conf_key), label, allow_unavailable=allow_unavailable)
 
     def _build_home_input(self) -> tuple[HomeInput, datetime | None]:
         timer = self._active_aircon_timer(); climate = self._state(c.CONF_CLIMATE_ENTITY_ID, "climate")
-        inv_id = self._entity_id(c.CONF_INVERTER_ENTITY_ID, optional=True); inv = self._get_state(inv_id, "inverter", allow_unavailable=True) if inv_id else None
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
         gen_live = "generation" not in self._fallback_inputs; grid_live = "grid" not in self._fallback_inputs  # a fallback means the sensor is unknown/unavailable (e.g. inverter asleep)
         generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid") if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
-        inverter_online = c.is_inverter_online(str(inv.state)) if inv else True
-        have_solar = inverter_online and gen_live and generation > 0.0  # solar present: inverter up AND live, positive generation
-        solar_unknown = inverter_online and not gen_live  # inverter claims online but no telemetry, so solar cannot be confirmed (vs offline = confirmed no solar)
+        have_solar = gen_live and generation > 0.0
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         if mode not in (AirconMode.COOL, AirconMode.DRY): self._auto_mode = False  # self-heal: only COOL/DRY are home-rules-owned runs; a user-switched mode is external
         aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, solar_unknown), timer
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if self._session.last is None: self._session.last = current
@@ -247,7 +243,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.hass.async_create_task(self.async_run_evaluation("timer_expired"))
 
     def _normalized_power(self, state: State, label: str) -> float:
-        value = self._state_to_float(state, label); unit = c.normalize_power_unit(str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")))
+        value = self._state_to_float(state, label); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
         try: return max(0.0, PowerConverter.convert(value, UnitOfPower(unit), UnitOfPower.WATT))
         except ValueError:
             self._create_issue(c.ISSUE_INVALID_UNIT, {"entity_id": state.entity_id, "unit": unit or "(none)"}); raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}") from None

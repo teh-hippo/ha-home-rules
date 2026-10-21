@@ -12,7 +12,6 @@
         "title": "Solar Inputs",
         "description": "Select sensors used for solar availability and power flow.",
         "data": {
-          "inverter_entity_id": "Solar online entity (optional)",
           "generation_entity_id": "Generation sensor",
           "grid_entity_id": "Grid usage sensor"
         }
@@ -31,7 +30,6 @@
       "invalid_entity_selection": "Cannot select Home Rules entities as inputs.",
       "invalid_power_unit": "Power sensors must report W, kW, or MW.",
       "invalid_climate_entity": "Climate must be a climate entity.",
-      "invalid_inverter_entity": "Inverter must be sensor or binary_sensor.",
       "invalid_sensor_entity": "Selected entity must be a sensor."
     },
     "abort": {
@@ -44,7 +42,6 @@
         "title": "Home Rules Options",
         "data": {
           "climate_entity_id": "Climate entity",
-          "inverter_entity_id": "Solar online entity (optional)",
           "generation_entity_id": "Generation sensor",
           "grid_entity_id": "Grid usage sensor",
           "temperature_entity_id": "Temperature sensor",

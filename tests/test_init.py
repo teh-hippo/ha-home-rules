@@ -51,17 +51,27 @@ async def test_setup_removes_legacy_entities(hass, mock_entry, entity_registry) 
         assert entity_registry.async_get_entity_id(platform, "home_rules", unique_id) is None
 
 
-async def test_migrate_entry_removes_legacy_timer_entity_id(hass) -> None:
-    """Entry migration removes stale timer_entity_id from data and options."""
+async def test_migrate_entry_removes_legacy_keys(hass) -> None:
+    """Entry migration removes stale timer_entity_id and inverter_entity_id from data and options."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     from custom_components.home_rules import async_migrate_entry
-    from custom_components.home_rules.const import DOMAIN, LEGACY_CONF_TIMER_ENTITY_ID
+    from custom_components.home_rules.const import (
+        DOMAIN,
+        LEGACY_CONF_INVERTER_ENTITY_ID,
+        LEGACY_CONF_TIMER_ENTITY_ID,
+    )
 
     entry = MockConfigEntry(
         domain=DOMAIN,
-        data={LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy"},
-        options={LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy"},
+        data={
+            LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy",
+            LEGACY_CONF_INVERTER_ENTITY_ID: "sensor.foxess_inverter",
+        },
+        options={
+            LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy",
+            LEGACY_CONF_INVERTER_ENTITY_ID: "sensor.foxess_inverter",
+        },
         version=1,
         minor_version=1,
     )
@@ -70,7 +80,9 @@ async def test_migrate_entry_removes_legacy_timer_entity_id(hass) -> None:
     assert await async_migrate_entry(hass, entry)
     assert LEGACY_CONF_TIMER_ENTITY_ID not in entry.data
     assert LEGACY_CONF_TIMER_ENTITY_ID not in entry.options
-    assert entry.minor_version == 2
+    assert LEGACY_CONF_INVERTER_ENTITY_ID not in entry.data
+    assert LEGACY_CONF_INVERTER_ENTITY_ID not in entry.options
+    assert entry.minor_version == 3
 
 
 async def test_options_update_triggers_reload(hass, loaded_entry) -> None:

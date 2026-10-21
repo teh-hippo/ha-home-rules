@@ -39,7 +39,6 @@ else:
             CONF_GENERATION_ENTITY_ID,
             CONF_GRID_ENTITY_ID,
             CONF_HUMIDITY_ENTITY_ID,
-            CONF_INVERTER_ENTITY_ID,
             CONF_TEMPERATURE_ENTITY_ID,
             DOMAIN,
         )
@@ -54,7 +53,6 @@ else:
             temperature: str = "25",
             humidity: str = "40",
             climate: str = "off",
-            inverter: str | None = None,
             options: dict | None = None,
             extra_data: dict | None = None,
         ) -> HomeRulesCoordinator:
@@ -71,9 +69,6 @@ else:
                 CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
                 CONF_HUMIDITY_ENTITY_ID: "sensor.humidity",
             }
-            if inverter is not None:
-                hass.states.async_set("sensor.inverter", inverter)
-                data[CONF_INVERTER_ENTITY_ID] = "sensor.inverter"
             data.update(extra_data or {})
             entry = MockConfigEntry(domain=DOMAIN, data=data, options=options or {})
             entry.add_to_hass(hass)

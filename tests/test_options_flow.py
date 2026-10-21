@@ -19,7 +19,6 @@ def _valid_options_input() -> dict[str, str | int | float]:
         CONF_GRID_ENTITY_ID,
         CONF_GRID_USAGE_DELAY,
         CONF_HUMIDITY_ENTITY_ID,
-        CONF_INVERTER_ENTITY_ID,
         CONF_REACTIVATE_DELAY,
         CONF_TEMPERATURE_ENTITY_ID,
         DEFAULT_AIRCON_TIMER_DURATION,
@@ -32,7 +31,6 @@ def _valid_options_input() -> dict[str, str | int | float]:
 
     return {
         CONF_CLIMATE_ENTITY_ID: "climate.test",
-        CONF_INVERTER_ENTITY_ID: "sensor.inverter",
         CONF_GENERATION_ENTITY_ID: "sensor.generation",
         CONF_GRID_ENTITY_ID: "sensor.grid",
         CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",
@@ -54,7 +52,6 @@ async def test_options_flow_updates_values_and_accepts_notify_service(hass, mock
         return None
 
     hass.services.async_register("notify", "mobile_app_test", _notify_service)
-    hass.states.async_set("sensor.inverter", "online")
 
     result = await hass.config_entries.options.async_init(mock_entry.entry_id)
     assert result["type"] is FlowResultType.FORM
@@ -72,7 +69,6 @@ async def test_options_flow_validates_entities(hass, mock_entry) -> None:
     """Options flow should return entity_not_found for missing entities."""
     from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID
 
-    hass.states.async_set("sensor.inverter", "online")
     result = await hass.config_entries.options.async_init(mock_entry.entry_id)
     user_input = _valid_options_input()
     user_input[CONF_CLIMATE_ENTITY_ID] = "climate.missing"
@@ -82,15 +78,20 @@ async def test_options_flow_validates_entities(hass, mock_entry) -> None:
     assert result["errors"] == {"base": "entity_not_found"}
 
 
-async def test_options_flow_drops_legacy_timer_entity_id(hass, mock_entry) -> None:
-    """Saving options strips stale timer_entity_id from existing option payloads."""
-    from custom_components.home_rules.const import LEGACY_CONF_TIMER_ENTITY_ID
+async def test_options_flow_drops_legacy_keys(hass, mock_entry) -> None:
+    """Saving options strips stale timer_entity_id and inverter_entity_id from option payloads."""
+    from custom_components.home_rules.const import (
+        LEGACY_CONF_INVERTER_ENTITY_ID,
+        LEGACY_CONF_TIMER_ENTITY_ID,
+    )
 
     hass.config_entries.async_update_entry(
         mock_entry,
-        options={LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy"},
+        options={
+            LEGACY_CONF_TIMER_ENTITY_ID: "timer.legacy",
+            LEGACY_CONF_INVERTER_ENTITY_ID: "sensor.foxess_inverter",
+        },
     )
-    hass.states.async_set("sensor.inverter", "online")
 
     result = await hass.config_entries.options.async_init(mock_entry.entry_id)
     result = await hass.config_entries.options.async_configure(
@@ -100,3 +101,4 @@ async def test_options_flow_drops_legacy_timer_entity_id(hass, mock_entry) -> No
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert LEGACY_CONF_TIMER_ENTITY_ID not in result["data"]
+    assert LEGACY_CONF_INVERTER_ENTITY_ID not in result["data"]

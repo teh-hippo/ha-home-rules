@@ -9,17 +9,18 @@ _LEGACY_SUFFIXES = (
     "enabled aggressive_cooling dry_run notifications_enabled "
     "generation_cool_threshold generation_dry_threshold timer_countdown current humidity_threshold"
 ).split()
-_TARGET_MINOR_VERSION = 2
+_TARGET_MINOR_VERSION = 3
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = dict(entry.data)
     options = dict(entry.options)
     changed = False
-    if data.pop(c.LEGACY_CONF_TIMER_ENTITY_ID, None) is not None:
-        changed = True
-    if options.pop(c.LEGACY_CONF_TIMER_ENTITY_ID, None) is not None:
-        changed = True
+    for key in (c.LEGACY_CONF_TIMER_ENTITY_ID, c.LEGACY_CONF_INVERTER_ENTITY_ID):
+        if data.pop(key, None) is not None:
+            changed = True
+        if options.pop(key, None) is not None:
+            changed = True
     if entry.minor_version < _TARGET_MINOR_VERSION or changed:
         hass.config_entries.async_update_entry(
             entry,

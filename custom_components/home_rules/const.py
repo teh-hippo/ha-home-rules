@@ -16,8 +16,9 @@ class ControlMode(StrEnum):
 
 PLATFORMS: list[Plat] = [Plat.SWITCH, Plat.SELECT, Plat.SENSOR, Plat.BINARY_SENSOR, Plat.BUTTON, Plat.NUMBER]
 
-CONF_CLIMATE_ENTITY_ID, LEGACY_CONF_TIMER_ENTITY_ID = "climate_entity_id", "timer_entity_id"
-CONF_INVERTER_ENTITY_ID, CONF_GENERATION_ENTITY_ID = "inverter_entity_id", "generation_entity_id"
+CONF_CLIMATE_ENTITY_ID = "climate_entity_id"
+LEGACY_CONF_TIMER_ENTITY_ID, LEGACY_CONF_INVERTER_ENTITY_ID = "timer_entity_id", "inverter_entity_id"
+CONF_GENERATION_ENTITY_ID = "generation_entity_id"
 CONF_GRID_ENTITY_ID, CONF_TEMPERATURE_ENTITY_ID = "grid_entity_id", "temperature_entity_id"
 CONF_HUMIDITY_ENTITY_ID, CONF_GENERATION_COOL_THRESHOLD = "humidity_entity_id", "generation_cool_threshold"
 CONF_GENERATION_DRY_THRESHOLD, CONF_GENERATION_BOOST_THRESHOLD = (
@@ -37,21 +38,6 @@ DEFAULT_TEMPERATURE_THRESHOLD, DRY_MODE_HUMIDITY_CUTOFF = 24.0, 65.0
 DEFAULT_GRID_USAGE_DELAY, DEFAULT_REACTIVATE_DELAY = 2, 2
 DEFAULT_TEMPERATURE_COOL, DEFAULT_EVAL_INTERVAL, DEFAULT_AIRCON_TIMER_DURATION = 22.0, 180, 60
 DEFAULT_SMOOTHING_WINDOW = 5
-_POWER_UNITS = {"w": "W", "kw": "kW", "mw": "MW", "gw": "GW"}
-
-
-def normalize_power_unit(unit: str) -> str:
-    cleaned = unit.strip()
-    return _POWER_UNITS.get(cleaned.lower(), cleaned)
-
-
-INVERTER_ONLINE_STATES = frozenset({"on", "true", "1", "online"})
-
-
-def is_inverter_online(state: str) -> bool:
-    """True when an inverter status string denotes an online, producing inverter."""
-    return state.lower().strip().replace("-", "").replace("_", "").replace(" ", "") in INVERTER_ONLINE_STATES
-
 
 DEFAULT_OPTIONS: dict[str, int | float] = {
     CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
