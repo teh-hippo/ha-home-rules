@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v1.11.2 (2026-11-02)
+
+### Bug Fixes
+
+- Limit Boost cooling to the afternoon
+  ([`746e0b3`](https://github.com/teh-hippo/ha-home-rules/commit/746e0b3057a08b7a94d4fbbcc9e70dc908dddb2d))
+
+### Chores
+
+- **deps**: Update astral-sh/setup-uv action to v10.3.1
+  ([`138e5b6`](https://github.com/teh-hippo/ha-home-rules/commit/138e5b62e7ff667229768b8d1e27f12c72e1f172))
+
+- **deps**: Update astral-sh/setup-uv action to v10.3.2
+  ([`caaac84`](https://github.com/teh-hippo/ha-home-rules/commit/caaac84ca74dcf03e0ba623c714c44532adf86c7))
+
+- **deps**: Update astral-sh/setup-uv action to v10.3.3
+  ([`56e7c5b`](https://github.com/teh-hippo/ha-home-rules/commit/56e7c5b0f26795e5f560fe1bb29d2ff1680956f2))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 66a3950
+  ([`557933e`](https://github.com/teh-hippo/ha-home-rules/commit/557933e3b4e47f7b6954a564eb4c4a57607ae28e))
+
+
 ## v1.11.1 (2026-10-21)
 
 ### Bug Fixes
