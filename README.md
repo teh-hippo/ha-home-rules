@@ -32,6 +32,10 @@ Home Rules manages its own aircon timer internally, so you do not need a separat
 
 `select.home_rules_control_mode` defaults to **Monitor** for safe setup. Switch to **Solar Cooling** once you're happy with decisions and want the integration to control your climate entity.
 
+**Boost Cooling** uses normal solar rules before the configured afternoon start hour (default 14:00 local time).
+From that hour, it allows cooling above the cool setpoint with generation at or above the boost threshold, tolerating grid draw to keep cooling as daylight fades.
+The separate **Afternoon Cooling** switch blocks all automatic starts before that hour when enabled.
+
 Monitor runs the internal timer for the configured duration and exposes its remaining seconds through `sensor.home_rules_timer_countdown`, without controlling the aircon.
 
 ## Development

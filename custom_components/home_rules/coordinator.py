@@ -146,9 +146,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         if mode not in (AirconMode.COOL, AirconMode.DRY): self._auto_mode = False  # self-heal: only COOL/DRY are home-rules-owned runs; a user-switched mode is external
-        aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
-        before_afternoon = self.afternoon_cooling and dt_util.now().hour < int(self.config_entry.options.get(c.CONF_AFTERNOON_COOLING_HOUR, c.DEFAULT_AFTERNOON_COOLING_HOUR))
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, before_afternoon), timer
+        before_afternoon = dt_util.now().hour < int(self.config_entry.options.get(c.CONF_AFTERNOON_COOLING_HOUR, c.DEFAULT_AFTERNOON_COOLING_HOUR))
+        aggressive = self.control_mode is c.ControlMode.BOOST_COOLING and not before_afternoon; enabled = self.control_mode is not c.ControlMode.DISABLED
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, self.afternoon_cooling and before_afternoon), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if self._session.last is None: self._session.last = current
