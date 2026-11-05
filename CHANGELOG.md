@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.14.0 (2026-11-05)
+
+### Documentation
+
+- Refer to battery and forecast numbers by display name
+  ([`ab490b0`](https://github.com/teh-hippo/ha-home-rules/commit/ab490b0b267b4461f0832449251973065e4292a6))
+
+### Features
+
+- Stop Solar Cooling when the battery engages and let Boost run on it
+  ([`d4de528`](https://github.com/teh-hippo/ha-home-rules/commit/d4de5281193a4773e8434865033f90a7c09277fd))
+
+
 ## v1.13.0 (2026-11-05)
 
 ### Features
