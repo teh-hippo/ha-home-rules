@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.13.0 (2026-11-05)
+
+### Features
+
+- Add battery charge, discharge and solar forecast guards
+  ([`81df4ac`](https://github.com/teh-hippo/ha-home-rules/commit/81df4ac299f6875aa3a8b0b953d6447404cd1181))
+
+
 ## v1.12.0 (2026-11-05)
 
 ### Features
