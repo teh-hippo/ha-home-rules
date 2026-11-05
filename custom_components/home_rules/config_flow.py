@@ -87,5 +87,6 @@ class HomeRulesOptionsFlow(OptionsFlow):
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
+        schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()
         schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=cur.get(c.CONF_NOTIFICATION_SERVICE, ""))] = selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)

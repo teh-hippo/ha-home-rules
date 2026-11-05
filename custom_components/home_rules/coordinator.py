@@ -141,7 +141,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         timer = self._active_aircon_timer(); climate = self._state(c.CONF_CLIMATE_ENTITY_ID, "climate")
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
         gen_live = "generation" not in self._fallback_inputs; grid_live = "grid" not in self._fallback_inputs  # a fallback means the sensor is unknown/unavailable (e.g. inverter asleep)
-        generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid") if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
+        generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid", invert=bool(self.config_entry.options.get(c.CONF_GRID_INVERT, False))) if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
         have_solar = gen_live and generation > 0.0
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
@@ -215,8 +215,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._timer_expiry_handle = None
         self.hass.async_create_task(self.async_run_evaluation("timer_expired"))
 
-    def _normalized_power(self, state: State, label: str) -> float:
-        value = self._state_to_float(state, label); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
+    def _normalized_power(self, state: State, label: str, *, invert: bool = False) -> float:
+        value = -self._state_to_float(state, label) if invert else self._state_to_float(state, label); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
         try: return max(0.0, PowerConverter.convert(value, UnitOfPower(unit), UnitOfPower.WATT))
         except ValueError:
             self._create_issue(c.ISSUE_INVALID_UNIT, {"entity_id": state.entity_id, "unit": unit or "(none)"}); raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}") from None

@@ -54,6 +54,7 @@
           "grid_usage_delay": "Grid usage delay (evaluations)",
           "reactivate_delay": "Reactivation delay (evaluations)",
           "smoothing_window": "Smoothing window (evaluations)",
+          "grid_invert": "Grid sensor reports export as positive (invert sign)",
           "afternoon_cooling_hour": "Afternoon cooling start hour (0-23)",
           "notification_service": "Notification service (optional)"
         }
