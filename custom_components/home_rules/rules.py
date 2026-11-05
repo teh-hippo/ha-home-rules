@@ -8,8 +8,9 @@ Decision tree (high-level):
   2. Unknown aircon mode → NO_CHANGE
   3. Reactivation delay active → NO_CHANGE (countdown)
   4. Aircon OFF → evaluate activation (solar thresholds or boost)
-  5. Aircon ON + grid draw (or battery below minimum) → tolerate, downgrade, or shut off
-  6. Aircon ON + free solar → maintain or upgrade mode
+  5. Aircon ON + battery engaged → Solar Cooling shuts off (not free); Boost keeps going until cool or battery low
+  6. Aircon ON + grid draw (or battery below minimum) → tolerate, downgrade, or shut off
+  7. Aircon ON + free solar → maintain or upgrade mode
 """
 
 from dataclasses import dataclass
@@ -45,6 +46,8 @@ R_BELOW_COOL_SETPOINT = "Temperature below cool setpoint"
 R_BELOW_THRESHOLD = "Temperature below threshold"
 R_BATTERY_LOW = "Battery below minimum charge"
 R_FORECAST_LOW = "Solar forecast too low"
+R_BATTERY_ENGAGED = "Battery engaged"
+R_COOL_ON_BATTERY = "Cool enough on battery"
 
 
 class AirconMode(StrEnum):
@@ -90,6 +93,7 @@ class HomeInput:
     forecast_low: bool = False
     battery_soc: float | None = None
     forecast_kwh: float | None = None
+    battery_discharge: float = 0.0
 
 
 @dataclass
@@ -192,6 +196,8 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
         return R_BEFORE_AFTERNOON
     if home.battery_low:
         return R_BATTERY_LOW
+    if home.battery_discharge > 0 and not home.aggressive_cooling:
+        return R_BATTERY_ENGAGED
     if home.forecast_low:
         return R_FORECAST_LOW
     if home.aggressive_cooling and home.temperature <= config.temperature_cool:
@@ -233,6 +239,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             and not h.before_afternoon
             and not h.battery_low
             and not h.forecast_low
+            and (h.battery_discharge <= 0 or h.aggressive_cooling)
             and temp_ok
             and target.output is not None
         ):
@@ -252,6 +259,14 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         if state.last is HomeOutput.TIMER:
             return AdjustResult(HomeOutput.OFF, R_TIMER_EXPIRED)
         return AdjustResult(HomeOutput.TIMER, R_MANUAL)
+
+    # --- Cooling run + battery engaged ---
+    # Stored energy is not free: Solar Cooling stops at once. Boost spends it while the house is still
+    # hot (battery_low ends that), and stops only once the cool setpoint is reached.
+    if h.auto and h.battery_discharge > 0 and (not h.aggressive_cooling or h.temperature <= config.temperature_cool):
+        state.tolerated = 0
+        state.reactivate_delay = config.reactivate_delay
+        return AdjustResult(HomeOutput.OFF, R_COOL_ON_BATTERY if h.aggressive_cooling else R_BATTERY_ENGAGED)
 
     # --- Cooling run + grid draw (or no solar) ---
     if not h.have_solar or h.grid_usage > 0 or h.battery_low:

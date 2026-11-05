@@ -37,7 +37,7 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "auto", "aircon_mode", "before_afternoon", "battery_soc", "battery_low", "forecast_kwh", "forecast_low")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "auto", "aircon_mode", "before_afternoon", "battery_soc", "battery_discharge", "battery_low", "forecast_kwh", "forecast_low")
 _SESSION_RECORD_FIELDS = ("tolerated", "reactivate_delay")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
@@ -145,7 +145,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         gen_live = "generation" not in self._fallback_inputs; grid_live = "grid" not in self._fallback_inputs  # a fallback means the sensor is unknown/unavailable (e.g. inverter asleep)
         generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid", invert=bool(self.config_entry.options.get(c.CONF_GRID_INVERT, False))) if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
         have_solar = gen_live and generation > 0.0
-        grid_usage += max(0.0, (discharge or 0.0) - self.get_parameter(c.CONF_BATTERY_DISCHARGE_TOLERANCE, c.DEFAULT_BATTERY_DISCHARGE_TOLERANCE))  # a battery covering the load hides the draw from the grid meter: count discharge as grid usage
+        battery_discharge = max(0.0, (discharge or 0.0) - self.get_parameter(c.CONF_BATTERY_DISCHARGE_TOLERANCE, c.DEFAULT_BATTERY_DISCHARGE_TOLERANCE))  # a battery covering the load hides the draw from the grid meter: pass it to the rules separately from grid usage
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         running = mode in (AirconMode.COOL, AirconMode.DRY); min_soc, min_kwh = self.get_parameter(c.CONF_BATTERY_MIN_SOC, c.DEFAULT_BATTERY_MIN_SOC), self.get_parameter(c.CONF_FORECAST_MIN_KWH, c.DEFAULT_FORECAST_MIN_KWH)
@@ -154,7 +154,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if mode not in (AirconMode.COOL, AirconMode.DRY): self._auto_mode = False  # self-heal: only COOL/DRY are home-rules-owned runs; a user-switched mode is external
         before_afternoon = dt_util.now().hour < int(self.config_entry.options.get(c.CONF_AFTERNOON_COOLING_HOUR, c.DEFAULT_AFTERNOON_COOLING_HOUR))
         aggressive = self.control_mode is c.ControlMode.BOOST_COOLING and not before_afternoon; enabled = self.control_mode is not c.ControlMode.DISABLED
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, self.afternoon_cooling and before_afternoon, battery_low, forecast_low, soc, forecast), timer
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, self.afternoon_cooling and before_afternoon, battery_low, forecast_low, soc, forecast, battery_discharge), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if self._session.last is None: self._session.last = current
