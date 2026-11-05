@@ -14,7 +14,7 @@ from . import const as c
 
 _PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)
-_POWER_KEYS = {c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID}
+_POWER_KEYS = {c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_BATTERY_POWER_ENTITY_ID}
 
 
 def _entity_selector(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector: return selector.EntitySelector(selector.EntitySelectorConfig(domain=domain) if device_class is None else selector.EntitySelectorConfig(domain=domain, device_class=device_class))
@@ -22,7 +22,7 @@ def _number_selector(min_val: float, max_val: float, step: float, unit: str | No
     return selector.NumberSelector(selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=selector.NumberSelectorMode.BOX) if unit is None else selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=unit))
 
 
-_ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity")}
+_ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"), c.CONF_BATTERY_SOC_ENTITY_ID: _entity_selector("sensor", "battery"), c.CONF_BATTERY_POWER_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_FORECAST_ENTITY_ID: _entity_selector("sensor", "energy")}
 _NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW, _number_selector(1, 10, 1)), (c.CONF_AFTERNOON_COOLING_HOUR, c.DEFAULT_AFTERNOON_COOLING_HOUR, _number_selector(0, 23, 1, "h")), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_BOOST_THRESHOLD, c.DEFAULT_GENERATION_BOOST_THRESHOLD, _number_selector(0, 5000, 50, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY, _number_selector(0, 5, 1)))
 _OPTIONS_ENTITY_FIELDS: tuple[str, ...] = (c.CONF_CLIMATE_ENTITY_ID, c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)
 
@@ -81,11 +81,13 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 
 class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errors = _validate_entities(self.hass, user_input, list(_OPTIONS_ENTITY_FIELDS)) if user_input else {}
-        if user_input and not errors: return self.async_create_entry(data={**self.config_entry.options, **user_input})
+        errors = _validate_entities(self.hass, user_input, [*_OPTIONS_ENTITY_FIELDS, *(k for k in c.OPTIONAL_ENTITY_KEYS if user_input.get(k))]) if user_input else {}
+        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS}, **user_input})  # optional entities are cleared by omission
         cur = self.config_entry.options
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
+        schema.update({vol.Optional(key, description={"suggested_value": cur[key]} if cur.get(key) else None): _ENTITY_SELECTORS[key] for key in c.OPTIONAL_ENTITY_KEYS})
+        schema[vol.Optional(c.CONF_BATTERY_INVERT, default=bool(cur.get(c.CONF_BATTERY_INVERT, False)))] = selector.BooleanSelector()
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
         schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()
         schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=cur.get(c.CONF_NOTIFICATION_SERVICE, ""))] = selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))

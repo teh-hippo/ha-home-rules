@@ -8,7 +8,7 @@ Decision tree (high-level):
   2. Unknown aircon mode → NO_CHANGE
   3. Reactivation delay active → NO_CHANGE (countdown)
   4. Aircon OFF → evaluate activation (solar thresholds or boost)
-  5. Aircon ON + grid draw → tolerate, downgrade, or shut off
+  5. Aircon ON + grid draw (or battery below minimum) → tolerate, downgrade, or shut off
   6. Aircon ON + free solar → maintain or upgrade mode
 """
 
@@ -43,6 +43,8 @@ R_COOLING_DISABLED = "Cooling disabled"
 R_BEFORE_AFTERNOON = "Before afternoon cooling time"
 R_BELOW_COOL_SETPOINT = "Temperature below cool setpoint"
 R_BELOW_THRESHOLD = "Temperature below threshold"
+R_BATTERY_LOW = "Battery below minimum charge"
+R_FORECAST_LOW = "Solar forecast too low"
 
 
 class AirconMode(StrEnum):
@@ -84,6 +86,10 @@ class HomeInput:
     enabled: bool
     cooling_enabled: bool
     before_afternoon: bool = False
+    battery_low: bool = False
+    forecast_low: bool = False
+    battery_soc: float | None = None
+    forecast_kwh: float | None = None
 
 
 @dataclass
@@ -184,6 +190,10 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
         return R_COOLING_DISABLED
     if home.before_afternoon:
         return R_BEFORE_AFTERNOON
+    if home.battery_low:
+        return R_BATTERY_LOW
+    if home.forecast_low:
+        return R_FORECAST_LOW
     if home.aggressive_cooling and home.temperature <= config.temperature_cool:
         return R_BELOW_COOL_SETPOINT
     if home.temperature < config.temperature_threshold:
@@ -218,7 +228,14 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             if h.aggressive_cooling
             else h.temperature >= config.temperature_threshold
         )
-        if h.cooling_enabled and not h.before_afternoon and temp_ok and target.output is not None:
+        if (
+            h.cooling_enabled
+            and not h.before_afternoon
+            and not h.battery_low
+            and not h.forecast_low
+            and temp_ok
+            and target.output is not None
+        ):
             return AdjustResult(target.output, target.reason)
         if h.auto:
             return AdjustResult(HomeOutput.OFF, _idle_reason(config, h, activation, R_AUTO_IDLE))
@@ -237,14 +254,19 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         return AdjustResult(HomeOutput.TIMER, R_MANUAL)
 
     # --- Cooling run + grid draw (or no solar) ---
-    if not h.have_solar or h.grid_usage > 0:
+    if not h.have_solar or h.grid_usage > 0 or h.battery_low:
         if h.auto:
             # If a mode transition is available (e.g. COOL→DRY downgrade), apply immediately.
-            if target.output is not None:
+            if target.output is not None and not h.battery_low:
                 state.tolerated = 0
                 return AdjustResult(target.output, target.reason)
             # Boost: tolerate grid draw while solar is available.
-            if h.aggressive_cooling and h.have_solar and h.generation >= config.generation_boost_threshold:
+            if (
+                h.aggressive_cooling
+                and h.have_solar
+                and not h.battery_low
+                and h.generation >= config.generation_boost_threshold
+            ):
                 state.tolerated = 0
                 return AdjustResult(HomeOutput.NO_CHANGE, R_BOOST_GRID_TOLERATED)
             # Solar: tolerate briefly, then shut off.
@@ -253,7 +275,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
                 return AdjustResult(HomeOutput.NO_CHANGE, R_GRID_TOLERATED)
             state.tolerated = 0
             state.reactivate_delay = config.reactivate_delay
-            return AdjustResult(HomeOutput.OFF, R_GRID_TOO_HIGH)
+            return AdjustResult(HomeOutput.OFF, R_BATTERY_LOW if h.battery_low else R_GRID_TOO_HIGH)
         if h.timer:
             return AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
         if state.last is HomeOutput.TIMER:

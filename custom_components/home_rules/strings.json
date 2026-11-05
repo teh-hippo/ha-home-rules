@@ -46,6 +46,10 @@
           "grid_entity_id": "Grid usage sensor",
           "temperature_entity_id": "Temperature sensor",
           "humidity_entity_id": "Humidity sensor",
+          "battery_soc_entity_id": "Battery charge sensor (optional)",
+          "battery_power_entity_id": "Battery power sensor (optional)",
+          "battery_invert": "Battery sensor reports charging as positive (invert sign)",
+          "forecast_entity_id": "Solar forecast remaining-energy sensor (optional)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
@@ -145,6 +149,15 @@
       },
       "temperature_cool": {
         "name": "Cool Setpoint"
+      },
+      "battery_min_soc": {
+        "name": "Battery Minimum Charge"
+      },
+      "battery_discharge_tolerance": {
+        "name": "Battery Discharge Tolerance"
+      },
+      "forecast_min_kwh": {
+        "name": "Forecast Minimum Remaining"
       }
     }
   },
