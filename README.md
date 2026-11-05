@@ -37,9 +37,9 @@ From that hour, it allows cooling above the cool setpoint with generation at or 
 The separate **Afternoon Cooling** switch blocks all automatic starts before that hour when enabled.
 
 **Battery and forecast (optional).** In options, select a battery charge sensor, a battery power sensor and a solar forecast "remaining energy today" sensor (for example from Forecast.Solar). All are optional; leave them empty to keep the old behaviour.
-- `number.home_rules_battery_minimum_charge`: no automatic start below this charge. A running aircon stops only once charge is 5 points below it. 0 disables the guard.
-- `number.home_rules_battery_discharge_tolerance`: battery discharge above this (W) counts as grid usage, so a battery covering the aircon load can no longer hide it from the grid meter. Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
-- `number.home_rules_forecast_minimum_remaining`: no automatic start when the forecast energy remaining today is below this (kWh). 0 disables the gate.
+- **Battery Minimum Charge**: no automatic start below this charge. A running aircon stops only once charge is 5 points below it. 0 disables the guard.
+- **Battery Discharge Tolerance**: battery discharge above this (W) counts as grid usage, so a battery covering the aircon load can no longer hide it from the grid meter. Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
+- **Forecast Minimum Remaining**: no automatic start when the forecast energy remaining today is below this (kWh). 0 disables the gate.
 
 Monitor runs the internal timer for the configured duration and exposes its remaining seconds through `sensor.home_rules_timer_countdown`, without controlling the aircon.
 
