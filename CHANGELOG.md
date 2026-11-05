@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.12.0 (2026-11-05)
+
+### Features
+
+- Add option to invert grid sensor sign
+  ([`d00929e`](https://github.com/teh-hippo/ha-home-rules/commit/d00929ea382b6958d145fac080472754ca5ff648))
+
+
 ## v1.11.2 (2026-11-02)
 
 ### Bug Fixes
