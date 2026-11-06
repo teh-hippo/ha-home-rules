@@ -263,7 +263,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
     # --- Cooling run + battery engaged ---
     # Stored energy is not free: Solar Cooling stops at once. Boost spends it while the house is still
     # hot (battery_low ends that), and stops only once the cool setpoint is reached.
-    if h.auto and h.battery_discharge > 0 and (not h.aggressive_cooling or h.temperature <= config.temperature_cool):
+    if h.battery_discharge > 0 and (not h.aggressive_cooling or h.temperature <= config.temperature_cool):
         state.tolerated = 0
         state.reactivate_delay = config.reactivate_delay
         return AdjustResult(HomeOutput.OFF, R_COOL_ON_BATTERY if h.aggressive_cooling else R_BATTERY_ENGAGED)
