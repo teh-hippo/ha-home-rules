@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.14.1 (2026-11-06)
+
+### Bug Fixes
+
+- Turn off manually started cooling when the battery engages
+  ([`c1d1c8b`](https://github.com/teh-hippo/ha-home-rules/commit/c1d1c8b3efc7957114eca5ac32daaeaf8ec80df2))
+
+### Chores
+
+- **deps**: Update softprops/action-gh-release digest to 8a0cd65
+  ([`0ca3e28`](https://github.com/teh-hippo/ha-home-rules/commit/0ca3e28ab1ffee5fbe34875882a17b8d942c027b))
+
+
 ## v1.14.0 (2026-11-05)
 
 ### Documentation
