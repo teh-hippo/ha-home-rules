@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
 from math import isfinite
 from typing import Any
+from uuid import uuid4
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -17,7 +18,7 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, State
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
@@ -27,10 +28,12 @@ from homeassistant.util.unit_conversion import PowerConverter, TemperatureConver
 
 from . import const as c
 from .rules import (
+    AdjustResult,
     AirconMode,
     CachedState,
     HomeInput,
     HomeOutput,
+    ManualCoolingBehaviour,
     RuleParameters,
     adjust,
     apply_adjustment,
@@ -58,6 +61,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self.hass, self.config_entry = hass, config_entry; self._lock, self._session = asyncio.Lock(), CachedState(); self.control_mode, self.cooling_enabled, self.dry_mode_enabled, self.afternoon_cooling = c.ControlMode.MONITOR, True, True, False
         self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record, self._fallback_inputs = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}, {}; self._aircon_timer_finishes_at: datetime | None = None; self._timer_expiry_handle: asyncio.TimerHandle | None = None
+        self._timer_target_notified = False; self._timer_prompt_id: str | None = None; self._notification_unsub: CALLBACK_TYPE | None = None
         self._store = Store[dict[str, Any]](hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
         interval = timedelta(seconds=int(config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))); name = f"{c.DOMAIN} ({config_entry.entry_id})"
         super().__init__(hass, c.LOGGER, name=name, update_interval=interval, always_update=True, config_entry=config_entry); self.data = CoordinatorData()
@@ -72,13 +76,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     @property
     def parameters(self) -> RuleParameters:
         g, o = self.get_parameter, self.config_entry.options
-        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), int(o.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL))
+        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), int(o.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL), ManualCoolingBehaviour(o.get(c.CONF_MANUAL_COOLING_BEHAVIOUR, ManualCoolingBehaviour.ASK)))
 
     async def async_set_mode(self, mode: c.ControlMode) -> None: self.control_mode = mode; await self._save_state(); await self.async_run_evaluation("control_mode")
 
     async def async_initialize(self) -> None:
-        stored = await self._store.async_load()
-        if not stored: return
+        stored = await self._store.async_load() or {}
         controls, session = stored.get("controls", {}), stored.get("session", {})
         with suppress(ValueError): self.control_mode = c.ControlMode(str(controls.get("mode", c.ControlMode.MONITOR)))
         self.cooling_enabled, self.dry_mode_enabled, self.afternoon_cooling = bool(controls.get("cooling_enabled", True)), bool(controls.get(c.CONF_DRY_MODE_ENABLED, True)), bool(controls.get(c.CONF_AFTERNOON_COOLING, False))
@@ -87,14 +90,18 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._auto_mode, self._last_changed = bool(stored.get("auto_mode", False)), stored.get("last_changed")
         self._recent = deque(stored.get("recent_evaluations", []), maxlen=c.MAX_RECENT_EVALUATIONS)
         self._aircon_timer_finishes_at = dt_util.parse_datetime(str(v)) if (v := stored.get("aircon_timer_finishes_at")) else None
+        self._timer_target_notified, self._timer_prompt_id = bool(stored.get("timer_target_notified", False)), stored.get("timer_prompt_id")
         self._parameters = {}
         for k, v in stored.get("parameters", {}).items():
             if k in c.RETIRED_CONFIG_KEYS: continue
             with suppress(TypeError, ValueError): self._parameters[str(k)] = float(v)
         self._schedule_timer_expiry()
+        if self._notification_unsub is None:
+            self._notification_unsub = self.hass.bus.async_listen(c.EVENT_NOTIFICATION_ACTION, self._async_handle_notification_action)
+            self.config_entry.async_on_unload(self._unsubscribe_notifications)
 
     async def async_set_control(self, key: str, value: bool) -> None: setattr(self, key, value); await self._save_state(); await self.async_run_evaluation("control")
-    async def async_shutdown(self) -> None: self._cancel_timer_expiry()
+    async def async_shutdown(self) -> None: self._cancel_timer_expiry(); self._unsubscribe_notifications()
     async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate(trigger))
 
     async def _async_update_data(self) -> CoordinatorData:
@@ -104,33 +111,71 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._create_issue(c.ISSUE_RUNTIME, {"error": str(err)})
             raise UpdateFailed(translation_domain=c.DOMAIN, translation_key="update_failed", translation_placeholders={"error": str(err)}) from err
 
-    async def _evaluate(self, trigger: str) -> CoordinatorData:
+    async def _evaluate(self, trigger: str, *, notification_action: str | None = None) -> CoordinatorData:
         async with self._lock:
-            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, _ = self._build_home_input(); current = current_state(home); params = self.parameters; smoothed_gen = self._smoothed_generation(home.generation); decision_home = replace(home, generation=smoothed_gen)
+            if notification_action is not None and notification_action not in self._timer_notification_actions(): return self.data
+            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, _ = self._build_home_input(); params = self.parameters
+            if notification_action is not None and (not home.timer or home.auto or home.aircon_mode not in (AirconMode.COOL, AirconMode.DRY) or self.control_mode in (c.ControlMode.DISABLED, c.ControlMode.MONITOR) or params.manual_cooling_behaviour is not ManualCoolingBehaviour.ASK): notification_action = None
+            if home.timer and home.aircon_mode is AirconMode.OFF: self._clear_aircon_timer(); home = replace(home, timer=False)
+            if notification_action is not None and notification_action.endswith("_five"):
+                self._aircon_timer_finishes_at = min(self._aircon_timer_finishes_at or dt_util.utcnow(), dt_util.utcnow() + timedelta(minutes=5)); self._schedule_timer_expiry()
+            current = current_state(home); smoothed_gen = self._smoothed_generation(home.generation); decision_home = replace(home, generation=smoothed_gen)
             if not self._initialized: self._initialized = True; self._sync_on_startup(current, home)
             elif self._session.last is None: self._session.last = current
-            result = adjust(params, decision_home, self._session); adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer()
+            if notification_action is not None and notification_action.endswith("_off"):
+                self._session.tolerated, self._session.reactivate_delay = 0, params.reactivate_delay
+                result = AdjustResult(HomeOutput.OFF, "Turned off from notification")
+            else: result = adjust(params, decision_home, self._session)
+            adjustment, reason = result.output, result.reason; await self._execute_adjustment(adjustment); timer = self._active_aircon_timer()
+            if notification_action is not None: self._timer_prompt_id = None
             previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
             if is_monitor: self._session.failed_to_change, applied = 0, True
             if not applied: raise HomeAssistantError("failed to apply adjustment")
             if previous is not None and previous != self._session.last and adjustment is not HomeOutput.RESET: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
+            await self._maybe_notify_timer_target(home)
             mode = self._session.last or current
-            record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "raw_generation": home.generation, "smoothed_generation": round(smoothed_gen, 1), "fallback_inputs": dict(self._fallback_inputs)} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
+            record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "manual_cooling_behaviour": params.manual_cooling_behaviour.value, "raw_generation": home.generation, "smoothed_generation": round(smoothed_gen, 1), "fallback_inputs": dict(self._fallback_inputs)} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
             self._last_record = record; self._recent.appendleft(record); await self._save_state(); self.hass.bus.async_fire(c.EVENT_EVALUATION, record)
             for issue in _CLEAR_ISSUES: self._clear_issue(issue)
             self._first_refresh_done = True
             return CoordinatorData(mode=mode, adjustment=adjustment, decision=f"{mode.value} - {reason}", solar_available=home.have_solar, auto_mode=self._auto_mode, timer_finishes_at=timer, last_evaluated=now, last_changed=self._last_changed)
 
     async def _maybe_notify(self, previous: HomeOutput, current: HomeOutput, adjustment: HomeOutput) -> None:
-        service = str(self.config_entry.options.get(c.CONF_NOTIFICATION_SERVICE, "")).strip()
-        if not service: self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE); return
-        domain, name = service.split(".", 1) if "." in service else ("notify", service)
-        if not self.hass.services.has_service(domain, name): self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service}); return
-        self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE)
         _emoji = {"Cool": "❄️", "Dry": "💧", "Off": "⏹", "On": "🔛", "Timer": "⏱", "Disabled": "⏸", "Reset": "🔄"}
         new = (self._session.last or current).value; icon = _emoji.get(new, "")
-        try: await self.hass.services.async_call(domain, name, {"title": f"{icon} Aircon → {new}", "message": f"Switched from {previous.value} to {new}"}, blocking=False)
-        except ServiceValidationError: self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service})
+        await self._send_notification({"title": f"{icon} Aircon → {new}", "message": f"Switched from {previous.value} to {new}"})
+
+    async def _send_notification(self, data: dict[str, Any]) -> bool:
+        service = str(self.config_entry.options.get(c.CONF_NOTIFICATION_SERVICE, "")).strip()
+        if not service: self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE); return False
+        domain, name = service.split(".", 1) if "." in service else ("notify", service)
+        if not self.hass.services.has_service(domain, name): self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service}); return False
+        self._clear_issue(c.ISSUE_NOTIFICATION_SERVICE)
+        try: await self.hass.services.async_call(domain, name, data, blocking=True)
+        except (HomeAssistantError, TimeoutError): self._create_issue(c.ISSUE_NOTIFICATION_SERVICE, {"service": service}); return False
+        return True
+
+    def _timer_notification_actions(self) -> dict[str, str]:
+        if self._timer_prompt_id is None: return {}
+        prefix = f"{c.DOMAIN}_{self.config_entry.entry_id}_{self._timer_prompt_id}"
+        return {f"{prefix}_off": "Turn off", f"{prefix}_keep": "Keep running", f"{prefix}_five": "5 mins"}
+
+    async def _maybe_notify_timer_target(self, home: HomeInput) -> None:
+        if self._timer_target_notified or self._active_aircon_timer() is None or home.auto or home.aircon_mode not in (AirconMode.COOL, AirconMode.DRY): return
+        if self.control_mode in (c.ControlMode.DISABLED, c.ControlMode.MONITOR) or self.parameters.manual_cooling_behaviour is not ManualCoolingBehaviour.ASK: return
+        if not home.temperature_available or home.temperature > self.parameters.temperature_cool: return
+        self._timer_prompt_id = uuid4().hex
+        data = {"title": "Aircon target reached", "message": f"Room: {home.temperature:g}°C. Target: {self.parameters.temperature_cool:g}°C. Turn cooling off? No response leaves the timer unchanged.", "data": {"actions": [{"action": action, "title": title} for action, title in self._timer_notification_actions().items()]}}
+        self._timer_target_notified = await self._send_notification(data)
+        if not self._timer_target_notified: self._timer_prompt_id = None
+
+    async def _async_handle_notification_action(self, event: Event[dict[str, Any]]) -> None:
+        action = event.data.get("action")
+        if not isinstance(action, str) or action not in self._timer_notification_actions(): return
+        self.async_set_updated_data(await self._evaluate("notification_action", notification_action=action))
+
+    def _unsubscribe_notifications(self) -> None:
+        if self._notification_unsub is not None: self._notification_unsub(); self._notification_unsub = None
 
     def _smoothed_generation(self, raw_gen: float) -> float:
         window = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
@@ -178,9 +223,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 for service, data in (("set_hvac_mode", {"entity_id": climate, "hvac_mode": adjustment.value.lower()}), ("set_temperature", {"entity_id": climate, "temperature": self.parameters.temperature_cool})): await self._call_service("climate", service, data)
             elif adjustment is HomeOutput.OFF: await self._call_service("climate", "turn_off", {"entity_id": climate})
         if adjustment is HomeOutput.TIMER:
+            self._timer_target_notified, self._timer_prompt_id = False, None
             self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION)))); self._schedule_timer_expiry()
         elif adjustment in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.OFF):
-            self._aircon_timer_finishes_at = None; self._schedule_timer_expiry()
+            self._clear_aircon_timer()
         if adjustment in (HomeOutput.COOL, HomeOutput.DRY): self._auto_mode = True
         elif adjustment is HomeOutput.OFF: self._auto_mode = False
 
@@ -206,8 +252,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         except ValueError as err: raise ValueError(f"invalid numeric {label}: {state.state}") from err
 
     def _active_aircon_timer(self) -> datetime | None:
-        if self._aircon_timer_finishes_at and self._aircon_timer_finishes_at <= dt_util.utcnow(): self._aircon_timer_finishes_at = None; self._schedule_timer_expiry()
+        if self._aircon_timer_finishes_at and self._aircon_timer_finishes_at <= dt_util.utcnow(): self._clear_aircon_timer()
         return self._aircon_timer_finishes_at
+
+    def _clear_aircon_timer(self) -> None:
+        self._aircon_timer_finishes_at = None; self._timer_target_notified, self._timer_prompt_id = False, None; self._schedule_timer_expiry()
 
     def _cancel_timer_expiry(self) -> None:
         if self._timer_expiry_handle is None: return
@@ -248,7 +297,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _save_state(self) -> None:
         session = asdict(self._session); session["last"] = self._session.last.value if self._session.last else None
-        await self._store.async_save({"controls": {"mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_AFTERNOON_COOLING: self.afternoon_cooling}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent), "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "parameters": dict(self._parameters)})
+        await self._store.async_save({"controls": {"mode": self.control_mode.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_AFTERNOON_COOLING: self.afternoon_cooling}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent), "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "timer_target_notified": self._timer_target_notified, "timer_prompt_id": self._timer_prompt_id, "parameters": dict(self._parameters)})
 
     def _create_issue(self, issue: str, placeholders: dict[str, str]) -> None:
         ir.async_create_issue(self.hass, c.DOMAIN, f"{self.config_entry.entry_id}_{issue}", is_fixable=False, is_persistent=False, severity=ir.IssueSeverity.ERROR, translation_key=issue, translation_placeholders=placeholders)

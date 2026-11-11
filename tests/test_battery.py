@@ -6,7 +6,6 @@ import pytest
 
 from custom_components.home_rules.rules import (
     R_BATTERY_ENGAGED,
-    R_COOL_ON_BATTERY,
     R_TARGET_REACHED,
     AirconMode,
     CachedState,
@@ -38,14 +37,13 @@ async def test_battery_discharge_reported_separately_from_grid(coord_factory, ha
 
 
 @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
-@pytest.mark.parametrize("auto", [False, True])
-def test_solar_cooling_stops_when_battery_engaged(mode: AirconMode, auto: bool) -> None:
+def test_solar_cooling_stops_when_battery_engaged(mode: AirconMode) -> None:
     state = CachedState()
-    result = adjust(PARAMS, _home(mode, auto=auto, battery_discharge=300), state)
+    result = adjust(PARAMS, _home(mode, battery_discharge=300), state)
     assert result.output is HomeOutput.OFF and result.reason == R_BATTERY_ENGAGED and state.reactivate_delay == 2
 
 
-async def test_manual_battery_stop_cancels_active_timer(coord_factory, hass) -> None:
+async def test_manual_battery_run_preserves_active_timer(coord_factory, hass) -> None:
     pytest.importorskip("pytest_homeassistant_custom_component")
     from datetime import timedelta
 
@@ -68,18 +66,17 @@ async def test_manual_battery_stop_cancels_active_timer(coord_factory, hass) -> 
         options={CONF_BATTERY_POWER_ENTITY_ID: "sensor.batt"},
     )
     coordinator._session.last = HomeOutput.TIMER
-    coordinator._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=2)
+    deadline = dt_util.utcnow() + timedelta(minutes=2)
+    coordinator._aircon_timer_finishes_at = deadline
     coordinator._schedule_timer_expiry()
 
     await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
 
-    assert coordinator.data.adjustment is HomeOutput.OFF
-    assert coordinator._last_record["reason"] == R_BATTERY_ENGAGED
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
     assert coordinator._auto_mode is False
-    assert turned_off == ["climate.test"]
-    assert coordinator.data.timer_finishes_at is None
-    assert coordinator._aircon_timer_finishes_at is None
-    assert coordinator._timer_expiry_handle is None
+    assert not turned_off
+    assert coordinator.data.timer_finishes_at == deadline
+    assert coordinator._timer_expiry_handle is not None
 
 
 def test_solar_cooling_does_not_start_while_battery_engaged() -> None:
@@ -94,9 +91,8 @@ def test_boost_keeps_cooling_on_battery_while_house_hot(auto: bool) -> None:
     assert result.output is not HomeOutput.OFF
 
 
-@pytest.mark.parametrize("auto", [False, True])
-def test_boost_stops_on_battery_once_cool_enough(auto: bool) -> None:
-    home = _home(AirconMode.COOL, auto=auto, aggressive_cooling=True, temperature=22, battery_discharge=800)
+def test_boost_stops_on_battery_once_cool_enough() -> None:
+    home = _home(AirconMode.COOL, aggressive_cooling=True, temperature=22, battery_discharge=800)
     result = adjust(PARAMS, home, CachedState())
     assert result.output is HomeOutput.OFF
-    assert result.reason == (R_TARGET_REACHED if auto else R_COOL_ON_BATTERY)
+    assert result.reason == R_TARGET_REACHED

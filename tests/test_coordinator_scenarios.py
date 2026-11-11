@@ -215,8 +215,7 @@ async def test_restart_with_expired_timer_and_aircon_on_turns_off(coord_factory)
     assert coordinator._last_record["reason"] == "Timer expired"
 
 
-async def test_free_solar_reset_of_stale_timer_does_not_notify(coord_factory) -> None:
-    """Clearing a stale expired cap under genuine free solar is internal: no notify, no last_changed bump."""
+async def test_free_solar_cannot_override_timer_expiry(coord_factory) -> None:
     from custom_components.home_rules.rules import HomeOutput
 
     coordinator = await coord_factory(generation="6000", grid="0", climate="cool")
@@ -227,9 +226,9 @@ async def test_free_solar_reset_of_stale_timer_does_not_notify(coord_factory) ->
 
     await coordinator.async_run_evaluation("poll")
 
-    assert coordinator.data.adjustment is HomeOutput.RESET
-    assert coordinator._session.last is HomeOutput.COOL  # stale TIMER cleared to live state
-    assert coordinator._last_changed == "sentinel"  # RESET is internal, so no spurious mode-change notification
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    assert coordinator._session.last is HomeOutput.OFF
+    assert coordinator._last_changed != "sentinel"
 
 
 async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling(coord_factory) -> None:

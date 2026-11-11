@@ -3,6 +3,8 @@ from logging import Logger, getLogger
 
 from homeassistant.const import Platform as Plat
 
+from .rules import ManualCoolingBehaviour
+
 LOGGER: Logger = getLogger(__package__)
 DOMAIN = "home_rules"
 
@@ -28,6 +30,7 @@ CONF_GRID_USAGE_DELAY = "grid_usage_delay"
 CONF_REACTIVATE_DELAY, CONF_TEMPERATURE_COOL = "reactivate_delay", "temperature_cool"
 CONF_EVAL_INTERVAL, CONF_AIRCON_TIMER_DURATION = "eval_interval", "aircon_timer_duration"
 CONF_NOTIFICATION_SERVICE, CONF_SMOOTHING_WINDOW = "notification_service", "smoothing_window"
+CONF_MANUAL_COOLING_BEHAVIOUR = "manual_cooling_behaviour"
 CONF_GRID_INVERT = "grid_invert"
 CONF_BATTERY_POWER_ENTITY_ID = "battery_power_entity_id"
 CONF_BATTERY_INVERT = "battery_invert"
@@ -44,7 +47,7 @@ DEFAULT_GRID_USAGE_DELAY, DEFAULT_REACTIVATE_DELAY = 2, 2
 DEFAULT_TEMPERATURE_COOL, DEFAULT_EVAL_INTERVAL, DEFAULT_AIRCON_TIMER_DURATION = 22.0, 180, 60
 DEFAULT_SMOOTHING_WINDOW, DEFAULT_AFTERNOON_COOLING_HOUR = 5, 14
 
-DEFAULT_OPTIONS: dict[str, int | float] = {
+DEFAULT_OPTIONS: dict[str, int | float | str] = {
     CONF_AFTERNOON_COOLING_HOUR: DEFAULT_AFTERNOON_COOLING_HOUR,
     CONF_AIRCON_TIMER_DURATION: DEFAULT_AIRCON_TIMER_DURATION,
     CONF_EVAL_INTERVAL: DEFAULT_EVAL_INTERVAL,
@@ -53,9 +56,11 @@ DEFAULT_OPTIONS: dict[str, int | float] = {
     CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
     CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
     CONF_SMOOTHING_WINDOW: DEFAULT_SMOOTHING_WINDOW,
+    CONF_MANUAL_COOLING_BEHAVIOUR: ManualCoolingBehaviour.ASK,
 }
 
 MAX_RECENT_EVALUATIONS, STORAGE_VERSION = 50, 1
 EVENT_EVALUATION = "home_rules_evaluation"
+EVENT_NOTIFICATION_ACTION = "mobile_app_notification_action"
 ISSUE_RUNTIME, ISSUE_ENTITY_MISSING, ISSUE_ENTITY_UNAVAILABLE = "runtime_error", "entity_missing", "entity_unavailable"
 ISSUE_INVALID_UNIT, ISSUE_NOTIFICATION_SERVICE = "invalid_unit", "notification_service"

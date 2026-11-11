@@ -76,3 +76,16 @@ async def test_options_flow_validates_entities(hass, mock_entry) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "entity_not_found"}
+
+
+@pytest.mark.parametrize("behaviour", ["timer", "ask", "stop"])
+async def test_options_flow_sets_manual_cooling_behaviour(hass, mock_entry, behaviour) -> None:
+    from custom_components.home_rules.const import CONF_MANUAL_COOLING_BEHAVIOUR
+
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    user_input = _valid_options_input()
+    user_input[CONF_MANUAL_COOLING_BEHAVIOUR] = behaviour
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_MANUAL_COOLING_BEHAVIOUR] == behaviour

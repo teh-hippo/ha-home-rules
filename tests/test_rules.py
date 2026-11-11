@@ -43,6 +43,7 @@ from custom_components.home_rules.rules import (
     CachedState,
     HomeInput,
     HomeOutput,
+    ManualCoolingBehaviour,
     RuleParameters,
     TargetResult,
     _evaluate_target_mode,
@@ -1486,7 +1487,7 @@ def test_unavailable_temperature_prevents_start_and_mode_upgrade():
 
 
 class TestAdjustManualFreeSolar:
-    """A manual run genuinely on free solar is left uncapped; a stale expired cap is cleared."""
+    """Free solar allows uncapped manual cooling, but cannot override an existing timer cap."""
 
     def test_free_solar_manual_stays_uncapped(self):
         r = adjust(
@@ -1496,13 +1497,47 @@ class TestAdjustManualFreeSolar:
         )
         assert r == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
 
-    def test_free_solar_manual_resets_stale_expired_timer(self):
+    def test_free_solar_manual_stops_when_timer_expires(self):
         r = adjust(
             TEST_PARAMS,
             home(aircon_mode=AirconMode.COOL, have_solar=True, generation=6000, auto=False),
             CachedState(last=OUT.TIMER),
         )
-        assert r == AdjustResult(OUT.RESET, R_TIMER_EXPIRED)
+        assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+
+@pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
+@pytest.mark.parametrize("boost", [False, True])
+@pytest.mark.parametrize("behaviour", list(ManualCoolingBehaviour))
+def test_manual_timer_target_behaviour_overrides_battery_guard(mode, boost, behaviour):
+    params = replace(TEST_PARAMS, manual_cooling_behaviour=behaviour)
+    state = CachedState(last=OUT.TIMER, reactivate_delay=2)
+    result = adjust(
+        params,
+        home(
+            aircon_mode=mode,
+            auto=False,
+            aggressive_cooling=boost,
+            timer=True,
+            have_solar=False,
+            battery_discharge=800,
+            temperature=22,
+        ),
+        state,
+    )
+    expected = OUT.OFF if behaviour is ManualCoolingBehaviour.STOP else OUT.NO_CHANGE
+    assert result.output is expected
+    assert result.reason == (R_TARGET_REACHED if expected is OUT.OFF else R_NO_CHANGE)
+
+
+def test_manual_stop_at_target_requires_available_temperature():
+    params = replace(TEST_PARAMS, manual_cooling_behaviour=ManualCoolingBehaviour.STOP)
+    result = adjust(
+        params,
+        home(aircon_mode=AirconMode.COOL, timer=True, temperature=20, temperature_available=False),
+        CachedState(last=OUT.TIMER),
+    )
+    assert result == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
 
 
 class TestManualOvernightCapLifecycle:

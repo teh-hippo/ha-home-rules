@@ -7,10 +7,11 @@ Decision tree (high-level):
   1. Disabled → report DISABLED
   2. Unknown aircon mode → NO_CHANGE
   3. Automatic cooling at target → OFF
-  4. Reactivation delay active → NO_CHANGE (countdown)
-  5. Aircon OFF → evaluate temperature and solar eligibility
-  6. Automatic Boost → finish cooling regardless of power source
-  7. Solar/manual cooling → apply existing power and timer rules
+  4. Manual cooling on paid power/timer → apply manual target behaviour and timer cap
+  5. Reactivation delay active → NO_CHANGE (countdown)
+  6. Aircon OFF → evaluate temperature and solar eligibility
+  7. Automatic Boost → finish cooling regardless of power source
+  8. Automatic Solar cooling → apply power rules
 """
 
 from dataclasses import dataclass
@@ -45,7 +46,6 @@ R_BEFORE_AFTERNOON = "Before afternoon cooling time"
 R_BELOW_COOL_SETPOINT = "Temperature below cool setpoint"
 R_BELOW_THRESHOLD = "Temperature below threshold"
 R_BATTERY_ENGAGED = "Battery engaged"
-R_COOL_ON_BATTERY = "Cool enough on battery"
 R_TARGET_REACHED = "Cooling target reached"
 R_TEMPERATURE_UNAVAILABLE = "Temperature unavailable"
 R_INVALID_TEMPERATURE_RANGE = "Start temperature must be above cool setpoint"
@@ -71,6 +71,12 @@ class HomeOutput(StrEnum):
     TIMER = "Timer"
     DISABLED = "Disabled"
     RESET = "Reset"
+
+
+class ManualCoolingBehaviour(StrEnum):
+    TIMER = "timer"
+    ASK = "ask"
+    STOP = "stop"
 
 
 OUT = HomeOutput
@@ -104,6 +110,7 @@ class RuleParameters:
     grid_usage_delay: int
     reactivate_delay: int
     temperature_cool: float
+    manual_cooling_behaviour: ManualCoolingBehaviour = ManualCoolingBehaviour.ASK
 
     @property
     def temperature_range_valid(self) -> bool:
@@ -232,6 +239,21 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         state.tolerated = 0
         state.reactivate_delay = config.reactivate_delay
         return AdjustResult(HomeOutput.OFF, R_TARGET_REACHED)
+    if not h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY):
+        if state.last is HomeOutput.TIMER and not h.timer:
+            return AdjustResult(HomeOutput.OFF, R_TIMER_EXPIRED)
+        if h.timer or not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0:
+            state.tolerated = 0
+            if (
+                config.manual_cooling_behaviour is ManualCoolingBehaviour.STOP
+                and h.temperature_available
+                and h.temperature <= config.temperature_cool
+            ):
+                state.reactivate_delay = config.reactivate_delay
+                return AdjustResult(HomeOutput.OFF, R_TARGET_REACHED)
+            if h.timer:
+                return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
+            return AdjustResult(HomeOutput.TIMER, R_MANUAL)
     if state.reactivate_delay:
         state.reactivate_delay -= 1
         return AdjustResult(HomeOutput.NO_CHANGE, R_REACTIVATE_WAIT)
@@ -276,33 +298,24 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             HomeOutput.NO_CHANGE, R_BOOST_COOLING if h.temperature_available else R_TEMPERATURE_UNAVAILABLE
         )
 
-    if h.battery_discharge > 0 and (
-        not h.aggressive_cooling or (h.temperature_available and h.temperature <= config.temperature_cool)
-    ):
+    if h.battery_discharge > 0:
         state.tolerated = 0
         state.reactivate_delay = config.reactivate_delay
-        return AdjustResult(HomeOutput.OFF, R_COOL_ON_BATTERY if h.aggressive_cooling else R_BATTERY_ENGAGED)
+        return AdjustResult(HomeOutput.OFF, R_BATTERY_ENGAGED)
 
     # --- Cooling run + grid draw (or no solar) ---
-    if not h.have_solar or h.grid_usage > 0:
-        if h.auto:
-            # If a mode transition is available (e.g. COOL→DRY downgrade), apply immediately.
-            if target.output is not None and h.temperature_available:
-                state.tolerated = 0
-                return AdjustResult(target.output, target.reason)
-            # Solar: tolerate briefly, then shut off.
-            state.tolerated += 1
-            if state.tolerated < config.grid_usage_delay:
-                return AdjustResult(HomeOutput.NO_CHANGE, R_GRID_TOLERATED)
+    if h.auto and (not h.have_solar or h.grid_usage > 0):
+        # If a mode transition is available (e.g. COOL→DRY downgrade), apply immediately.
+        if target.output is not None and h.temperature_available:
             state.tolerated = 0
-            state.reactivate_delay = config.reactivate_delay
-            return AdjustResult(HomeOutput.OFF, R_GRID_TOO_HIGH)
-        if h.timer:
-            return AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
-        if state.last is HomeOutput.TIMER:
-            return AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
-        return AdjustResult(OUT.TIMER, R_MANUAL)
-
+            return AdjustResult(target.output, target.reason)
+        # Solar: tolerate briefly, then shut off.
+        state.tolerated += 1
+        if state.tolerated < config.grid_usage_delay:
+            return AdjustResult(HomeOutput.NO_CHANGE, R_GRID_TOLERATED)
+        state.tolerated = 0
+        state.reactivate_delay = config.reactivate_delay
+        return AdjustResult(HomeOutput.OFF, R_GRID_TOO_HIGH)
     # --- Cooling run + free solar ---
     if h.auto:
         state.tolerated = 0
@@ -310,9 +323,6 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return AdjustResult(target.output, target.reason)
         return AdjustResult(HomeOutput.NO_CHANGE, activation or R_NO_CHANGE)
 
-    # Manual cooling run confirmed on genuine free solar: clear a now-stale expired cap.
-    if state.last is HomeOutput.TIMER and not h.timer:
-        return AdjustResult(HomeOutput.RESET, R_TIMER_EXPIRED)
     return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
 
 

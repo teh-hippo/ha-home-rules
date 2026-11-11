@@ -40,7 +40,8 @@ An unavailable temperature sensor prevents automatic starts and cannot be treate
 Existing installations with equal or inverted temperature settings must correct them before automatic starts resume.
 
 **Solar Cooling** uses the configured generation thresholds to choose Cool or Dry and retains the grid-usage tolerance.
-Battery discharge is not free solar: it blocks automatic starts and turns running Cool or Dry off, including manually started runs.
+Battery discharge is not free solar: it blocks automatic starts and turns automatically started Cool or Dry runs off.
+Manual cooling that uses battery or grid power receives the configured timer cap instead.
 
 **Boost Cooling** can start with any positive solar generation and supplement the aircon's demand with battery or grid power.
 Once an automatic run starts, it continues towards Cool Setpoint even if solar generation disappears.
@@ -54,7 +55,19 @@ Inverter battery protections remain external to Home Rules.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
 The shared temperature stop applies only to automatically started Cool and Dry runs.
-Manual runs retain their existing power and timer rules, including Boost's battery-specific stop at Cool Setpoint.
+For manually started Cool or Dry runs on Timer, choose **Manual cooling target behaviour** in the integration options:
+
+- **Timer:** keep running until the configured timer expires.
+- **Ask** (default): notify once at Cool Setpoint, with **Turn off**, **Keep running**, and **5 mins** buttons.
+- **Auto off:** stop at Cool Setpoint or timer expiry, whichever comes first.
+
+Ask requires a configured notification service; interactive buttons require a Home Assistant Companion `notify.mobile_app_*` service.
+No response or **Keep running** leaves the original deadline unchanged.
+**5 mins** shortens the remaining timer to five minutes from the response, without extending a shorter remaining time.
+Target prompts and pending responses survive HA restarts, and buttons from completed or replaced timer sessions are ignored.
+Timer expiry still stops the run if solar generation recovers.
+Unavailable temperature readings cannot trigger target prompts or target-based stops.
+Heat and other non-cooling manual modes retain their timer-only behaviour.
 
 Monitor runs the internal timer for the configured duration and exposes its remaining seconds through `sensor.home_rules_timer_countdown`, without controlling the aircon.
 

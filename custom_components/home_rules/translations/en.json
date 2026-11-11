@@ -49,6 +49,7 @@
           "battery_power_entity_id": "Battery power sensor (optional)",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
+          "manual_cooling_behaviour": "Manual cooling target behaviour",
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
@@ -59,6 +60,15 @@
           "afternoon_cooling_hour": "Afternoon cooling start hour (0-23)",
           "notification_service": "Notification service (optional)"
         }
+      }
+    }
+  },
+  "selector": {
+    "manual_cooling_behaviour": {
+      "options": {
+        "timer": "Timer",
+        "ask": "Ask",
+        "stop": "Auto off"
       }
     }
   },
@@ -81,7 +91,7 @@
     },
     "notification_service": {
       "title": "Notifications misconfigured",
-      "description": "Notify service **{service}** is not available. Select a valid notification service in Home Rules options."
+      "description": "Notify service **{service}** is unavailable or failed to send. Check the notification service and Home Rules options."
     }
   },
   "entity": {

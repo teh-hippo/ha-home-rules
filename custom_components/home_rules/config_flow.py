@@ -11,6 +11,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.selector import SelectOptionDict
 
 from . import const as c
+from .rules import ManualCoolingBehaviour
 
 _PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)
@@ -90,5 +91,6 @@ class HomeRulesOptionsFlow(OptionsFlow):
         schema[vol.Optional(c.CONF_BATTERY_INVERT, default=bool(cur.get(c.CONF_BATTERY_INVERT, False)))] = selector.BooleanSelector()
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
         schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()
+        schema[vol.Optional(c.CONF_MANUAL_COOLING_BEHAVIOUR, default=cur.get(c.CONF_MANUAL_COOLING_BEHAVIOUR, ManualCoolingBehaviour.ASK))] = selector.SelectSelector(selector.SelectSelectorConfig(options=list(ManualCoolingBehaviour), translation_key=c.CONF_MANUAL_COOLING_BEHAVIOUR))
         schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=cur.get(c.CONF_NOTIFICATION_SERVICE, ""))] = selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)
