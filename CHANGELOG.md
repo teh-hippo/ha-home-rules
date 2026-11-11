@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v2.0.0 (2026-11-11)
+
+### Chores
+
+- **deps**: Update dependency certifi to v2026.10.18 [security]
+  ([`6c88aed`](https://github.com/teh-hippo/ha-home-rules/commit/6c88aeda6c2bca6daab71bb36cdec99e51970ed5))
+
+### Features
+
+- Cool the home to its target with solar-assisted Boost
+  ([`bbd0186`](https://github.com/teh-hippo/ha-home-rules/commit/bbd0186eb257a88fce7417725cd95fe4e81d11ea))
+
+### Breaking Changes
+
+- Remove Forecast Minimum Remaining, Battery Minimum Charge, battery charge sensor selection and the
+  minimum Boost generation setting. Boost is no longer implicitly afternoon-only. Existing invalid
+  temperature pairs must be corrected before automatic cooling can start.
+
+
 ## v1.14.1 (2026-11-06)
 
 ### Bug Fixes
