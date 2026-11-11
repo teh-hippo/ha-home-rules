@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v2.1.0 (2026-11-11)
+
+### Features
+
+- Choose when manually started cooling stops
+  ([`7df48d6`](https://github.com/teh-hippo/ha-home-rules/commit/7df48d6ededa3eff4b3d0e37cc4ad62af626a45d))
+
+### Additional Release Information
+
+- Manual cooling now defaults to Ask and keeps its timer cap instead of stopping early on battery
+  discharge. Select Auto off to stop at the cool setpoint.
+
+
 ## v2.0.0 (2026-11-11)
 
 ### Chores
