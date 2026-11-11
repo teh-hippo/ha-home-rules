@@ -71,3 +71,44 @@ async def test_parameter_override_affects_evaluation(coord_factory) -> None:
 
     await coordinator.async_set_parameter(CONF_TEMPERATURE_THRESHOLD, 30.0)
     assert coordinator._last_record["reason"] == "Temperature below threshold"
+
+
+@pytest.mark.parametrize(
+    ("entity_id", "value"),
+    [
+        ("number.home_rules_temperature_threshold", 22),
+        ("number.home_rules_temperature_threshold", 21),
+        ("number.home_rules_cool_setpoint", 24),
+        ("number.home_rules_cool_setpoint", 25),
+    ],
+)
+async def test_invalid_temperature_update_does_not_change_saved_parameters(
+    hass, loaded_entry, hass_storage, entity_id, value
+) -> None:
+    from homeassistant.exceptions import ServiceValidationError
+
+    from custom_components.home_rules.const import DOMAIN
+
+    before = hass.states.get(entity_id).state
+    with pytest.raises(ServiceValidationError) as error:
+        await hass.services.async_call("number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True)
+
+    assert error.value.translation_key == "invalid_temperature_range"
+    assert hass.states.get(entity_id).state == before
+    assert loaded_entry.runtime_data._parameters == {}
+    assert hass_storage[f"{DOMAIN}_{loaded_entry.entry_id}"]["data"]["parameters"] == {}
+
+
+@pytest.mark.parametrize("start", [21, 22])
+async def test_legacy_invalid_temperature_pair_can_be_corrected(coord_factory, start) -> None:
+    from custom_components.home_rules.const import CONF_TEMPERATURE_THRESHOLD
+    from custom_components.home_rules.rules import R_INVALID_TEMPERATURE_RANGE, HomeOutput
+
+    coordinator = await coord_factory(options={CONF_TEMPERATURE_THRESHOLD: start})
+    await coordinator.async_run_evaluation("startup")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == R_INVALID_TEMPERATURE_RANGE
+
+    await coordinator.async_set_parameter(CONF_TEMPERATURE_THRESHOLD, 24)
+    corrected = coordinator.data
+    assert corrected.adjustment is HomeOutput.COOL

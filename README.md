@@ -32,14 +32,29 @@ Home Rules manages its own aircon timer internally, so you do not need a separat
 
 `select.home_rules_control_mode` defaults to **Monitor** for safe setup. Switch to **Solar Cooling** once you're happy with decisions and want the integration to control your climate entity.
 
-**Boost Cooling** uses normal solar rules before the configured afternoon start hour (default 14:00 local time).
-From that hour, it allows cooling above the cool setpoint with generation at or above the boost threshold, tolerating grid draw to keep cooling as daylight fades.
-The separate **Afternoon Cooling** switch blocks all automatic starts before that hour when enabled.
+**Temperature control.** Both modes start automatic cooling at or above **Temperature Threshold** and turn off automatic Cool or Dry runs at or below **Cool Setpoint**, using the configured home temperature sensor.
+Temperature Threshold must be higher than Cool Setpoint; the gap prevents repeated starts near the target.
+The same Cool Setpoint is sent to the climate entity.
+These decisions run at the configured evaluation interval, not continuously.
+An unavailable temperature sensor prevents automatic starts and cannot be treated as proof that the target has been reached.
+Existing installations with equal or inverted temperature settings must correct them before automatic starts resume.
 
-**Battery and forecast (optional).** In options, select a battery charge sensor, a battery power sensor and a solar forecast "remaining energy today" sensor (for example from Forecast.Solar). All are optional; leave them empty to keep the old behaviour.
-- **Battery Minimum Charge**: no automatic start below this charge. A running aircon stops only once charge is 5 points below it. 0 disables the guard.
-- **Battery Discharge Tolerance**: battery discharge above this (W) means the battery is engaged. Solar Cooling treats that as not free and turns cooling off at once, including manually started cooling; Boost Cooling keeps going on the battery while the house is above the cool setpoint, and stops when it is cool enough or the battery falls below the minimum charge. Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
-- **Forecast Minimum Remaining**: no automatic start when the forecast energy remaining today is below this (kWh). 0 disables the gate.
+**Solar Cooling** uses the configured generation thresholds to choose Cool or Dry and retains the grid-usage tolerance.
+Battery discharge is not free solar: it blocks automatic starts and turns running Cool or Dry off, including manually started runs.
+
+**Boost Cooling** can start with any positive solar generation and supplement the aircon's demand with battery or grid power.
+Once an automatic run starts, it continues towards Cool Setpoint even if solar generation disappears.
+Boost applies whenever selected, not just in the afternoon.
+The separate **Afternoon Cooling** switch blocks automatic starts in either mode before the configured start hour (default 14:00 local time), without interrupting an existing run.
+Home Rules does not enforce a battery charge reserve; Boost may import grid power or use stored energy until the target is reached.
+Inverter battery protections remain external to Home Rules.
+
+**Battery power (optional).** Select a battery power sensor in options to let Solar Cooling detect discharge.
+**Battery Discharge Tolerance** ignores discharge up to the configured wattage.
+Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
+
+The shared temperature stop applies only to automatically started Cool and Dry runs.
+Manual runs retain their existing power and timer rules, including Boost's battery-specific stop at Cool Setpoint.
 
 Monitor runs the internal timer for the configured duration and exposes its remaining seconds through `sensor.home_rules_timer_countdown`, without controlling the aircon.
 

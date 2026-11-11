@@ -103,38 +103,37 @@ async def test_afternoon_cooling_gates_before_start_hour(coord_factory, monkeypa
     assert coordinator.data.adjustment is HomeOutput.COOL
 
 
-@pytest.mark.parametrize("start_hour", [None, 16])
-async def test_boost_only_applies_in_afternoon(hass, coord_factory, monkeypatch, start_hour) -> None:
+@pytest.mark.parametrize("start_hour", [14, 16])
+async def test_boost_respects_explicit_afternoon_gate(hass, coord_factory, monkeypatch, start_hour) -> None:
     from datetime import datetime
 
     from homeassistant.util import dt as dt_util
     from pytest_homeassistant_custom_component.common import async_mock_service
 
-    from custom_components.home_rules.const import CONF_AFTERNOON_COOLING_HOUR, CONF_TEMPERATURE_COOL, ControlMode
+    from custom_components.home_rules.const import CONF_AFTERNOON_COOLING_HOUR, ControlMode
     from custom_components.home_rules.rules import HomeOutput
 
     cooling_calls = async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
-    off_calls = async_mock_service(hass, "climate", "turn_off")
-    options = {CONF_TEMPERATURE_COOL: 21}
-    if start_hour is not None:
-        options[CONF_AFTERNOON_COOLING_HOUR] = start_hour
-    coordinator = await coord_factory(generation="1134", temperature="21.2", humidity="71", options=options)
+    coordinator = await coord_factory(
+        generation="1", temperature="25", options={CONF_AFTERNOON_COOLING_HOUR: start_hour}
+    )
     now = datetime.fromisoformat("2026-11-03T08:04:00+11:00")
     monkeypatch.setattr(dt_util, "now", lambda *a, **kw: now)
+    await coordinator.async_set_control("afternoon_cooling", True)
     await coordinator.async_set_mode(ControlMode.BOOST_COOLING)
 
     morning = coordinator.data
     assert morning.adjustment is HomeOutput.NO_CHANGE
     assert not cooling_calls
 
-    now = now.replace(hour=(start_hour or 14) - 1, minute=59)
+    now = now.replace(hour=start_hour - 1, minute=59)
     await coordinator.async_run_evaluation("poll")
     before_start = coordinator.data
     assert before_start.adjustment is HomeOutput.NO_CHANGE
     assert not cooling_calls
 
-    now = now.replace(hour=start_hour or 14, minute=0)
+    now = now.replace(hour=start_hour, minute=0)
     await coordinator.async_run_evaluation("poll")
     afternoon = coordinator.data
     assert afternoon.adjustment is HomeOutput.COOL
@@ -144,14 +143,13 @@ async def test_boost_only_applies_in_afternoon(hass, coord_factory, monkeypatch,
     hass.states.async_set("climate.test", "cool")
     hass.states.async_set("sensor.grid", "1000", {"unit_of_measurement": "W"})
     await coordinator.async_run_evaluation("poll")
-    assert coordinator._last_record["reason"] == "Boost grid tolerated"
+    assert coordinator._last_record["reason"] == "Boost cooling towards target"
 
     now = now.replace(day=4, hour=8)
     await coordinator.async_run_evaluation("poll")
     await coordinator.async_run_evaluation("poll")
-    assert coordinator.data.adjustment is HomeOutput.OFF
-    assert coordinator._last_record["reason"] == "Grid usage too high"
-    assert len(off_calls) == 1
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == "Boost cooling towards target"
     assert coordinator.control_mode is ControlMode.BOOST_COOLING
 
 
@@ -159,11 +157,12 @@ async def test_boost_only_applies_in_afternoon(hass, coord_factory, monkeypatch,
     ("generation", "temperature", "adjustment", "reason"),
     [
         ("6000", "23", "No Change", "Temperature below threshold"),
-        ("1134", "25", "No Change", "No change"),
-        ("6000", "25", "Cool", "Solar above cool threshold"),
+        ("1", "24", "Cool", "Boost solar available"),
+        ("0", "25", "No Change", "No solar available"),
+        ("unavailable", "25", "No Change", "No solar available"),
     ],
 )
-async def test_boost_uses_normal_solar_rules_in_morning(
+async def test_boost_works_in_morning_with_any_solar(
     hass, coord_factory, monkeypatch, generation, temperature, adjustment, reason
 ) -> None:
     from datetime import datetime

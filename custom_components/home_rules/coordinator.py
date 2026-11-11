@@ -6,6 +6,7 @@ from collections import deque
 from contextlib import suppress
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
+from math import isfinite
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -13,7 +14,6 @@ from homeassistant.const import (
     ATTR_UNIT_OF_MEASUREMENT,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
-    UnitOfEnergy,
     UnitOfPower,
     UnitOfTemperature,
 )
@@ -23,7 +23,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
-from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter, TemperatureConverter
+from homeassistant.util.unit_conversion import PowerConverter, TemperatureConverter
 
 from . import const as c
 from .rules import (
@@ -37,7 +37,7 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "humidity", "have_solar", "auto", "aircon_mode", "before_afternoon", "battery_soc", "battery_discharge", "battery_low", "forecast_kwh", "forecast_low")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "have_solar", "auto", "aircon_mode", "before_afternoon", "battery_discharge")
 _SESSION_RECORD_FIELDS = ("tolerated", "reactivate_delay")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
@@ -63,12 +63,16 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         super().__init__(hass, c.LOGGER, name=name, update_interval=interval, always_update=True, config_entry=config_entry); self.data = CoordinatorData()
 
     def get_parameter(self, key: str, default: float) -> float: return float(self._parameters.get(key, self.config_entry.options.get(key, default)))
-    async def async_set_parameter(self, key: str, value: float) -> None: self._parameters[key] = value; await self._save_state(); await self.async_run_evaluation("parameter")
+    async def async_set_parameter(self, key: str, value: float) -> None:
+        if key in (c.CONF_TEMPERATURE_THRESHOLD, c.CONF_TEMPERATURE_COOL):
+            candidate = replace(self.parameters, temperature_threshold=value) if key == c.CONF_TEMPERATURE_THRESHOLD else replace(self.parameters, temperature_cool=value)
+            if not candidate.temperature_range_valid: raise ServiceValidationError(translation_domain=c.DOMAIN, translation_key="invalid_temperature_range")
+        self._parameters[key] = value; await self._save_state(); await self.async_run_evaluation("parameter")
 
     @property
     def parameters(self) -> RuleParameters:
         g, o = self.get_parameter, self.config_entry.options
-        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_GENERATION_BOOST_THRESHOLD, c.DEFAULT_GENERATION_BOOST_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), int(o.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL))
+        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), int(o.get(c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL))
 
     async def async_set_mode(self, mode: c.ControlMode) -> None: self.control_mode = mode; await self._save_state(); await self.async_run_evaluation("control_mode")
 
@@ -85,6 +89,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._aircon_timer_finishes_at = dt_util.parse_datetime(str(v)) if (v := stored.get("aircon_timer_finishes_at")) else None
         self._parameters = {}
         for k, v in stored.get("parameters", {}).items():
+            if k in c.RETIRED_CONFIG_KEYS: continue
             with suppress(TypeError, ValueError): self._parameters[str(k)] = float(v)
         self._schedule_timer_expiry()
 
@@ -141,20 +146,18 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _build_home_input(self) -> tuple[HomeInput, datetime | None]:
         timer = self._active_aircon_timer(); climate = self._state(c.CONF_CLIMATE_ENTITY_ID, "climate")
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
-        soc, discharge, forecast = self._optional_float(c.CONF_BATTERY_SOC_ENTITY_ID, "battery_soc"), self._optional_power(c.CONF_BATTERY_POWER_ENTITY_ID, "battery_power", invert=bool(self.config_entry.options.get(c.CONF_BATTERY_INVERT, False))), self._optional_energy_kwh(c.CONF_FORECAST_ENTITY_ID, "forecast")
+        discharge = self._optional_power(c.CONF_BATTERY_POWER_ENTITY_ID, "battery_power", invert=bool(self.config_entry.options.get(c.CONF_BATTERY_INVERT, False)))
         gen_live = "generation" not in self._fallback_inputs; grid_live = "grid" not in self._fallback_inputs  # a fallback means the sensor is unknown/unavailable (e.g. inverter asleep)
         generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid", invert=bool(self.config_entry.options.get(c.CONF_GRID_INVERT, False))) if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
         have_solar = gen_live and generation > 0.0
         battery_discharge = max(0.0, (discharge or 0.0) - self.get_parameter(c.CONF_BATTERY_DISCHARGE_TOLERANCE, c.DEFAULT_BATTERY_DISCHARGE_TOLERANCE))  # a battery covering the load hides the draw from the grid meter: pass it to the rules separately from grid usage
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
-        running = mode in (AirconMode.COOL, AirconMode.DRY); min_soc, min_kwh = self.get_parameter(c.CONF_BATTERY_MIN_SOC, c.DEFAULT_BATTERY_MIN_SOC), self.get_parameter(c.CONF_FORECAST_MIN_KWH, c.DEFAULT_FORECAST_MIN_KWH)
-        battery_low = soc is not None and min_soc > 0 and soc < (min_soc - c.BATTERY_SOC_STOP_MARGIN if running else min_soc)  # hysteresis: a running aircon only stops once SoC is a margin below the start minimum
-        forecast_low = forecast is not None and min_kwh > 0 and forecast < min_kwh
         if mode not in (AirconMode.COOL, AirconMode.DRY): self._auto_mode = False  # self-heal: only COOL/DRY are home-rules-owned runs; a user-switched mode is external
         before_afternoon = dt_util.now().hour < int(self.config_entry.options.get(c.CONF_AFTERNOON_COOLING_HOUR, c.DEFAULT_AFTERNOON_COOLING_HOUR))
-        aggressive = self.control_mode is c.ControlMode.BOOST_COOLING and not before_afternoon; enabled = self.control_mode is not c.ControlMode.DISABLED
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, self._normalized_temperature(temp), self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, self.afternoon_cooling and before_afternoon, battery_low, forecast_low, soc, forecast, battery_discharge), timer
+        aggressive = self.control_mode is c.ControlMode.BOOST_COOLING; enabled = self.control_mode is not c.ControlMode.DISABLED
+        temperature = self._normalized_temperature(temp); temperature_available = "temperature" not in self._fallback_inputs and isfinite(temperature)
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, temperature, self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, self.afternoon_cooling and before_afternoon, battery_discharge, temperature_available), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if self._session.last is None: self._session.last = current
@@ -176,7 +179,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             elif adjustment is HomeOutput.OFF: await self._call_service("climate", "turn_off", {"entity_id": climate})
         if adjustment is HomeOutput.TIMER:
             self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION)))); self._schedule_timer_expiry()
-        elif adjustment is HomeOutput.OFF:
+        elif adjustment in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.OFF):
             self._aircon_timer_finishes_at = None; self._schedule_timer_expiry()
         if adjustment in (HomeOutput.COOL, HomeOutput.DRY): self._auto_mode = True
         elif adjustment is HomeOutput.OFF: self._auto_mode = False
@@ -234,17 +237,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if state is None or str(state.state).lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}: self._fallback_inputs[label] = "missing" if state is None else str(state.state).lower(); return None  # optional input: fail open, but record it
         return state
 
-    def _optional_float(self, conf_key: str, label: str) -> float | None:
-        return None if (state := self._optional_state(conf_key, label)) is None else self._state_to_float(state, label)
-
     def _optional_power(self, conf_key: str, label: str, *, invert: bool = False) -> float | None:
         return None if (state := self._optional_state(conf_key, label)) is None else self._normalized_power(state, label, invert=invert)
-
-    def _optional_energy_kwh(self, conf_key: str, label: str) -> float | None:
-        if (state := self._optional_state(conf_key, label)) is None: return None
-        value, unit = self._state_to_float(state, label), str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip()
-        try: return EnergyConverter.convert(value, UnitOfEnergy(unit), UnitOfEnergy.KILO_WATT_HOUR)
-        except ValueError: self._create_issue(c.ISSUE_INVALID_UNIT, {"entity_id": state.entity_id, "unit": unit or "(none)"}); raise ValueError(f"unsupported energy unit for {state.entity_id}: {unit}") from None
 
     def _normalized_temperature(self, state: State) -> float:
         value = self._state_to_float(state, "temperature"); unit = str(state.attributes.get(ATTR_UNIT_OF_MEASUREMENT, "")).strip().upper()

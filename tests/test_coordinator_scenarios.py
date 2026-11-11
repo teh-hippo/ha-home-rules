@@ -253,3 +253,74 @@ async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling
 
     assert coordinator.data.adjustment is HomeOutput.OFF
     assert coordinator._aircon_timer_finishes_at is None
+
+
+@pytest.mark.parametrize(("mode", "generation"), [("solar_cooling", "6000"), ("boost_cooling", "1")])
+async def test_automatic_cooling_stops_at_target_and_restarts_at_threshold(
+    hass, coord_factory, mode, generation
+) -> None:
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.rules import R_BELOW_THRESHOLD, R_TARGET_REACHED, HomeOutput
+
+    starts = async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(generation=generation, temperature="24")
+    await coordinator.async_set_mode(ControlMode(mode))
+    assert len(starts) == 1
+    assert coordinator.data.auto_mode
+
+    hass.states.async_set("climate.test", "cool")
+    if mode == "boost_cooling":
+        hass.states.async_set("sensor.generation", "0", {"unit_of_measurement": "W"})
+        hass.states.async_set("sensor.grid", "1500", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.temperature", "23", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert not stops
+
+    hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("manual")
+    assert len(stops) == 1
+    assert coordinator._last_record["reason"] == R_TARGET_REACHED
+    assert not coordinator.data.auto_mode
+    assert coordinator.data.timer_finishes_at is None
+    assert coordinator._timer_expiry_handle is None
+
+    hass.states.async_set("climate.test", "off")
+    hass.states.async_set("sensor.generation", generation, {"unit_of_measurement": "W"})
+    for _ in range(coordinator.parameters.reactivate_delay):
+        await coordinator.async_run_evaluation("poll")
+    hass.states.async_set("sensor.temperature", "23", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator._last_record["reason"] == R_BELOW_THRESHOLD
+    assert len(starts) == 1
+
+    hass.states.async_set("sensor.temperature", "24", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert len(starts) == 2
+    assert coordinator.data.auto_mode
+
+
+async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory) -> None:
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.rules import HomeOutput
+
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    coordinator = await coord_factory(climate="heat")
+    await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
+    assert coordinator.data.adjustment is HomeOutput.TIMER
+    assert coordinator.data.timer_finishes_at is not None
+
+    hass.states.async_set("climate.test", "off")
+    await coordinator.async_run_evaluation("poll")
+    automatic = coordinator.data
+    assert automatic.adjustment is HomeOutput.COOL
+    assert automatic.auto_mode
+    assert automatic.timer_finishes_at is None
+    assert coordinator._timer_expiry_handle is None

@@ -125,9 +125,7 @@ NUMBERS = tuple(
     for spec in (
         ("temperature_threshold", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD),
         ("temperature_cool", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL),
-        ("battery_min_soc", 0, 100, 1, "%", c.CONF_BATTERY_MIN_SOC, c.DEFAULT_BATTERY_MIN_SOC),
         ("battery_discharge_tolerance", 0, 5000, 50, "W", c.CONF_BATTERY_DISCHARGE_TOLERANCE, c.DEFAULT_BATTERY_DISCHARGE_TOLERANCE),
-        ("forecast_min_kwh", 0, 200, 1, "kWh", c.CONF_FORECAST_MIN_KWH, c.DEFAULT_FORECAST_MIN_KWH),
     )
 )
 

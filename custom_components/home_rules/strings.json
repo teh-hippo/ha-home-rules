@@ -46,15 +46,12 @@
           "grid_entity_id": "Grid usage sensor",
           "temperature_entity_id": "Temperature sensor",
           "humidity_entity_id": "Humidity sensor",
-          "battery_soc_entity_id": "Battery charge sensor (optional)",
           "battery_power_entity_id": "Battery power sensor (optional)",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
-          "forecast_entity_id": "Solar forecast remaining-energy sensor (optional)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
-          "generation_boost_threshold": "Boost threshold (W)",
           "grid_usage_delay": "Grid usage delay (evaluations)",
           "reactivate_delay": "Reactivation delay (evaluations)",
           "smoothing_window": "Smoothing window (evaluations)",
@@ -150,18 +147,15 @@
       "temperature_cool": {
         "name": "Cool Setpoint"
       },
-      "battery_min_soc": {
-        "name": "Battery Minimum Charge"
-      },
       "battery_discharge_tolerance": {
         "name": "Battery Discharge Tolerance"
-      },
-      "forecast_min_kwh": {
-        "name": "Forecast Minimum Remaining"
       }
     }
   },
   "exceptions": {
+    "invalid_temperature_range": {
+      "message": "Temperature Threshold must be higher than Cool Setpoint."
+    },
     "update_failed": {
       "message": "Failed to evaluate Home Rules: {error}"
     }

@@ -72,3 +72,30 @@ async def test_unavailable_humidity_biases_away_from_dry(coord_factory) -> None:
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
     assert coordinator._last_record["reason"] == "Humidity too low for dry mode"
+
+
+@pytest.mark.parametrize("temperature", ["unknown", "unavailable", "nan"])
+async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(hass, coord_factory, temperature) -> None:
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_TEMPERATURE_COOL, CONF_TEMPERATURE_THRESHOLD, ControlMode
+    from custom_components.home_rules.rules import R_TEMPERATURE_UNAVAILABLE, HomeOutput
+
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(
+        temperature="25", options={CONF_TEMPERATURE_THRESHOLD: 24, CONF_TEMPERATURE_COOL: 23.95}
+    )
+    await coordinator.async_set_mode(ControlMode.BOOST_COOLING)
+    hass.states.async_set("climate.test", "cool")
+    hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == R_TEMPERATURE_UNAVAILABLE
+    assert not stops
+
+    hass.states.async_set("climate.test", "off")
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == R_TEMPERATURE_UNAVAILABLE

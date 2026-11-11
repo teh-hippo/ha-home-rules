@@ -56,14 +56,8 @@
       "temperature_cool": {
         "default": "mdi:thermometer-chevron-down"
       },
-      "battery_min_soc": {
-        "default": "mdi:battery-lock"
-      },
       "battery_discharge_tolerance": {
         "default": "mdi:battery-arrow-down"
-      },
-      "forecast_min_kwh": {
-        "default": "mdi:weather-sunny-alert"
       }
     }
   }
