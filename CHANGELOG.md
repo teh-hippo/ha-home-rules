@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v4.0.1 (2026-11-13)
+
+### Bug Fixes
+
+- Prevent unwanted cooling restarts after solar fades
+  ([`7328e2f`](https://github.com/teh-hippo/ha-home-rules/commit/7328e2f0cae368b1c1b4f18d25fdbd84d04879bb))
+
+### Additional Release Information
+
+- Automatic battery/grid use now permits bounded continuation of solar-started runs only. It no
+  longer starts cooling without sufficient solar. Manual cooling retains its separate timer.
+
+
 ## v4.0.0 (2026-11-13)
 
 ### Features
