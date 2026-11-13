@@ -79,6 +79,7 @@ async def test_window_boundaries_evaluate_without_waiting_for_poll(hass, coord_f
     assert not starts
 
     freezer.move_to(f"2026-11-13T14:00:00{offset}")
+    hass.states.async_set("sensor.temperature", "24", {"unit_of_measurement": "°C"})
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
     assert len(starts) == 1

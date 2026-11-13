@@ -132,6 +132,12 @@ async def test_precooling_window_sets_and_maintains_target_then_returns_to_comfo
 
     now = now.replace(hour=14, minute=0)
     await coordinator.async_run_evaluation("poll")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == "Temperature below threshold"
+    assert not cooling_calls
+
+    hass.states.async_set("sensor.temperature", "24", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
     afternoon = coordinator.data
     assert afternoon.adjustment is HomeOutput.COOL
     assert len(cooling_calls) == 1

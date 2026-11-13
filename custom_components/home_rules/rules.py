@@ -125,9 +125,6 @@ class RuleParameters:
     def precooling_range_valid(self) -> bool:
         return isfinite(self.temperature_precool) and self.temperature_precool <= self.temperature_cool
 
-    def start_temperature(self, home: HomeInput) -> float:
-        return self.temperature_precool + 1.0 if home.pre_cooling else self.temperature_threshold
-
 
 @dataclass
 class CachedState:
@@ -237,7 +234,7 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
         return R_GRID_TOO_HIGH
     if home.temperature <= (config.temperature_precool if home.pre_cooling else config.temperature_cool):
         return R_BELOW_COOL_SETPOINT
-    if home.temperature < config.start_temperature(home):
+    if home.temperature < config.temperature_threshold:
         return R_BELOW_THRESHOLD
     return activation or default
 
@@ -330,7 +327,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             and config.temperature_range_valid
             and (not h.pre_cooling or config.precooling_range_valid)
             and h.temperature_available
-            and h.temperature >= config.start_temperature(h)
+            and h.temperature >= config.temperature_threshold
             and target.output is not None
         ):
             state.solar_run_eligible = True

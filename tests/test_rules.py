@@ -361,14 +361,17 @@ class TestAdjustOffSolar:
         )
         assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
 
-    def test_precooling_starts_below_normal_start_temperature(self):
+    @pytest.mark.parametrize("temperature", [21, 23.9, 24])
+    @pytest.mark.parametrize("generation,mode,reason", [(6000, OUT.COOL, R_SOLAR_COOL), (3500, OUT.DRY, R_SOLAR_DRY)])
+    def test_precooling_respects_normal_start_temperature(self, temperature, generation, mode, reason):
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(generation=6000, humidity=65, temperature=21, pre_cooling=True),
+            home(generation=generation, humidity=65, temperature=temperature, pre_cooling=True, auto=True),
             state,
         )
-        assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
+        expected = AdjustResult(mode, reason) if temperature >= 24 else AdjustResult(OUT.OFF, R_BELOW_THRESHOLD)
+        assert r == expected
 
     def test_high_humidity_does_not_block_cool(self):
         """High humidity should not force DRY when COOL solar is available."""
@@ -1307,16 +1310,6 @@ def test_unavailable_temperature_prevents_start_and_mode_upgrade():
 def test_solar_only_does_not_start_while_importing():
     result = adjust(TEST_PARAMS, home(generation=6000, grid_usage=500), CachedState())
     assert result == AdjustResult(OUT.NO_CHANGE, R_GRID_TOO_HIGH)
-
-
-@pytest.mark.parametrize("boost", [False, True])
-def test_precooling_restart_gap_prevents_starting_at_target(boost):
-    result = adjust(
-        TEST_PARAMS,
-        home(pre_cooling=True, temperature=20.5, generation=6000, allow_paid_power=boost),
-        CachedState(),
-    )
-    assert result == AdjustResult(OUT.NO_CHANGE, R_BELOW_THRESHOLD)
 
 
 class TestAdjustManualFreeSolar:

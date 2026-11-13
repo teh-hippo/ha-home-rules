@@ -81,7 +81,8 @@ Enable it to use **Pre-cooling Temperature** (default 20°C) during the local-ti
 - `time.home_rules_pre_cooling_start`: defaults to **14:00**.
 - `time.home_rules_pre_cooling_finish`: defaults to **17:00**.
 
-Pre-cooling can start 1°C above its target, below the normal Start Temperature.
+Automatic starts always require the configured Start Temperature (default 24°C), including during pre-cooling.
+The lower pre-cooling target only applies after cooling starts.
 It lets the aircon maintain that target until the window ends, subject to Automatic Power Use.
 The target-stop and automatic target-notification switches apply outside the pre-cooling window; power limits still apply throughout it.
 Outside the window, the target returns to Comfort Temperature unless you adjusted the aircon setpoint during the run.
