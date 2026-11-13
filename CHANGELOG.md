@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v4.0.0 (2026-11-13)
+
+### Features
+
+- Separate temperature stops and cooling notifications
+  ([`a68cadd`](https://github.com/teh-hippo/ha-home-rules/commit/a68cadd611278b272baba8c47825a8bb216f50de))
+
+### Breaking Changes
+
+- Manual cooling target behaviour is replaced by Stop at Comfort Temperature and Automatic Target
+  Notifications switches. Auto off migrates to target stopping enabled; Timer and Ask migrate to
+  disabled. Automatic and manual target stopping now follows this switch rather than the power
+  policy, with automatic pre-cooling exempt until its window ends. Automatic target notifications
+  default on; manual target alerts remain enabled.
+
+
 ## v3.0.0 (2026-11-13)
 
 ### Features
