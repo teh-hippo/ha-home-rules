@@ -17,5 +17,7 @@ async def test_diagnostics_contains_expected_sections(hass, loaded_entry) -> Non
     assert diagnostics["controls"]["mode"] == "monitor"
     assert diagnostics["controls"]["dry_mode_enabled"] is True
     assert diagnostics["controls"]["afternoon_cooling"] is False
+    assert diagnostics["controls"]["stop_at_comfort_temperature"] is False
+    assert diagnostics["controls"]["automatic_target_notifications"] is True
     assert diagnostics["policy"]["dry_mode_humidity_cutoff"] == 65.0
     assert isinstance(diagnostics["recent_evaluations"], list)

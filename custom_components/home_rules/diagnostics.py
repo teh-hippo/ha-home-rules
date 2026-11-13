@@ -18,6 +18,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "cooling_enabled": coordinator.cooling_enabled,
             "dry_mode_enabled": coordinator.dry_mode_enabled,
             "afternoon_cooling": coordinator.afternoon_cooling,
+            "stop_at_comfort_temperature": coordinator.stop_at_comfort_temperature,
+            "automatic_target_notifications": coordinator.automatic_target_notifications,
             "power_policy": coordinator.power_policy.value,
             "pre_cooling_start": coordinator.pre_cooling_start.isoformat(),
             "pre_cooling_finish": coordinator.pre_cooling_finish.isoformat(),

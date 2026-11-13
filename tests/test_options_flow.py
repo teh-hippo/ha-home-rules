@@ -78,17 +78,16 @@ async def test_options_flow_validates_entities(hass, mock_entry) -> None:
     assert result["errors"] == {"base": "entity_not_found"}
 
 
-@pytest.mark.parametrize("behaviour", ["timer", "ask", "stop"])
-async def test_options_flow_sets_manual_cooling_behaviour(hass, mock_entry, behaviour) -> None:
+async def test_target_behaviour_is_no_longer_an_options_selector(hass, mock_entry) -> None:
     from custom_components.home_rules.const import CONF_MANUAL_COOLING_BEHAVIOUR
 
+    hass.config_entries.async_update_entry(mock_entry, options={CONF_MANUAL_COOLING_BEHAVIOUR: "ask"})
     result = await hass.config_entries.options.async_init(mock_entry.entry_id)
-    user_input = _valid_options_input()
-    user_input[CONF_MANUAL_COOLING_BEHAVIOUR] = behaviour
-    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+    assert CONF_MANUAL_COOLING_BEHAVIOUR not in {str(key) for key in result["data_schema"].schema}
+    result = await hass.config_entries.options.async_configure(result["flow_id"], _valid_options_input())
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_MANUAL_COOLING_BEHAVIOUR] == behaviour
+    assert CONF_MANUAL_COOLING_BEHAVIOUR not in result["data"]
 
 
 async def test_options_flow_accepts_tariff_selector_and_clears_it_by_omission(hass, mock_entry) -> None:

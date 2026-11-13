@@ -264,6 +264,7 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     async_mock_service(hass, "climate", "set_temperature")
     stops = async_mock_service(hass, "climate", "turn_off")
     coordinator = await coord_factory(generation="6000", temperature="24")
+    coordinator.stop_at_comfort_temperature = True
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     assert len(starts) == 1
     assert coordinator.data.auto_mode

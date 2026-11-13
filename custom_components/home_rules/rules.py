@@ -6,8 +6,8 @@ The engine evaluates environmental inputs and produces adjustment decisions.
 Decision tree (high-level):
   1. Disabled → report DISABLED
   2. Unknown aircon mode → NO_CHANGE
-  3. Solar-only cooling outside pre-cooling at target → OFF
-  4. Manual cooling on paid power/timer → apply manual target behaviour and timer cap
+  3. Automatic cooling disabled, or target-stop enabled at target → OFF
+  4. Manual cooling on paid power/timer → apply timer cap
   5. Reactivation delay active → NO_CHANGE (countdown)
   6. Aircon OFF → evaluate temperature and solar eligibility
   7. Battery/grid permitted → maintain the cooling target
@@ -73,12 +73,6 @@ class HomeOutput(StrEnum):
     RESET = "Reset"
 
 
-class ManualCoolingBehaviour(StrEnum):
-    TIMER = "timer"
-    ASK = "ask"
-    STOP = "stop"
-
-
 OUT = HomeOutput
 
 
@@ -110,7 +104,7 @@ class RuleParameters:
     grid_usage_delay: int
     reactivate_delay: int
     temperature_cool: float
-    manual_cooling_behaviour: ManualCoolingBehaviour = ManualCoolingBehaviour.ASK
+    stop_at_comfort_temperature: bool = False
     temperature_precool: float = 20.0
 
     @property
@@ -184,10 +178,10 @@ def _evaluate_target_mode(config: RuleParameters, home: HomeInput) -> TargetResu
 
     # Solar DRY: generation above dry threshold, if dry mode is allowed and useful.
     if h.generation >= config.generation_dry_threshold:
-        if h.aircon_mode == AirconMode.DRY:
-            return TargetResult(None, R_ALREADY_DRYING, False)
         if not config.dry_mode_enabled:
             return TargetResult(None, R_DRY_DISABLED, True)
+        if h.aircon_mode == AirconMode.DRY:
+            return TargetResult(None, R_ALREADY_DRYING, False)
         if h.humidity < config.dry_mode_humidity_cutoff:
             return TargetResult(None, R_HUMIDITY_TOO_LOW, True)
         return TargetResult(HomeOutput.DRY, R_SOLAR_DRY, True)
@@ -243,11 +237,14 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         return AdjustResult(out, R_DISABLED)
     if h.aircon_mode == AirconMode.UNKNOWN:
         return AdjustResult(HomeOutput.NO_CHANGE, R_UNKNOWN_MODE)
+    if h.auto and not h.cooling_enabled and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY):
+        state.tolerated = 0
+        state.reactivate_delay = config.reactivate_delay
+        return AdjustResult(HomeOutput.OFF, R_COOLING_DISABLED)
     if (
-        h.auto
-        and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
-        and not h.allow_paid_power
-        and not h.pre_cooling
+        h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
+        and config.stop_at_comfort_temperature
+        and not (h.auto and h.pre_cooling)
         and h.temperature_available
         and h.temperature <= config.temperature_cool
     ):
@@ -259,21 +256,26 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return AdjustResult(HomeOutput.OFF, R_TIMER_EXPIRED)
         if h.timer or not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0:
             state.tolerated = 0
-            if (
-                config.manual_cooling_behaviour is ManualCoolingBehaviour.STOP
-                and h.temperature_available
-                and h.temperature <= config.temperature_cool
-            ):
-                state.reactivate_delay = config.reactivate_delay
-                return AdjustResult(HomeOutput.OFF, R_TARGET_REACHED)
             if h.timer:
                 return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
             return AdjustResult(HomeOutput.TIMER, R_MANUAL)
+
+    target = _evaluate_target_mode(config, h)
+    if h.auto and h.aircon_mode is AirconMode.DRY and not config.dry_mode_enabled:
+        if (
+            target.output is HomeOutput.COOL
+            and h.temperature_available
+            and (h.allow_paid_power or (h.grid_usage <= 0 and h.battery_discharge <= 0))
+        ):
+            state.tolerated = 0
+            return AdjustResult(target.output, target.reason)
+        state.tolerated = 0
+        state.reactivate_delay = config.reactivate_delay
+        return AdjustResult(HomeOutput.OFF, R_DRY_DISABLED)
     if state.reactivate_delay:
         state.reactivate_delay -= 1
         return AdjustResult(HomeOutput.NO_CHANGE, R_REACTIVATE_WAIT)
 
-    target = _evaluate_target_mode(config, h)
     activation = target.reason if target.is_actionable else None
 
     # --- Aircon is OFF ---
@@ -316,13 +318,10 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
 
     # --- Cooling run + grid draw (or no solar) ---
     if h.auto and (not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0):
-        # If a mode transition is available (e.g. COOL→DRY downgrade), apply immediately.
-        if target.output is not None and h.temperature_available and h.battery_discharge <= 0:
-            state.tolerated = 0
-            return AdjustResult(target.output, target.reason)
-        # Solar: tolerate briefly, then shut off.
         state.tolerated += 1
         if state.tolerated < config.grid_usage_delay:
+            if target.output is not None and h.temperature_available and h.battery_discharge <= 0:
+                return AdjustResult(target.output, target.reason)
             return AdjustResult(
                 HomeOutput.NO_CHANGE, R_BATTERY_TOLERATED if h.battery_discharge > 0 else R_GRID_TOLERATED
             )

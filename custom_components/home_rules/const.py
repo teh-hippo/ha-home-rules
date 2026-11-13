@@ -4,8 +4,6 @@ from logging import Logger, getLogger
 
 from homeassistant.const import Platform as Plat
 
-from .rules import ManualCoolingBehaviour
-
 LOGGER: Logger = getLogger(__package__)
 DOMAIN = "home_rules"
 
@@ -40,6 +38,8 @@ CONF_TEMPERATURE_PRECOOL = "temperature_precool"
 CONF_EVAL_INTERVAL, CONF_AIRCON_TIMER_DURATION = "eval_interval", "aircon_timer_duration"
 CONF_NOTIFICATION_SERVICE, CONF_SMOOTHING_WINDOW = "notification_service", "smoothing_window"
 CONF_MANUAL_COOLING_BEHAVIOUR = "manual_cooling_behaviour"
+CONF_STOP_AT_COMFORT_TEMPERATURE = "stop_at_comfort_temperature"
+CONF_AUTOMATIC_TARGET_NOTIFICATIONS = "automatic_target_notifications"
 CONF_GRID_INVERT = "grid_invert"
 CONF_BATTERY_POWER_ENTITY_ID = "battery_power_entity_id"
 CONF_BATTERY_INVERT = "battery_invert"
@@ -67,7 +67,6 @@ DEFAULT_OPTIONS: dict[str, int | float | str] = {
     CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
     CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
     CONF_SMOOTHING_WINDOW: DEFAULT_SMOOTHING_WINDOW,
-    CONF_MANUAL_COOLING_BEHAVIOUR: ManualCoolingBehaviour.ASK,
 }
 
 MAX_RECENT_EVALUATIONS, STORAGE_VERSION = 50, 1

@@ -111,7 +111,7 @@ async def test_timer_notification_response(hass, manual_timer, monkeypatch, choi
     await hass.async_block_till_done()
     assert len(notifications) == count
     assert len(off_calls) == (1 if choice == "off" else 0)
-    assert coordinator._timer_prompt_id is None
+    assert coordinator._target_prompt_id is None
 
 
 async def test_ignored_target_prompt_still_expires_at_original_deadline(hass, manual_timer, monkeypatch) -> None:
@@ -181,8 +181,8 @@ async def test_failed_target_notification_is_persisted_as_unsent_and_retried(has
     stored = await coordinator._store.async_load()
 
     assert stored is not None
-    assert not stored["timer_target_notified"]
-    assert stored["timer_prompt_id"] is None
+    assert not stored["target_notified"]
+    assert stored["target_prompt_id"] is None
     assert stored["aircon_timer_finishes_at"] == deadline.isoformat()
     assert not off_calls
 
@@ -190,11 +190,12 @@ async def test_failed_target_notification_is_persisted_as_unsent_and_retried(has
     await coordinator.async_run_evaluation("poll")
     await coordinator.async_run_evaluation("poll")
     assert len(attempts) == 2
-    assert coordinator._timer_target_notified
+    assert coordinator._target_notified
     assert coordinator.data.timer_finishes_at == deadline
 
 
-async def test_target_prompt_and_response_survive_restart(hass, manual_timer) -> None:
+@pytest.mark.parametrize("legacy_storage", [False, True])
+async def test_target_prompt_and_response_survive_restart(hass, manual_timer, legacy_storage) -> None:
     from custom_components.home_rules.const import EVENT_NOTIFICATION_ACTION
     from custom_components.home_rules.coordinator import HomeRulesCoordinator
 
@@ -203,6 +204,11 @@ async def test_target_prompt_and_response_survive_restart(hass, manual_timer) ->
     await coordinator.async_run_evaluation("poll")
     action = notifications[-1].data["data"]["actions"][0]["action"]
     deadline = coordinator.data.timer_finishes_at
+    if legacy_storage:
+        stored = await coordinator._store.async_load()
+        stored["timer_target_notified"] = stored.pop("target_notified")
+        stored["timer_prompt_id"] = stored.pop("target_prompt_id")
+        await coordinator._store.async_save(stored)
     await coordinator.async_shutdown()
 
     restored = HomeRulesCoordinator(hass, coordinator.config_entry)
@@ -293,4 +299,64 @@ async def test_manual_timer_non_interactive_modes(hass, coord_factory, behaviour
 
     assert bool(off_calls) is stops
     assert coordinator.data.timer_finishes_at == (None if stops else deadline)
-    assert all("data" not in call.data for call in notifications)
+    assert notifications[-1].data["title"] == "Aircon target reached"
+    assert ("data" in notifications[-1].data) is not stops
+
+
+@pytest.mark.parametrize("notify", [False, True])
+@pytest.mark.parametrize("stop", [False, True])
+async def test_automatic_target_alert_is_optional_information_only(hass, coord_factory, notify, stop) -> None:
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE, ControlMode, PowerPolicy
+
+    notifications = async_mock_service(hass, "notify", "mobile_app_test")
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(generation="0", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"})
+    coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
+    coordinator.stop_at_comfort_temperature = stop
+    coordinator.automatic_target_notifications = notify
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    hass.states.async_set("climate.test", "cool", {"temperature": 22})
+    hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    await coordinator.async_run_evaluation("poll")
+    if not stop:
+        await coordinator.async_run_evaluation("poll")
+
+    target_alerts = [call for call in notifications if call.data["title"] == "Aircon target reached"]
+    assert len(target_alerts) == int(notify)
+    assert all("data" not in call.data for call in target_alerts)
+    assert bool(stops) is stop
+    assert coordinator.data.timer_finishes_at is None
+
+
+@pytest.mark.parametrize("stop", [False, True])
+async def test_free_manual_target_alert_ignores_automatic_notification_switch(hass, coord_factory, stop) -> None:
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE, EVENT_NOTIFICATION_ACTION, ControlMode
+    from custom_components.home_rules.rules import HomeOutput
+
+    notifications = async_mock_service(hass, "notify", "mobile_app_test")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(climate="cool", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"})
+    coordinator.automatic_target_notifications = False
+    coordinator.stop_at_comfort_temperature = stop
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    initial = coordinator.data
+    assert initial.timer_finishes_at is None
+    hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert notifications[-1].data["title"] == "Aircon target reached"
+    assert bool(stops) is stop
+    if not stop:
+        actions = notifications[-1].data["data"]["actions"]
+        action = next(item["action"] for item in actions if item["title"] == "5 mins")
+        hass.bus.async_fire(EVENT_NOTIFICATION_ACTION, {"action": action})
+        await hass.async_block_till_done()
+        assert coordinator.data.mode is HomeOutput.TIMER
+        assert coordinator.data.timer_finishes_at is not None
+        assert not coordinator.data.auto_mode

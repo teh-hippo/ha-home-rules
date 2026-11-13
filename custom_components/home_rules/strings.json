@@ -52,7 +52,6 @@
           "peak_tariff": "Peak tariff state",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
-          "manual_cooling_behaviour": "Manual cooling target behaviour",
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
@@ -62,15 +61,6 @@
           "grid_invert": "Grid sensor reports export as positive (invert sign)",
           "notification_service": "Notification service (optional)"
         }
-      }
-    }
-  },
-  "selector": {
-    "manual_cooling_behaviour": {
-      "options": {
-        "timer": "Timer",
-        "ask": "Ask",
-        "stop": "Auto off"
       }
     }
   },
@@ -151,6 +141,12 @@
       },
       "afternoon_cooling": {
         "name": "Afternoon Pre-cooling"
+      },
+      "stop_at_comfort_temperature": {
+        "name": "Stop at Comfort Temperature"
+      },
+      "automatic_target_notifications": {
+        "name": "Automatic Target Notifications"
       }
     },
     "button": {

@@ -42,7 +42,6 @@ from custom_components.home_rules.rules import (
     CachedState,
     HomeInput,
     HomeOutput,
-    ManualCoolingBehaviour,
     RuleParameters,
     TargetResult,
     _evaluate_target_mode,
@@ -667,7 +666,7 @@ class TestAdjustOnGridAutoSolar:
             state,
         )
         assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
-        assert state.tolerated == 0
+        assert state.tolerated == 1
 
     def test_tolerance_counter_below_delay(self):
         """Tolerance counter < delay -> NO_CHANGE R_GRID_TOLERATED."""
@@ -1092,7 +1091,7 @@ class TestLifecycleScenarios:
         )
         assert r1 == AdjustResult(OUT.DRY, R_SOLAR_DRY)
 
-        # DRY, gen drops below dry -> tolerance cycle -> OFF
+        # A mode change cannot reset the paid-power allowance.
         r2 = adjust(
             TEST_PARAMS,
             home(
@@ -1103,19 +1102,7 @@ class TestLifecycleScenarios:
             ),
             state,
         )
-        assert r2.reason == R_GRID_TOLERATED
-
-        r3 = adjust(
-            TEST_PARAMS,
-            home(
-                aircon_mode=AirconMode.DRY,
-                generation=2000,
-                grid_usage=100,
-                auto=True,
-            ),
-            state,
-        )
-        assert r3 == AdjustResult(OUT.OFF, R_GRID_TOO_HIGH)
+        assert r2 == AdjustResult(OUT.OFF, R_GRID_TOO_HIGH)
 
     def test_boost_lifecycle(self):
         """Boost starts on solar, finishes without it, then stays off below the start threshold."""
@@ -1431,7 +1418,7 @@ class TestReasonConstants:
 def test_automatic_target_stop_precedes_power_and_mode_changes(mode, boost, generation, grid, discharge, temperature):
     state = CachedState(tolerated=1, reactivate_delay=1)
     result = adjust(
-        TEST_PARAMS,
+        replace(TEST_PARAMS, stop_at_comfort_temperature=True),
         home(
             aircon_mode=mode,
             auto=True,
@@ -1514,9 +1501,9 @@ class TestAdjustManualFreeSolar:
 
 @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
 @pytest.mark.parametrize("boost", [False, True])
-@pytest.mark.parametrize("behaviour", list(ManualCoolingBehaviour))
-def test_manual_timer_target_behaviour_overrides_battery_guard(mode, boost, behaviour):
-    params = replace(TEST_PARAMS, manual_cooling_behaviour=behaviour)
+@pytest.mark.parametrize("stop_at_target", [False, True])
+def test_manual_timer_target_behaviour_overrides_battery_guard(mode, boost, stop_at_target):
+    params = replace(TEST_PARAMS, stop_at_comfort_temperature=stop_at_target)
     state = CachedState(last=OUT.TIMER, reactivate_delay=2)
     result = adjust(
         params,
@@ -1531,19 +1518,87 @@ def test_manual_timer_target_behaviour_overrides_battery_guard(mode, boost, beha
         ),
         state,
     )
-    expected = OUT.OFF if behaviour is ManualCoolingBehaviour.STOP else OUT.NO_CHANGE
+    expected = OUT.OFF if stop_at_target else OUT.NO_CHANGE
     assert result.output is expected
     assert result.reason == (R_TARGET_REACHED if expected is OUT.OFF else R_NO_CHANGE)
 
 
 def test_manual_stop_at_target_requires_available_temperature():
-    params = replace(TEST_PARAMS, manual_cooling_behaviour=ManualCoolingBehaviour.STOP)
+    params = replace(TEST_PARAMS, stop_at_comfort_temperature=True)
     result = adjust(
         params,
         home(aircon_mode=AirconMode.COOL, timer=True, temperature=20, temperature_available=False),
         CachedState(last=OUT.TIMER),
     )
     assert result == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+
+
+@pytest.mark.parametrize("auto", [False, True])
+@pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
+def test_disabling_cooling_stops_only_automatic_runs(auto, mode):
+    result = adjust(
+        TEST_PARAMS,
+        home(aircon_mode=mode, auto=auto, cooling_enabled=False, generation=6000),
+        CachedState(),
+    )
+    assert result.output is (OUT.OFF if auto else OUT.NO_CHANGE)
+    if auto:
+        assert result.reason == R_COOLING_DISABLED
+
+
+@pytest.mark.parametrize(
+    ("auto", "generation", "paid", "grid", "temperature_available", "expected"),
+    [
+        (True, 6000, False, 0, True, OUT.COOL),
+        (True, 4000, False, 0, True, OUT.OFF),
+        (True, 0, True, 500, True, OUT.COOL),
+        (True, 6000, False, 500, True, OUT.OFF),
+        (True, 6000, False, 0, False, OUT.OFF),
+        (False, 4000, False, 0, True, OUT.NO_CHANGE),
+    ],
+)
+def test_disabling_dry_rechecks_cool_eligibility(auto, generation, paid, grid, temperature_available, expected):
+    result = adjust(
+        replace(TEST_PARAMS, dry_mode_enabled=False),
+        home(
+            aircon_mode=AirconMode.DRY,
+            auto=auto,
+            generation=generation,
+            have_solar=generation > 0,
+            allow_paid_power=paid,
+            grid_usage=grid,
+            temperature_available=temperature_available,
+        ),
+        CachedState(),
+    )
+    assert result.output is expected
+
+
+@pytest.mark.parametrize(
+    ("auto", "paid", "stop", "precool", "expected"),
+    [
+        (True, False, False, False, OUT.NO_CHANGE),
+        (True, False, True, False, OUT.OFF),
+        (True, True, True, False, OUT.OFF),
+        (False, False, True, False, OUT.OFF),
+        (True, True, True, True, OUT.NO_CHANGE),
+        (True, False, True, True, OUT.NO_CHANGE),
+    ],
+)
+def test_target_stop_is_independent_of_power_and_preserves_precooling(auto, paid, stop, precool, expected):
+    result = adjust(
+        replace(TEST_PARAMS, stop_at_comfort_temperature=stop),
+        home(
+            aircon_mode=AirconMode.COOL,
+            auto=auto,
+            allow_paid_power=paid,
+            pre_cooling=precool,
+            generation=6000,
+            temperature=20,
+        ),
+        CachedState(),
+    )
+    assert result.output is expected
 
 
 class TestManualOvernightCapLifecycle:

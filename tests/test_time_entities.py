@@ -25,6 +25,12 @@ async def test_time_and_power_controls_persist_across_reload(hass, loaded_entry)
         {"entity_id": "number.home_rules_temperature_precool", "value": 21},
         blocking=True,
     )
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": "switch.home_rules_stop_at_comfort_temperature"}, blocking=True
+    )
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": "switch.home_rules_automatic_target_notifications"}, blocking=True
+    )
 
     assert await hass.config_entries.async_reload(loaded_entry.entry_id)
     await hass.async_block_till_done()
@@ -33,6 +39,8 @@ async def test_time_and_power_controls_persist_across_reload(hass, loaded_entry)
     assert hass.states.get("time.home_rules_pre_cooling_finish").state == "17:30:00"
     assert hass.states.get("select.home_rules_power_policy").state == "allow_battery_grid"
     assert hass.states.get("number.home_rules_temperature_precool").state == "21.0"
+    assert hass.states.get("switch.home_rules_stop_at_comfort_temperature").state == "on"
+    assert hass.states.get("switch.home_rules_automatic_target_notifications").state == "off"
 
 
 @pytest.mark.parametrize(
@@ -65,6 +73,7 @@ async def test_window_boundaries_evaluate_without_waiting_for_poll(hass, coord_f
     targets = async_mock_service(hass, "climate", "set_temperature")
     stops = async_mock_service(hass, "climate", "turn_off")
     coordinator = await coord_factory(temperature="23")
+    coordinator.stop_at_comfort_temperature = True
     await coordinator.async_set_control("afternoon_cooling", True)
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     assert not starts
@@ -106,6 +115,7 @@ async def test_tariff_change_immediately_ends_precooling(hass, coord_factory, fr
     async_mock_service(hass, "climate", "set_temperature")
     stops = async_mock_service(hass, "climate", "turn_off")
     coordinator = await coord_factory(temperature="23", options={CONF_TARIFF_ENTITY_ID: "select.tariff"})
+    coordinator.stop_at_comfort_temperature = True
     await coordinator.async_set_control("afternoon_cooling", True)
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     assert coordinator._last_record.get("pre_cooling") is True
@@ -145,3 +155,22 @@ async def test_legacy_modes_and_afternoon_hour_migrate(coord_factory, legacy_mod
     stored = await coordinator._store.async_load()
     assert stored["controls"]["mode"] == "automatic"
     assert stored["controls"]["power_policy"] == policy
+
+
+@pytest.mark.parametrize(("behaviour", "stop"), [("timer", False), ("ask", False), ("stop", True)])
+async def test_legacy_target_behaviour_migrates_to_independent_controls(coord_factory, behaviour, stop) -> None:
+    from custom_components.home_rules.const import (
+        CONF_AUTOMATIC_TARGET_NOTIFICATIONS,
+        CONF_MANUAL_COOLING_BEHAVIOUR,
+        CONF_STOP_AT_COMFORT_TEMPERATURE,
+    )
+
+    coordinator = await coord_factory(options={CONF_MANUAL_COOLING_BEHAVIOUR: behaviour})
+    assert coordinator.stop_at_comfort_temperature is stop
+    assert coordinator.automatic_target_notifications
+    await coordinator.async_set_control(CONF_STOP_AT_COMFORT_TEMPERATURE, not stop)
+    await coordinator.async_set_control(CONF_AUTOMATIC_TARGET_NOTIFICATIONS, False)
+    await coordinator.async_shutdown()
+    await coordinator.async_initialize()
+    assert coordinator.stop_at_comfort_temperature is not stop
+    assert not coordinator.automatic_target_notifications

@@ -45,6 +45,12 @@
       },
       "afternoon_cooling": {
         "default": "mdi:weather-sunset"
+      },
+      "stop_at_comfort_temperature": {
+        "default": "mdi:thermometer-check"
+      },
+      "automatic_target_notifications": {
+        "default": "mdi:bell-outline"
       }
     },
     "button": {

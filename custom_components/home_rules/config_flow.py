@@ -11,7 +11,6 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.selector import SelectOptionDict
 
 from . import const as c
-from .rules import ManualCoolingBehaviour
 
 _PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number", "time")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)
@@ -84,7 +83,7 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors = _validate_entities(self.hass, user_input, [*_OPTIONS_ENTITY_FIELDS, *(k for k in c.OPTIONAL_ENTITY_KEYS if user_input.get(k))]) if user_input else {}
-        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k not in c.RETIRED_CONFIG_KEYS}, **user_input})  # optional entities are cleared by omission
+        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k not in c.RETIRED_CONFIG_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional entities are cleared by omission
         cur = self.config_entry.options
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
@@ -93,6 +92,5 @@ class HomeRulesOptionsFlow(OptionsFlow):
         schema[vol.Optional(c.CONF_BATTERY_INVERT, default=bool(cur.get(c.CONF_BATTERY_INVERT, False)))] = selector.BooleanSelector()
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
         schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()
-        schema[vol.Optional(c.CONF_MANUAL_COOLING_BEHAVIOUR, default=cur.get(c.CONF_MANUAL_COOLING_BEHAVIOUR, ManualCoolingBehaviour.ASK))] = selector.SelectSelector(selector.SelectSelectorConfig(options=list(ManualCoolingBehaviour), translation_key=c.CONF_MANUAL_COOLING_BEHAVIOUR))
         schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=cur.get(c.CONF_NOTIFICATION_SERVICE, ""))] = selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)

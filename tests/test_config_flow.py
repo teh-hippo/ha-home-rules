@@ -72,7 +72,6 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_GRID_ENTITY_ID,
         CONF_GRID_USAGE_DELAY,
         CONF_HUMIDITY_ENTITY_ID,
-        CONF_MANUAL_COOLING_BEHAVIOUR,
         CONF_REACTIVATE_DELAY,
         CONF_SMOOTHING_WINDOW,
         CONF_TEMPERATURE_ENTITY_ID,
@@ -111,7 +110,6 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
         CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
         CONF_SMOOTHING_WINDOW: DEFAULT_SMOOTHING_WINDOW,
-        CONF_MANUAL_COOLING_BEHAVIOUR: "ask",
     }
 
 

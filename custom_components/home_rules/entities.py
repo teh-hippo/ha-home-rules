@@ -43,7 +43,7 @@ BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
     BinarySensorEntityDescription(key="auto_mode", translation_key="auto_mode", entity_category=_DIAG),
 )
-SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", "afternoon_cooling"))
+SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", "afternoon_cooling", c.CONF_STOP_AT_COMFORT_TEMPERATURE, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS))
 
 
 class HomeRulesEntity(CoordinatorEntity[HomeRulesCoordinator]):

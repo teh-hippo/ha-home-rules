@@ -23,6 +23,8 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
         "switch.home_rules_cooling_enabled",
         "switch.home_rules_dry_mode_enabled",
         "switch.home_rules_afternoon_cooling",
+        "switch.home_rules_stop_at_comfort_temperature",
+        "switch.home_rules_automatic_target_notifications",
         "button.home_rules_evaluate_now",
         "time.home_rules_pre_cooling_start",
         "time.home_rules_pre_cooling_finish",
@@ -39,6 +41,8 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
     assert hass.states.get("switch.home_rules_cooling_enabled").state == "on"
     assert hass.states.get("switch.home_rules_dry_mode_enabled").state == "on"
     assert hass.states.get("switch.home_rules_afternoon_cooling").state == "off"
+    assert hass.states.get("switch.home_rules_stop_at_comfort_temperature").state == "off"
+    assert hass.states.get("switch.home_rules_automatic_target_notifications").state == "on"
 
 
 async def test_all_entities_use_translation_key_not_name(hass, loaded_entry) -> None:

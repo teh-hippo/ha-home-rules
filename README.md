@@ -38,9 +38,9 @@ Switch to **Automatic** once you are happy with decisions and want the integrati
 
 - **Solar only** (default): use generation thresholds to choose Cool or Dry; do not start while importing or discharging the battery beyond its tolerance.
   Existing automatic runs tolerate brief battery discharge or grid import, then stop after the configured **Paid-power tolerance**.
-  Outside pre-cooling, reaching **Comfort Temperature** also stops the run, leaving remaining solar available for battery charging.
-- **Allow battery and grid**: start Cool without requiring solar and let the aircon maintain the selected temperature, including overnight.
-  This explicitly permits ongoing energy spending until you change the policy or turn the aircon off.
+  Cool/Dry mode changes do not reset that tolerance.
+- **Allow battery and grid**: start Cool without requiring solar, including overnight and during peak tariffs.
+  This explicitly permits energy spending; the independent target-stop setting determines whether reaching Comfort Temperature stops cooling.
   Home Rules does not enforce a battery charge reserve; inverter protections remain external.
 
 **Temperature control.** Normal automatic starts use **Start Temperature** (default 24°C).
@@ -48,6 +48,24 @@ Switch to **Automatic** once you are happy with decisions and want the integrati
 Start Temperature must be higher than Comfort Temperature to avoid repeated starts near the target.
 The existing `number.home_rules_temperature_threshold` and `number.home_rules_cool_setpoint` entity IDs are retained.
 An unavailable temperature sensor prevents automatic starts and cannot be treated as proof that the target has been reached.
+
+Two independent device switches control what happens when the house reaches Comfort Temperature:
+
+- **Stop at Comfort Temperature** (`switch.home_rules_stop_at_comfort_temperature`): stops automatic and manual Cool/Dry runs at the target when on.
+  When off, cooling continues under the existing power rules and any manual timer cap.
+- **Automatic Target Notifications** (`switch.home_rules_automatic_target_notifications`): enables information-only target-reached alerts for automatic runs, regardless of time.
+  Manual target-reached alerts are always enabled and are not affected by this switch.
+
+Automatic target notifications default on and target stopping defaults off.
+Both require the temperature input to be available; notifications require a configured notification service.
+Each run receives at most one successfully delivered target alert, including across HA restarts.
+Changing the aircon setpoint does not change run ownership or Home Rules' saved temperature settings.
+An automatic run respects the adjusted aircon setpoint until it ends, including across pre-cooling boundaries and restarts.
+The next automatic start uses the saved temperature settings; target-stop decisions still use Comfort Temperature.
+
+Turning **Cooling Enabled** off stops existing automatic cooling and prevents new automatic starts, without blocking manual cooling.
+Turning **Dry Mode Enabled** off during automatic Dry switches to Cool if eligible, otherwise stops the run.
+Manual Dry remains allowed.
 
 **Afternoon Pre-cooling** is an independent switch, initially off.
 Enable it to use **Pre-cooling Temperature** (default 20°C) during the local-time window:
@@ -57,7 +75,9 @@ Enable it to use **Pre-cooling Temperature** (default 20°C) during the local-ti
 
 Pre-cooling can start 1°C above its target, below the normal Start Temperature.
 It lets the aircon maintain that target until the window ends, subject to Automatic Power Use.
-Outside the window, the target returns to Comfort Temperature; Solar only stops an already-cool run.
+The target-stop and automatic target-notification switches apply outside the pre-cooling window; power limits still apply throughout it.
+Outside the window, the target returns to Comfort Temperature unless you adjusted the aircon setpoint during the run.
+An already-cool run stops only when Stop at Comfort Temperature is enabled.
 Normal cooling remains available before and after the window, and pre-cooling does not resume when an evening tariff changes back to off-peak.
 Times are adjustable on the integration device; the start must precede the finish on the same day.
 
@@ -70,21 +90,21 @@ No tariff schedule, battery charging or export settings are changed by Home Rule
 Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Allow battery and grid respectively.
 Existing comfort temperatures and afternoon-switch settings are preserved.
 The old afternoon start hour is used to initialise the new start-time entity.
+The former Manual cooling target behaviour option is replaced by the two switches: Auto off enables Stop at Comfort Temperature; Timer and Ask leave it off.
+Automatic Target Notifications initially defaults on, and manual target alerts remain enabled regardless of the previous choice.
 
 **Battery power (optional).** Select a battery power sensor in options to detect discharge.
 **Battery Discharge Tolerance** ignores discharge up to the configured wattage.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
-Manual cooling that uses battery or grid power receives the configured timer cap instead, independently of Automatic Power Use.
-For manually started Cool or Dry runs on Timer, choose **Manual cooling target behaviour** in the integration options:
-
-- **Timer:** keep running until the configured timer expires.
-- **Ask** (default): notify once at Comfort Temperature, with **Turn off**, **Keep running**, and **5 mins** buttons.
-- **Auto off:** stop at Comfort Temperature or timer expiry, whichever comes first.
-
-Ask requires a configured notification service; interactive buttons require a Home Assistant Companion `notify.mobile_app_*` service.
+Manually started cooling remains uncapped while free solar is available.
+Once it uses battery/grid power or solar is unavailable, the configured timer cap starts independently of Automatic Power Use.
+Automatic cooling does not receive a manual timer merely because battery/grid use is permitted.
+Manual target alerts offer **Turn off**, **Keep running**, and **5 mins** buttons while cooling remains on; a target-based stop sends an information-only alert.
+Interactive buttons require a Home Assistant Companion `notify.mobile_app_*` service.
 No response or **Keep running** leaves the original deadline unchanged.
 **5 mins** shortens the remaining timer to five minutes from the response, without extending a shorter remaining time.
+If a manual run is still uncapped, **5 mins** explicitly starts a five-minute timer.
 Target prompts and pending responses survive HA restarts, and buttons from completed or replaced timer sessions are ignored.
 Timer expiry still stops the run if solar generation recovers.
 Unavailable temperature readings cannot trigger target prompts or target-based stops.
