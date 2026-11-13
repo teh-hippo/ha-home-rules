@@ -89,3 +89,20 @@ async def test_options_flow_sets_manual_cooling_behaviour(hass, mock_entry, beha
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_MANUAL_COOLING_BEHAVIOUR] == behaviour
+
+
+async def test_options_flow_accepts_tariff_selector_and_clears_it_by_omission(hass, mock_entry) -> None:
+    from custom_components.home_rules.const import CONF_TARIFF_ENTITY_ID
+
+    hass.states.async_set("select.tariff", "offpeak", {"options": ["offpeak", "peak"]})
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    user_input = _valid_options_input()
+    user_input[CONF_TARIFF_ENTITY_ID] = "select.tariff"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_TARIFF_ENTITY_ID] == "select.tariff"
+
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], _valid_options_input())
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert CONF_TARIFF_ENTITY_ID not in result["data"]

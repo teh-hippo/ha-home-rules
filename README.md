@@ -13,7 +13,8 @@ Solar-aware aircon automation for Home Assistant.
 
 ## Features
 
-- Uses one **Control Mode** selector (**Disabled / Dry Run / Live / Aggressive**).
+- Separates **Control Mode** (**Disabled / Monitor / Automatic**) from **Automatic Power Use**.
+- Supports solar-powered afternoon pre-cooling with configurable start and finish times.
 - Exposes decision sensors so you can see why a mode/action was chosen.
 - Can optionally send mode-change alerts to a `notify.*` target.
 - Runtime integration code is intentionally compact to keep maintenance overhead low.
@@ -30,36 +31,56 @@ Install through HACS as a custom repository:
 Add **Home Rules** from Settings -> Devices & Services, select your entities, then tune options.
 Home Rules manages its own aircon timer internally, so you do not need a separate `timer.*` helper entity.
 
-`select.home_rules_control_mode` defaults to **Monitor** for safe setup. Switch to **Solar Cooling** once you're happy with decisions and want the integration to control your climate entity.
+`select.home_rules_control_mode` defaults to **Monitor** for safe setup.
+Switch to **Automatic** once you are happy with decisions and want the integration to control your climate entity.
 
-**Temperature control.** Both modes start automatic cooling at or above **Temperature Threshold** and turn off automatic Cool or Dry runs at or below **Cool Setpoint**, using the configured home temperature sensor.
-Temperature Threshold must be higher than Cool Setpoint; the gap prevents repeated starts near the target.
-The same Cool Setpoint is sent to the climate entity.
-These decisions run at the configured evaluation interval, not continuously.
+**Automatic Power Use** is a separate selector (`select.home_rules_power_policy`):
+
+- **Solar only** (default): use generation thresholds to choose Cool or Dry; do not start while importing or discharging the battery beyond its tolerance.
+  Existing automatic runs tolerate brief battery discharge or grid import, then stop after the configured **Paid-power tolerance**.
+  Outside pre-cooling, reaching **Comfort Temperature** also stops the run, leaving remaining solar available for battery charging.
+- **Allow battery and grid**: start Cool without requiring solar and let the aircon maintain the selected temperature, including overnight.
+  This explicitly permits ongoing energy spending until you change the policy or turn the aircon off.
+  Home Rules does not enforce a battery charge reserve; inverter protections remain external.
+
+**Temperature control.** Normal automatic starts use **Start Temperature** (default 24°C).
+**Comfort Temperature** (default 22°C) is the actual desired room temperature and the target sent to the climate entity.
+Start Temperature must be higher than Comfort Temperature to avoid repeated starts near the target.
+The existing `number.home_rules_temperature_threshold` and `number.home_rules_cool_setpoint` entity IDs are retained.
 An unavailable temperature sensor prevents automatic starts and cannot be treated as proof that the target has been reached.
-Existing installations with equal or inverted temperature settings must correct them before automatic starts resume.
 
-**Solar Cooling** uses the configured generation thresholds to choose Cool or Dry and retains the grid-usage tolerance.
-Battery discharge is not free solar: it blocks automatic starts and turns automatically started Cool or Dry runs off.
-Manual cooling that uses battery or grid power receives the configured timer cap instead.
+**Afternoon Pre-cooling** is an independent switch, initially off.
+Enable it to use **Pre-cooling Temperature** (default 20°C) during the local-time window:
 
-**Boost Cooling** can start with any positive solar generation and supplement the aircon's demand with battery or grid power.
-Once an automatic run starts, it continues towards Cool Setpoint even if solar generation disappears.
-Boost applies whenever selected, not just in the afternoon.
-The separate **Afternoon Cooling** switch blocks automatic starts in either mode before the configured start hour (default 14:00 local time), without interrupting an existing run.
-Home Rules does not enforce a battery charge reserve; Boost may import grid power or use stored energy until the target is reached.
-Inverter battery protections remain external to Home Rules.
+- `time.home_rules_pre_cooling_start`: defaults to **14:00**.
+- `time.home_rules_pre_cooling_finish`: defaults to **17:00**.
 
-**Battery power (optional).** Select a battery power sensor in options to let Solar Cooling detect discharge.
+Pre-cooling can start 1°C above its target, below the normal Start Temperature.
+It lets the aircon maintain that target until the window ends, subject to Automatic Power Use.
+Outside the window, the target returns to Comfort Temperature; Solar only stops an already-cool run.
+Normal cooling remains available before and after the window, and pre-cooling does not resume when an evening tariff changes back to off-peak.
+Times are adjustable on the integration device; the start must precede the finish on the same day.
+
+Optionally select your existing **Current tariff entity** in integration options and specify its **Peak tariff state** (default `peak`).
+Peak or unavailable tariff readings suppress pre-cooling, without blocking ordinary comfort cooling.
+The finish time remains the explicit daily limit even when no tariff entity is configured.
+Window boundaries and tariff changes trigger evaluation immediately; other decisions use the configured evaluation interval.
+No tariff schedule, battery charging or export settings are changed by Home Rules.
+
+Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Allow battery and grid respectively.
+Existing comfort temperatures and afternoon-switch settings are preserved.
+The old afternoon start hour is used to initialise the new start-time entity.
+
+**Battery power (optional).** Select a battery power sensor in options to detect discharge.
 **Battery Discharge Tolerance** ignores discharge up to the configured wattage.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
-The shared temperature stop applies only to automatically started Cool and Dry runs.
+Manual cooling that uses battery or grid power receives the configured timer cap instead, independently of Automatic Power Use.
 For manually started Cool or Dry runs on Timer, choose **Manual cooling target behaviour** in the integration options:
 
 - **Timer:** keep running until the configured timer expires.
-- **Ask** (default): notify once at Cool Setpoint, with **Turn off**, **Keep running**, and **5 mins** buttons.
-- **Auto off:** stop at Cool Setpoint or timer expiry, whichever comes first.
+- **Ask** (default): notify once at Comfort Temperature, with **Turn off**, **Keep running**, and **5 mins** buttons.
+- **Auto off:** stop at Comfort Temperature or timer expiry, whichever comes first.
 
 Ask requires a configured notification service; interactive buttons require a Home Assistant Companion `notify.mobile_app_*` service.
 No response or **Keep running** leaves the original deadline unchanged.
@@ -82,7 +103,7 @@ Requires [uv](https://docs.astral.sh/uv/). Uses [Conventional Commits](https://w
 ## Troubleshooting
 
 - Verify all configured entities exist and are available.
-- Keep Control Mode in **Dry Run** until behavior matches expectations.
+- Keep Control Mode in **Monitor** until behaviour matches expectations.
 - Check Home Assistant logs for `home_rules` issues.
 
 ## License

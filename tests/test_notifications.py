@@ -48,7 +48,10 @@ async def manual_timer(hass, coord_factory):
             CONF_BATTERY_POWER_ENTITY_ID: "sensor.battery",
         },
     )
-    await coordinator.async_set_mode(ControlMode.BOOST_COOLING)
+    from custom_components.home_rules.const import PowerPolicy
+
+    coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     return coordinator, notifications, off_calls
 
 
@@ -280,7 +283,10 @@ async def test_manual_timer_non_interactive_modes(hass, coord_factory, behaviour
         generation="0",
         options={CONF_MANUAL_COOLING_BEHAVIOUR: behaviour, CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"},
     )
-    await coordinator.async_set_mode(ControlMode.BOOST_COOLING)
+    from custom_components.home_rules.const import PowerPolicy
+
+    coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     deadline = coordinator.data.timer_finishes_at
     hass.states.async_set("sensor.temperature", "21.8", {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")

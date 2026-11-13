@@ -13,7 +13,7 @@ from homeassistant.helpers.selector import SelectOptionDict
 from . import const as c
 from .rules import ManualCoolingBehaviour
 
-_PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number")
+_PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number", "time")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)
 _POWER_KEYS = {c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_BATTERY_POWER_ENTITY_ID}
 
@@ -23,8 +23,8 @@ def _number_selector(min_val: float, max_val: float, step: float, unit: str | No
     return selector.NumberSelector(selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=selector.NumberSelectorMode.BOX) if unit is None else selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=unit))
 
 
-_ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"), c.CONF_BATTERY_POWER_ENTITY_ID: _entity_selector("sensor", "power")}
-_NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW, _number_selector(1, 10, 1)), (c.CONF_AFTERNOON_COOLING_HOUR, c.DEFAULT_AFTERNOON_COOLING_HOUR, _number_selector(0, 23, 1, "h")), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY, _number_selector(0, 5, 1)))
+_ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"), c.CONF_BATTERY_POWER_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TARIFF_ENTITY_ID: _entity_selector(["select", "sensor"])}
+_NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW, _number_selector(1, 10, 1)), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY, c.DEFAULT_REACTIVATE_DELAY, _number_selector(0, 5, 1)))
 _OPTIONS_ENTITY_FIELDS: tuple[str, ...] = (c.CONF_CLIMATE_ENTITY_ID, c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)
 
 
@@ -46,7 +46,8 @@ def _validate_entities(
             try: UnitOfPower(str(state.attributes.get("unit_of_measurement", "")).strip())
             except ValueError: return {"base": "invalid_power_unit"}
         if check_domains and key == c.CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("climate."): return {"base": "invalid_climate_entity"}
-        if check_domains and key != c.CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("sensor."): return {"base": "invalid_sensor_entity"}
+        if check_domains and key == c.CONF_TARIFF_ENTITY_ID and not entity_id.startswith(("select.", "sensor.")): return {"base": "invalid_tariff_entity"}
+        if check_domains and key not in (c.CONF_CLIMATE_ENTITY_ID, c.CONF_TARIFF_ENTITY_ID) and not entity_id.startswith("sensor."): return {"base": "invalid_sensor_entity"}
     return {}
 
 
@@ -88,6 +89,7 @@ class HomeRulesOptionsFlow(OptionsFlow):
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Optional(key, description={"suggested_value": cur[key]} if cur.get(key) else None): _ENTITY_SELECTORS[key] for key in c.OPTIONAL_ENTITY_KEYS})
+        schema[vol.Optional(c.CONF_PEAK_TARIFF, default=cur.get(c.CONF_PEAK_TARIFF, c.DEFAULT_PEAK_TARIFF))] = selector.TextSelector()
         schema[vol.Optional(c.CONF_BATTERY_INVERT, default=bool(cur.get(c.CONF_BATTERY_INVERT, False)))] = selector.BooleanSelector()
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
         schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()

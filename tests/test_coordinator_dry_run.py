@@ -37,7 +37,7 @@ async def test_timer_countdown_uses_internal_timer_duration(coord_factory) -> No
     )
 
     coordinator = await coord_factory(climate="cool", grid="100")
-    coordinator.control_mode = ControlMode.SOLAR_COOLING
+    coordinator.control_mode = ControlMode.AUTOMATIC
     await coordinator.async_run_evaluation("poll")
     result = coordinator.data.timer_finishes_at
     assert isinstance(result, datetime)
@@ -95,7 +95,7 @@ async def test_timer_adjustment_schedules_expiry_callback(coord_factory) -> None
     from custom_components.home_rules.const import ControlMode
 
     coordinator = await coord_factory(climate="cool", grid="100")
-    coordinator.control_mode = ControlMode.SOLAR_COOLING
+    coordinator.control_mode = ControlMode.AUTOMATIC
     await coordinator.async_run_evaluation("poll")
 
     assert coordinator._timer_expiry_handle is not None
@@ -115,7 +115,7 @@ async def test_monitor_timer_preserves_deadline_when_enabling_solar_cooling(coor
         deadline = coordinator.data.timer_finishes_at
         assert deadline is not None
 
-        await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
+        await coordinator.async_set_mode(ControlMode.AUTOMATIC)
         assert coordinator.data.mode is HomeOutput.TIMER
         assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
         assert coordinator.data.timer_finishes_at == deadline

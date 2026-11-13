@@ -30,7 +30,8 @@
       "invalid_entity_selection": "Cannot select Home Rules entities as inputs.",
       "invalid_power_unit": "Power sensors must report W, kW, or MW.",
       "invalid_climate_entity": "Climate must be a climate entity.",
-      "invalid_sensor_entity": "Selected entity must be a sensor."
+      "invalid_sensor_entity": "Selected entity must be a sensor.",
+      "invalid_tariff_entity": "Tariff entity must be a select or sensor."
     },
     "abort": {
       "already_configured": "Home Rules is already configured."
@@ -47,17 +48,18 @@
           "temperature_entity_id": "Temperature sensor",
           "humidity_entity_id": "Humidity sensor",
           "battery_power_entity_id": "Battery power sensor (optional)",
+          "tariff_entity_id": "Current tariff entity (optional)",
+          "peak_tariff": "Peak tariff state",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "manual_cooling_behaviour": "Manual cooling target behaviour",
           "eval_interval": "Evaluation interval (seconds)",
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
-          "grid_usage_delay": "Grid usage delay (evaluations)",
+          "grid_usage_delay": "Paid-power tolerance (evaluations)",
           "reactivate_delay": "Reactivation delay (evaluations)",
           "smoothing_window": "Smoothing window (evaluations)",
           "grid_invert": "Grid sensor reports export as positive (invert sign)",
-          "afternoon_cooling_hour": "Afternoon cooling start hour (0-23)",
           "notification_service": "Notification service (optional)"
         }
       }
@@ -129,8 +131,14 @@
         "state": {
           "disabled": "Disabled",
           "monitor": "Monitor",
-          "solar_cooling": "Solar Cooling",
-          "boost_cooling": "Boost Cooling"
+          "automatic": "Automatic"
+        }
+      },
+      "power_policy": {
+        "name": "Automatic Power Use",
+        "state": {
+          "solar_only": "Solar only",
+          "allow_battery_grid": "Allow battery and grid"
         }
       }
     },
@@ -142,7 +150,7 @@
         "name": "Dry Mode Enabled"
       },
       "afternoon_cooling": {
-        "name": "Afternoon Cooling"
+        "name": "Afternoon Pre-cooling"
       }
     },
     "button": {
@@ -152,19 +160,36 @@
     },
     "number": {
       "temperature_threshold": {
-        "name": "Temperature Threshold"
+        "name": "Start Temperature"
       },
       "temperature_cool": {
-        "name": "Cool Setpoint"
+        "name": "Comfort Temperature"
+      },
+      "temperature_precool": {
+        "name": "Pre-cooling Temperature"
       },
       "battery_discharge_tolerance": {
         "name": "Battery Discharge Tolerance"
+      }
+    },
+    "time": {
+      "pre_cooling_start": {
+        "name": "Pre-cooling Start"
+      },
+      "pre_cooling_finish": {
+        "name": "Pre-cooling Finish"
       }
     }
   },
   "exceptions": {
     "invalid_temperature_range": {
-      "message": "Temperature Threshold must be higher than Cool Setpoint."
+      "message": "Start Temperature must be higher than Comfort Temperature."
+    },
+    "invalid_precooling_temperature": {
+      "message": "Pre-cooling Temperature must be finite and no higher than Comfort Temperature."
+    },
+    "invalid_precooling_window": {
+      "message": "Pre-cooling Start must be earlier than Pre-cooling Finish on the same day."
     },
     "update_failed": {
       "message": "Failed to evaluate Home Rules: {error}"

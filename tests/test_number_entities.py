@@ -11,6 +11,7 @@ async def test_number_entities_register_on_setup(hass, loaded_entry) -> None:
     for entity_id in (
         "number.home_rules_temperature_threshold",
         "number.home_rules_cool_setpoint",
+        "number.home_rules_temperature_precool",
     ):
         assert hass.states.get(entity_id) is not None, f"{entity_id} not found"
 

@@ -15,11 +15,8 @@ from custom_components.home_rules.rules import (
     R_ALREADY_COOLING,
     R_ALREADY_DRYING,
     R_AUTO_IDLE,
-    R_BEFORE_AFTERNOON,
     R_BELOW_COOL_SETPOINT,
     R_BELOW_THRESHOLD,
-    R_BOOST_COOLING,
-    R_BOOST_SOLAR,
     R_COOLING_DISABLED,
     R_DISABLED,
     R_DRY_DISABLED,
@@ -28,9 +25,11 @@ from custom_components.home_rules.rules import (
     R_HUMIDITY_TOO_LOW,
     R_INSUFFICIENT_SOLAR,
     R_INVALID_TEMPERATURE_RANGE,
+    R_MAINTAIN_TARGET,
     R_MANUAL,
     R_NO_CHANGE,
     R_NO_SOLAR,
+    R_PAID_POWER,
     R_REACTIVATE_WAIT,
     R_SOLAR_COOL,
     R_SOLAR_DRY,
@@ -77,7 +76,7 @@ def home(**overrides) -> HomeInput:
         temperature=TEST_PARAMS.temperature_threshold,
         humidity=TEST_PARAMS.dry_mode_humidity_cutoff,
         auto=False,
-        aggressive_cooling=False,
+        allow_paid_power=False,
         enabled=True,
         cooling_enabled=True,
     )
@@ -100,17 +99,17 @@ class TestEvaluateTargetMode:
         """Boost with solar starts Cool regardless of generation thresholds."""
         r = _evaluate_target_mode(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, aircon_mode=AirconMode.OFF),
+            home(allow_paid_power=True, generation=500, aircon_mode=AirconMode.OFF),
         )
-        assert r == TargetResult(OUT.COOL, R_BOOST_SOLAR, True)
+        assert r == TargetResult(OUT.COOL, R_PAID_POWER, True)
 
     def test_b2_boost_already_cool(self):
         """An existing Boost Cool run is maintained."""
         r = _evaluate_target_mode(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, aircon_mode=AirconMode.COOL),
+            home(allow_paid_power=True, generation=500, aircon_mode=AirconMode.COOL),
         )
-        assert r == TargetResult(None, R_BOOST_COOLING, False)
+        assert r == TargetResult(None, R_MAINTAIN_TARGET, False)
 
     def test_c1_solar_cool_not_cool(self):
         """gen>=cool + not COOL -> COOL, R_SOLAR_COOL, actionable."""
@@ -199,21 +198,21 @@ class TestEvaluateTargetMode:
         r = _evaluate_target_mode(
             TEST_PARAMS,
             home(
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 humidity=99,
                 aircon_mode=AirconMode.OFF,
             ),
         )
-        assert r == TargetResult(OUT.COOL, R_BOOST_SOLAR, True)
+        assert r == TargetResult(OUT.COOL, R_PAID_POWER, True)
 
-    def test_boost_without_solar_cannot_start(self):
-        r = _evaluate_target_mode(TEST_PARAMS, home(aggressive_cooling=True, have_solar=False, generation=0))
-        assert r == TargetResult(None, R_NO_SOLAR, True)
+    def test_paid_power_without_solar_can_start(self):
+        r = _evaluate_target_mode(TEST_PARAMS, home(allow_paid_power=True, have_solar=False, generation=0))
+        assert r == TargetResult(OUT.COOL, R_PAID_POWER, True)
 
     def test_boost_starts_with_minimal_solar(self):
-        r = _evaluate_target_mode(TEST_PARAMS, home(aggressive_cooling=True, generation=0.1))
-        assert r == TargetResult(OUT.COOL, R_BOOST_SOLAR, True)
+        r = _evaluate_target_mode(TEST_PARAMS, home(allow_paid_power=True, generation=0.1))
+        assert r == TargetResult(OUT.COOL, R_PAID_POWER, True)
 
 
 # ---------------------------------------------------------------------------
@@ -267,27 +266,26 @@ class TestIdleReason:
         """cooling_enabled=False wins even if other conditions match."""
         r = _idle_reason(
             TEST_PARAMS,
-            home(cooling_enabled=False, before_afternoon=True, aggressive_cooling=True, temperature=20),
+            home(cooling_enabled=False, pre_cooling=True, allow_paid_power=True, temperature=20),
             "activation",
             "default",
         )
         assert r == R_COOLING_DISABLED
 
-    def test_before_afternoon_priority(self):
-        """before_afternoon=True blocks activation before temperature/solar checks."""
+    def test_precooling_uses_lower_temperature_target(self):
         r = _idle_reason(
             TEST_PARAMS,
-            home(before_afternoon=True, aggressive_cooling=True, temperature=20),
+            home(pre_cooling=True, allow_paid_power=True, temperature=20),
             "activation",
             "default",
         )
-        assert r == R_BEFORE_AFTERNOON
+        assert r == R_BELOW_COOL_SETPOINT
 
     def test_boost_below_cool_setpoint(self):
         """aggressive + temp <= cool_setpoint -> R_BELOW_COOL_SETPOINT."""
         r = _idle_reason(
             TEST_PARAMS,
-            home(aggressive_cooling=True, temperature=21),
+            home(allow_paid_power=True, temperature=21),
             None,
             "default",
         )
@@ -297,7 +295,7 @@ class TestIdleReason:
         """temperature == cool_setpoint (<= check) -> R_BELOW_COOL_SETPOINT."""
         r = _idle_reason(
             TEST_PARAMS,
-            home(aggressive_cooling=True, temperature=22),
+            home(allow_paid_power=True, temperature=22),
             None,
             "default",
         )
@@ -404,15 +402,14 @@ class TestAdjustOffSolar:
         )
         assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
 
-    def test_before_afternoon_blocks_activation(self):
-        """before_afternoon=True blocks activation when aircon is OFF."""
+    def test_precooling_starts_below_normal_start_temperature(self):
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(generation=6000, humidity=65, temperature=26, before_afternoon=True),
+            home(generation=6000, humidity=65, temperature=21, pre_cooling=True),
             state,
         )
-        assert r == AdjustResult(OUT.NO_CHANGE, R_BEFORE_AFTERNOON)
+        assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
 
     def test_high_humidity_does_not_block_cool(self):
         """High humidity should not force DRY when COOL solar is available."""
@@ -527,48 +524,46 @@ class TestAdjustOffBoost:
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=0.1, temperature=24, auto=True),
+            home(allow_paid_power=True, generation=0.1, temperature=24, auto=True),
             state,
         )
-        assert r == AdjustResult(OUT.COOL, R_BOOST_SOLAR)
+        assert r == AdjustResult(OUT.COOL, R_PAID_POWER)
 
     def test_boost_temp_at_setpoint_no_activation(self):
         """Boost does not start at its stop temperature."""
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, temperature=22, auto=True),
+            home(allow_paid_power=True, generation=500, temperature=22, auto=True),
             state,
         )
         assert r.output is OUT.OFF
         assert r.reason == R_BELOW_COOL_SETPOINT
 
-    def test_boost_zero_gen_no_activation(self):
-        """Boost cannot begin a new run without solar."""
+    def test_paid_power_starts_without_generation(self):
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, have_solar=False, generation=0, temperature=24, auto=True),
+            home(allow_paid_power=True, have_solar=False, generation=0, temperature=24, auto=True),
             state,
         )
-        assert r.output is OUT.OFF
-        assert r.reason == R_NO_SOLAR
+        assert r.output is OUT.COOL
+        assert r.reason == R_PAID_POWER
 
-    def test_boost_no_solar_no_activation(self):
-        """Boost + no solar -> OFF, R_NO_SOLAR (actionable via idle)."""
+    def test_paid_power_starts_without_solar(self):
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
             home(
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 have_solar=False,
                 temperature=24,
                 auto=True,
             ),
             state,
         )
-        assert r.output is OUT.OFF
-        assert r.reason == R_NO_SOLAR
+        assert r.output is OUT.COOL
+        assert r.reason == R_PAID_POWER
 
     def test_boost_cooling_disabled(self):
         """Boost + cooling_disabled -> OFF, R_COOLING_DISABLED."""
@@ -576,7 +571,7 @@ class TestAdjustOffBoost:
         r = adjust(
             TEST_PARAMS,
             home(
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 temperature=23,
                 cooling_enabled=False,
@@ -591,7 +586,7 @@ class TestAdjustOffBoost:
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, temperature=23, auto=True),
+            home(allow_paid_power=True, generation=500, temperature=23, auto=True),
             state,
         )
         assert r == AdjustResult(OUT.OFF, R_BELOW_THRESHOLD)
@@ -600,7 +595,7 @@ class TestAdjustOffBoost:
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=499, temperature=23, auto=False),
+            home(allow_paid_power=True, generation=499, temperature=23, auto=False),
             state,
         )
         assert r.output is OUT.NO_CHANGE
@@ -609,10 +604,10 @@ class TestAdjustOffBoost:
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=1, temperature=24, auto=True),
+            home(allow_paid_power=True, generation=1, temperature=24, auto=True),
             state,
         )
-        assert r == AdjustResult(OUT.COOL, R_BOOST_SOLAR)
+        assert r == AdjustResult(OUT.COOL, R_PAID_POWER)
 
 
 # ---------------------------------------------------------------------------
@@ -720,14 +715,14 @@ class TestAdjustOnGridAutoBoost:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=500,
                 auto=True,
             ),
             state,
         )
-        assert r == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
         assert state.tolerated == 0
 
     def test_boost_dry_upgrade_to_cool(self):
@@ -737,29 +732,29 @@ class TestAdjustOnGridAutoBoost:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.DRY,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=500,
                 auto=True,
             ),
             state,
         )
-        assert r == AdjustResult(OUT.COOL, R_BOOST_SOLAR)
+        assert r == AdjustResult(OUT.COOL, R_PAID_POWER)
 
     def test_boost_finishes_without_solar(self):
         state = CachedState()
         h = home(
             aircon_mode=AirconMode.COOL,
-            aggressive_cooling=True,
+            allow_paid_power=True,
             have_solar=False,
             grid_usage=100,
             auto=True,
         )
         r1 = adjust(TEST_PARAMS, h, state)
-        assert r1 == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r1 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
 
         r2 = adjust(TEST_PARAMS, h, state)
-        assert r2 == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r2 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
         assert state.tolerated == 0
 
     def test_boost_grid_tolerated_resets_counter(self):
@@ -769,7 +764,7 @@ class TestAdjustOnGridAutoBoost:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=500,
                 auto=True,
@@ -784,7 +779,7 @@ class TestAdjustOnGridAutoBoost:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.DRY,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 have_solar=False,
                 generation=0,
                 grid_usage=300,
@@ -792,7 +787,7 @@ class TestAdjustOnGridAutoBoost:
             ),
             state,
         )
-        assert r == AdjustResult(OUT.COOL, R_BOOST_COOLING)
+        assert r == AdjustResult(OUT.COOL, R_PAID_POWER)
 
 
 # ---------------------------------------------------------------------------
@@ -1129,17 +1124,17 @@ class TestLifecycleScenarios:
         # Activate boost
         r1 = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, temperature=24, auto=True),
+            home(allow_paid_power=True, generation=500, temperature=24, auto=True),
             state,
         )
-        assert r1 == AdjustResult(OUT.COOL, R_BOOST_SOLAR)
+        assert r1 == AdjustResult(OUT.COOL, R_PAID_POWER)
 
         # Grid appears, boost tolerates
         r2 = adjust(
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=500,
                 temperature=23,
@@ -1147,7 +1142,7 @@ class TestLifecycleScenarios:
             ),
             state,
         )
-        assert r2 == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r2 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
         assert state.tolerated == 0
 
         # Solar disappears, but the automatic run finishes its cooling goal.
@@ -1155,7 +1150,7 @@ class TestLifecycleScenarios:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 have_solar=False,
                 generation=0,
                 grid_usage=500,
@@ -1164,14 +1159,14 @@ class TestLifecycleScenarios:
             ),
             state,
         )
-        assert r3.reason == R_BOOST_COOLING
+        assert r3.reason == R_MAINTAIN_TARGET
         assert state.tolerated == 0
 
         r4 = adjust(
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 have_solar=False,
                 generation=0,
                 grid_usage=500,
@@ -1180,25 +1175,25 @@ class TestLifecycleScenarios:
             ),
             state,
         )
-        assert r4 == AdjustResult(OUT.OFF, R_TARGET_REACHED)
+        assert r4 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
         for _ in range(TEST_PARAMS.reactivate_delay):
-            adjust(TEST_PARAMS, home(aggressive_cooling=True, temperature=23), state)
-        assert adjust(TEST_PARAMS, home(aggressive_cooling=True, temperature=23), state).reason == R_BELOW_THRESHOLD
+            adjust(TEST_PARAMS, home(allow_paid_power=True, temperature=23), state)
+        assert adjust(TEST_PARAMS, home(allow_paid_power=True, temperature=23), state).reason == R_BELOW_THRESHOLD
 
     def test_boost_low_solar_does_not_cycle_on_grid(self):
         state = CachedState()
         h = home(
             aircon_mode=AirconMode.COOL,
-            aggressive_cooling=True,
+            allow_paid_power=True,
             generation=117,
             grid_usage=556,
             auto=True,
         )
         r1 = adjust(TEST_PARAMS, h, state)
-        assert r1 == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r1 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
 
         r2 = adjust(TEST_PARAMS, h, state)
-        assert r2 == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r2 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
 
     def test_mode_switch_solar_to_boost_tolerates_grid(self):
         """Solar COOL -> boost enabled -> grid appears -> boost tolerates."""
@@ -1222,14 +1217,14 @@ class TestLifecycleScenarios:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=200,
                 auto=True,
             ),
             state,
         )
-        assert r2 == AdjustResult(OUT.NO_CHANGE, R_BOOST_COOLING)
+        assert r2 == AdjustResult(OUT.NO_CHANGE, R_MAINTAIN_TARGET)
 
     def test_mode_switch_boost_to_solar_grid_tolerance_off(self):
         """Boost COOL -> boost disabled -> grid appears -> tolerance -> OFF."""
@@ -1240,21 +1235,21 @@ class TestLifecycleScenarios:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=200,
                 auto=True,
             ),
             state,
         )
-        assert r1.reason == R_BOOST_COOLING
+        assert r1.reason == R_MAINTAIN_TARGET
 
         # Boost disabled, grid still present, gen insufficient
         r2 = adjust(
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=False,
+                allow_paid_power=False,
                 generation=2000,
                 grid_usage=200,
                 auto=True,
@@ -1268,7 +1263,7 @@ class TestLifecycleScenarios:
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=False,
+                allow_paid_power=False,
                 generation=2000,
                 grid_usage=200,
                 auto=True,
@@ -1291,24 +1286,24 @@ class TestReasonConstants:
     def test_r_boost_solar(self):
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, temperature=24, auto=True),
+            home(allow_paid_power=True, generation=500, temperature=24, auto=True),
             CachedState(),
         )
-        assert r.reason == R_BOOST_SOLAR
+        assert r.reason == R_PAID_POWER
 
     def test_r_boost_cooling(self):
         r = adjust(
             TEST_PARAMS,
             home(
                 aircon_mode=AirconMode.COOL,
-                aggressive_cooling=True,
+                allow_paid_power=True,
                 generation=500,
                 grid_usage=100,
                 auto=True,
             ),
             CachedState(),
         )
-        assert r.reason == R_BOOST_COOLING
+        assert r.reason == R_MAINTAIN_TARGET
 
     def test_r_solar_cool(self):
         r = adjust(
@@ -1412,7 +1407,7 @@ class TestReasonConstants:
     def test_r_below_cool_setpoint(self):
         r = adjust(
             TEST_PARAMS,
-            home(aggressive_cooling=True, generation=500, temperature=22, auto=True),
+            home(allow_paid_power=True, generation=500, temperature=22, auto=True),
             CachedState(),
         )
         assert r.reason == R_BELOW_COOL_SETPOINT
@@ -1431,8 +1426,6 @@ class TestReasonConstants:
     [
         (AirconMode.COOL, False, 6000, 0, 0, 22),
         (AirconMode.DRY, False, 6000, 0, 0, 21),
-        (AirconMode.DRY, True, 0, 1500, 800, 22),
-        (AirconMode.COOL, True, 6000, 0, 0, 22),
     ],
 )
 def test_automatic_target_stop_precedes_power_and_mode_changes(mode, boost, generation, grid, discharge, temperature):
@@ -1442,7 +1435,7 @@ def test_automatic_target_stop_precedes_power_and_mode_changes(mode, boost, gene
         home(
             aircon_mode=mode,
             auto=True,
-            aggressive_cooling=boost,
+            allow_paid_power=boost,
             have_solar=generation > 0,
             generation=generation,
             grid_usage=grid,
@@ -1460,7 +1453,7 @@ def test_automatic_target_stop_precedes_power_and_mode_changes(mode, boost, gene
 def test_manual_free_solar_run_is_not_stopped_at_temperature_target(boost):
     result = adjust(
         TEST_PARAMS,
-        home(aircon_mode=AirconMode.COOL, generation=6000, temperature=21, aggressive_cooling=boost),
+        home(aircon_mode=AirconMode.COOL, generation=6000, temperature=21, allow_paid_power=boost),
         CachedState(),
     )
     assert result.output is OUT.NO_CHANGE
@@ -1478,12 +1471,25 @@ def test_unavailable_temperature_prevents_start_and_mode_upgrade():
     assert result == AdjustResult(OUT.NO_CHANGE, R_TEMPERATURE_UNAVAILABLE)
     result = adjust(
         TEST_PARAMS,
-        home(
-            aircon_mode=AirconMode.DRY, auto=True, aggressive_cooling=True, temperature=20, temperature_available=False
-        ),
+        home(aircon_mode=AirconMode.DRY, auto=True, allow_paid_power=True, temperature=20, temperature_available=False),
         CachedState(),
     )
     assert result == AdjustResult(OUT.NO_CHANGE, R_TEMPERATURE_UNAVAILABLE)
+
+
+def test_solar_only_does_not_start_while_importing():
+    result = adjust(TEST_PARAMS, home(generation=6000, grid_usage=500), CachedState())
+    assert result == AdjustResult(OUT.NO_CHANGE, R_GRID_TOO_HIGH)
+
+
+@pytest.mark.parametrize("boost", [False, True])
+def test_precooling_restart_gap_prevents_starting_at_target(boost):
+    result = adjust(
+        TEST_PARAMS,
+        home(pre_cooling=True, temperature=20.5, generation=6000, allow_paid_power=boost),
+        CachedState(),
+    )
+    assert result == AdjustResult(OUT.NO_CHANGE, R_BELOW_THRESHOLD)
 
 
 class TestAdjustManualFreeSolar:
@@ -1517,7 +1523,7 @@ def test_manual_timer_target_behaviour_overrides_battery_guard(mode, boost, beha
         home(
             aircon_mode=mode,
             auto=False,
-            aggressive_cooling=boost,
+            allow_paid_power=boost,
             timer=True,
             have_solar=False,
             battery_discharge=800,

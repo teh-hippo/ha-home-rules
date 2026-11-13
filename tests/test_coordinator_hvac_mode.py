@@ -26,7 +26,7 @@ async def test_execute_adjustment_sets_explicit_hvac_mode(hass, coord_factory) -
     hass.services.async_register("climate", "set_temperature", record_service_call)
 
     coordinator = await coord_factory()
-    await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
 
     assert calls == [
         ("climate", "set_hvac_mode", {"entity_id": "climate.test", "hvac_mode": "cool"}),
@@ -56,7 +56,7 @@ async def test_stale_auto_mode_self_heals_for_heat(hass, coord_factory) -> None:
     # Strong free solar + heat: the old engine would have commanded COOL.
     coordinator = await coord_factory(climate="heat", generation="6000", grid="0")
     coordinator._auto_mode = True  # simulate a prior cool cycle that home-rules owned
-    await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
 
     assert coordinator._auto_mode is False  # self-healed: heat is never home-rules-owned
     assert coordinator.data.adjustment is HomeOutput.TIMER  # capped, not cooled

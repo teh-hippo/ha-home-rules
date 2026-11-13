@@ -31,6 +31,9 @@
     "select": {
       "control_mode": {
         "default": "mdi:tune-variant"
+      },
+      "power_policy": {
+        "default": "mdi:transmission-tower"
       }
     },
     "switch": {
@@ -56,8 +59,19 @@
       "temperature_cool": {
         "default": "mdi:thermometer-chevron-down"
       },
+      "temperature_precool": {
+        "default": "mdi:snowflake-thermometer"
+      },
       "battery_discharge_tolerance": {
         "default": "mdi:battery-arrow-down"
+      }
+    },
+    "time": {
+      "pre_cooling_start": {
+        "default": "mdi:clock-start"
+      },
+      "pre_cooling_finish": {
+        "default": "mdi:clock-end"
       }
     }
   }

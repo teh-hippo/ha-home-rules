@@ -6,7 +6,7 @@ import pytest
 
 from custom_components.home_rules.rules import (
     R_BATTERY_ENGAGED,
-    R_TARGET_REACHED,
+    R_BATTERY_TOLERATED,
     AirconMode,
     CachedState,
     HomeInput,
@@ -21,7 +21,7 @@ PARAMS = RuleParameters(5500, 3500, 24, 65, True, 2, 2, 22)
 def _home(mode: AirconMode, **kw) -> HomeInput:
     base = dict(
         aircon_mode=mode, have_solar=True, generation=6000, grid_usage=0, timer=False, temperature=26, humidity=50,
-        auto=mode is not AirconMode.OFF, aggressive_cooling=False, enabled=True, cooling_enabled=True,
+        auto=mode is not AirconMode.OFF, allow_paid_power=False, enabled=True, cooling_enabled=True,
     )  # fmt: skip
     return HomeInput(**{**base, **kw})
 
@@ -39,6 +39,8 @@ async def test_battery_discharge_reported_separately_from_grid(coord_factory, ha
 @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
 def test_solar_cooling_stops_when_battery_engaged(mode: AirconMode) -> None:
     state = CachedState()
+    result = adjust(PARAMS, _home(mode, battery_discharge=300), state)
+    assert result.output is HomeOutput.NO_CHANGE and result.reason == R_BATTERY_TOLERATED
     result = adjust(PARAMS, _home(mode, battery_discharge=300), state)
     assert result.output is HomeOutput.OFF and result.reason == R_BATTERY_ENGAGED and state.reactivate_delay == 2
 
@@ -70,7 +72,7 @@ async def test_manual_battery_run_preserves_active_timer(coord_factory, hass) ->
     coordinator._aircon_timer_finishes_at = deadline
     coordinator._schedule_timer_expiry()
 
-    await coordinator.async_set_mode(ControlMode.SOLAR_COOLING)
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
 
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
     assert coordinator._auto_mode is False
@@ -86,13 +88,24 @@ def test_solar_cooling_does_not_start_while_battery_engaged() -> None:
 
 @pytest.mark.parametrize("auto", [False, True])
 def test_boost_keeps_cooling_on_battery_while_house_hot(auto: bool) -> None:
-    home = _home(AirconMode.COOL, auto=auto, aggressive_cooling=True, generation=1000, battery_discharge=800)
+    home = _home(AirconMode.COOL, auto=auto, allow_paid_power=True, generation=1000, battery_discharge=800)
     result = adjust(PARAMS, home, CachedState())
     assert result.output is not HomeOutput.OFF
 
 
-def test_boost_stops_on_battery_once_cool_enough() -> None:
-    home = _home(AirconMode.COOL, aggressive_cooling=True, temperature=22, battery_discharge=800)
+def test_paid_power_maintains_target_on_battery() -> None:
+    home = _home(AirconMode.COOL, allow_paid_power=True, temperature=22, battery_discharge=800)
     result = adjust(PARAMS, home, CachedState())
-    assert result.output is HomeOutput.OFF
-    assert result.reason == R_TARGET_REACHED
+    assert result.output is HomeOutput.NO_CHANGE
+
+
+def test_precooling_still_stops_on_sustained_battery_use_and_resets_after_recovery() -> None:
+    state = CachedState()
+    run = _home(AirconMode.COOL, pre_cooling=True, temperature=20, battery_discharge=300)
+    assert adjust(PARAMS, run, state).reason == R_BATTERY_TOLERATED
+    run.battery_discharge = 0
+    assert adjust(PARAMS, run, state).output is HomeOutput.NO_CHANGE
+    assert state.tolerated == 0
+    run.battery_discharge = 300
+    assert adjust(PARAMS, run, state).reason == R_BATTERY_TOLERATED
+    assert adjust(PARAMS, run, state).output is HomeOutput.OFF

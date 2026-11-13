@@ -87,7 +87,10 @@ async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(hass,
     coordinator = await coord_factory(
         temperature="25", options={CONF_TEMPERATURE_THRESHOLD: 24, CONF_TEMPERATURE_COOL: 23.95}
     )
-    await coordinator.async_set_mode(ControlMode.BOOST_COOLING)
+    from custom_components.home_rules.const import PowerPolicy
+
+    coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     hass.states.async_set("climate.test", "cool")
     hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")

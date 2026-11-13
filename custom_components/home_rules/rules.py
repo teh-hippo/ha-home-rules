@@ -6,12 +6,12 @@ The engine evaluates environmental inputs and produces adjustment decisions.
 Decision tree (high-level):
   1. Disabled → report DISABLED
   2. Unknown aircon mode → NO_CHANGE
-  3. Automatic cooling at target → OFF
+  3. Solar-only cooling outside pre-cooling at target → OFF
   4. Manual cooling on paid power/timer → apply manual target behaviour and timer cap
   5. Reactivation delay active → NO_CHANGE (countdown)
   6. Aircon OFF → evaluate temperature and solar eligibility
-  7. Automatic Boost → finish cooling regardless of power source
-  8. Automatic Solar cooling → apply power rules
+  7. Battery/grid permitted → maintain the cooling target
+  8. Solar only → tolerate brief paid-power use, then stop
 """
 
 from dataclasses import dataclass
@@ -24,8 +24,8 @@ ALLOWED_FAILURES = 3
 # Reason constants — every decision path has a named reason.
 R_NO_SOLAR = "No solar available"
 R_INSUFFICIENT_SOLAR = "Insufficient solar"
-R_BOOST_SOLAR = "Boost solar available"
-R_BOOST_COOLING = "Boost cooling towards target"
+R_PAID_POWER = "Battery and grid power permitted"
+R_MAINTAIN_TARGET = "Maintaining cooling target"
 R_SOLAR_COOL = "Solar above cool threshold"
 R_SOLAR_DRY = "Solar above dry threshold"
 R_DRY_DISABLED = "Dry mode disabled"
@@ -42,13 +42,13 @@ R_MANUAL = "Manual"
 R_AUTO_IDLE = "Auto idle"
 R_NO_CHANGE = "No change"
 R_COOLING_DISABLED = "Cooling disabled"
-R_BEFORE_AFTERNOON = "Before afternoon cooling time"
 R_BELOW_COOL_SETPOINT = "Temperature below cool setpoint"
 R_BELOW_THRESHOLD = "Temperature below threshold"
 R_BATTERY_ENGAGED = "Battery engaged"
+R_BATTERY_TOLERATED = "Battery discharge tolerated"
 R_TARGET_REACHED = "Cooling target reached"
 R_TEMPERATURE_UNAVAILABLE = "Temperature unavailable"
-R_INVALID_TEMPERATURE_RANGE = "Start temperature must be above cool setpoint"
+R_INVALID_TEMPERATURE_RANGE = "Start temperature must be above comfort temperature"
 
 
 class AirconMode(StrEnum):
@@ -92,10 +92,10 @@ class HomeInput:
     temperature: float
     humidity: float
     auto: bool
-    aggressive_cooling: bool
+    allow_paid_power: bool
     enabled: bool
     cooling_enabled: bool
-    before_afternoon: bool = False
+    pre_cooling: bool = False
     battery_discharge: float = 0.0
     temperature_available: bool = True
 
@@ -111,6 +111,7 @@ class RuleParameters:
     reactivate_delay: int
     temperature_cool: float
     manual_cooling_behaviour: ManualCoolingBehaviour = ManualCoolingBehaviour.ASK
+    temperature_precool: float = 20.0
 
     @property
     def temperature_range_valid(self) -> bool:
@@ -119,6 +120,16 @@ class RuleParameters:
             and isfinite(self.temperature_threshold)
             and self.temperature_threshold > self.temperature_cool
         )
+
+    def cooling_target(self, home: HomeInput) -> float:
+        return self.temperature_precool if home.pre_cooling else self.temperature_cool
+
+    @property
+    def precooling_range_valid(self) -> bool:
+        return isfinite(self.temperature_precool) and self.temperature_precool <= self.temperature_cool
+
+    def start_temperature(self, home: HomeInput) -> float:
+        return self.temperature_precool + 1.0 if home.pre_cooling else self.temperature_threshold
 
 
 @dataclass
@@ -157,10 +168,10 @@ def _evaluate_target_mode(config: RuleParameters, home: HomeInput) -> TargetResu
     display as an idle reason when the aircon is off).
     """
     h = home
-    if h.aggressive_cooling and (h.have_solar or (h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY))):
+    if h.allow_paid_power:
         if h.aircon_mode != AirconMode.COOL:
-            return TargetResult(HomeOutput.COOL, R_BOOST_SOLAR if h.have_solar else R_BOOST_COOLING, True)
-        return TargetResult(None, R_BOOST_COOLING, False)
+            return TargetResult(HomeOutput.COOL, R_PAID_POWER, True)
+        return TargetResult(None, R_MAINTAIN_TARGET, False)
 
     if not h.have_solar:
         return TargetResult(None, R_NO_SOLAR, True)
@@ -203,17 +214,19 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
     """
     if not home.cooling_enabled:
         return R_COOLING_DISABLED
-    if home.before_afternoon:
-        return R_BEFORE_AFTERNOON
     if not config.temperature_range_valid:
+        return R_INVALID_TEMPERATURE_RANGE
+    if home.pre_cooling and not config.precooling_range_valid:
         return R_INVALID_TEMPERATURE_RANGE
     if not home.temperature_available:
         return R_TEMPERATURE_UNAVAILABLE
-    if home.battery_discharge > 0 and not home.aggressive_cooling:
+    if home.battery_discharge > 0 and not home.allow_paid_power:
         return R_BATTERY_ENGAGED
-    if home.temperature <= config.temperature_cool:
+    if home.grid_usage > 0 and not home.allow_paid_power:
+        return R_GRID_TOO_HIGH
+    if home.temperature <= (config.temperature_precool if home.pre_cooling else config.temperature_cool):
         return R_BELOW_COOL_SETPOINT
-    if home.temperature < config.temperature_threshold:
+    if home.temperature < config.start_temperature(home):
         return R_BELOW_THRESHOLD
     return activation or default
 
@@ -233,6 +246,8 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
     if (
         h.auto
         and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
+        and not h.allow_paid_power
+        and not h.pre_cooling
         and h.temperature_available
         and h.temperature <= config.temperature_cool
     ):
@@ -266,11 +281,12 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         state.tolerated = 0
         if (
             h.cooling_enabled
-            and not h.before_afternoon
-            and (h.battery_discharge <= 0 or h.aggressive_cooling)
+            and (h.battery_discharge <= 0 or h.allow_paid_power)
+            and (h.grid_usage <= 0 or h.allow_paid_power)
             and config.temperature_range_valid
+            and (not h.pre_cooling or config.precooling_range_valid)
             and h.temperature_available
-            and h.temperature >= config.temperature_threshold
+            and h.temperature >= config.start_temperature(h)
             and target.output is not None
         ):
             return AdjustResult(target.output, target.reason)
@@ -290,32 +306,29 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return AdjustResult(HomeOutput.OFF, R_TIMER_EXPIRED)
         return AdjustResult(HomeOutput.TIMER, R_MANUAL)
 
-    if h.auto and h.aggressive_cooling:
+    if h.auto and h.allow_paid_power:
         state.tolerated = 0
         if target.output is not None and h.temperature_available:
             return AdjustResult(target.output, target.reason)
         return AdjustResult(
-            HomeOutput.NO_CHANGE, R_BOOST_COOLING if h.temperature_available else R_TEMPERATURE_UNAVAILABLE
+            HomeOutput.NO_CHANGE, R_MAINTAIN_TARGET if h.temperature_available else R_TEMPERATURE_UNAVAILABLE
         )
 
-    if h.battery_discharge > 0:
-        state.tolerated = 0
-        state.reactivate_delay = config.reactivate_delay
-        return AdjustResult(HomeOutput.OFF, R_BATTERY_ENGAGED)
-
     # --- Cooling run + grid draw (or no solar) ---
-    if h.auto and (not h.have_solar or h.grid_usage > 0):
+    if h.auto and (not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0):
         # If a mode transition is available (e.g. COOL→DRY downgrade), apply immediately.
-        if target.output is not None and h.temperature_available:
+        if target.output is not None and h.temperature_available and h.battery_discharge <= 0:
             state.tolerated = 0
             return AdjustResult(target.output, target.reason)
         # Solar: tolerate briefly, then shut off.
         state.tolerated += 1
         if state.tolerated < config.grid_usage_delay:
-            return AdjustResult(HomeOutput.NO_CHANGE, R_GRID_TOLERATED)
+            return AdjustResult(
+                HomeOutput.NO_CHANGE, R_BATTERY_TOLERATED if h.battery_discharge > 0 else R_GRID_TOLERATED
+            )
         state.tolerated = 0
         state.reactivate_delay = config.reactivate_delay
-        return AdjustResult(HomeOutput.OFF, R_GRID_TOO_HIGH)
+        return AdjustResult(HomeOutput.OFF, R_BATTERY_ENGAGED if h.battery_discharge > 0 else R_GRID_TOO_HIGH)
     # --- Cooling run + free solar ---
     if h.auto:
         state.tolerated = 0

@@ -93,8 +93,8 @@ async def test_options_update_triggers_reload(hass, loaded_entry) -> None:
 async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass_storage) -> None:
     from pytest_homeassistant_custom_component.common import async_mock_service
 
-    from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION
-    from custom_components.home_rules.rules import R_BOOST_COOLING, R_TARGET_REACHED, HomeOutput
+    from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION, ControlMode, PowerPolicy
+    from custom_components.home_rules.rules import R_MAINTAIN_TARGET, HomeOutput
 
     stops = async_mock_service(hass, "climate", "turn_off")
     hass.states.async_set("climate.test", "cool")
@@ -109,7 +109,9 @@ async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
     coordinator = mock_entry.runtime_data
-    assert coordinator._last_record["reason"] == R_BOOST_COOLING
+    assert coordinator._last_record["reason"] == R_MAINTAIN_TARGET
+    assert coordinator.control_mode is ControlMode.AUTOMATIC
+    assert coordinator.power_policy is PowerPolicy.ALLOW_BATTERY_GRID
     assert coordinator.data.auto_mode
     assert not stops
 
@@ -119,9 +121,9 @@ async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass
     coordinator = mock_entry.runtime_data
     hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")
-    assert coordinator.data.adjustment is HomeOutput.OFF
-    assert coordinator._last_record["reason"] == R_TARGET_REACHED
-    assert len(stops) == 1
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == R_MAINTAIN_TARGET
+    assert not stops
 
 
 async def test_setup_retry_for_unavailable_required_entity_does_not_create_runtime_issue(hass, mock_entry) -> None:
