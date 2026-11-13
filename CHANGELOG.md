@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v3.0.0 (2026-11-13)
+
+### Features
+
+- Control cooling power use and afternoon pre-cooling separately
+  ([`23c1983`](https://github.com/teh-hippo/ha-home-rules/commit/23c1983b4de05af73ecbc014b53bff3efc2d15c6))
+
+### Breaking Changes
+
+- Solar Cooling and Boost Cooling are replaced by Automatic plus Automatic Power Use. Saved choices
+  migrate, but automations selecting the old mode values must be updated. Allow battery and grid can
+  now start without solar and maintain the target continuously.
+
+
 ## v2.1.0 (2026-11-11)
 
 ### Features
