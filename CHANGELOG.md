@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.0.2 (2026-11-13)
+
+### Bug Fixes
+
+- Respect start temperature during afternoon cooling
+  ([`f3bed17`](https://github.com/teh-hippo/ha-home-rules/commit/f3bed17197584c0442bd65e2db7513d57769efd1))
+
+
 ## v4.0.1 (2026-11-13)
 
 ### Bug Fixes
