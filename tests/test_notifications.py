@@ -314,7 +314,7 @@ async def test_automatic_target_alert_is_optional_information_only(hass, coord_f
     async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
     stops = async_mock_service(hass, "climate", "turn_off")
-    coordinator = await coord_factory(generation="0", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"})
+    coordinator = await coord_factory(options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"})
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     coordinator.stop_at_comfort_temperature = stop
     coordinator.automatic_target_notifications = notify

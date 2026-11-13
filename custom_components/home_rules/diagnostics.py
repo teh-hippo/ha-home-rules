@@ -29,6 +29,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "dry_mode_humidity_cutoff": c.DRY_MODE_HUMIDITY_CUTOFF,
             "temperature_cool": coordinator.parameters.temperature_cool,
             "temperature_precool": coordinator.parameters.temperature_precool,
+            "reactivate_delay_minutes": coordinator.parameters.reactivate_delay,
+            "solar_run_on_minutes": coordinator.parameters.solar_run_on_minutes,
         },
         "session": dict(coordinator._last_record),
         "recent_evaluations": list(coordinator._recent),

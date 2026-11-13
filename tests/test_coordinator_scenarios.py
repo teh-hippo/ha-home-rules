@@ -121,12 +121,12 @@ async def test_restart_timer_still_active_preserves_timer_state(coord_factory) -
 
 async def test_restart_with_stale_timer_state_syncs_to_live(hass, coord_factory) -> None:
     """After restart, if stored state was TIMER but timer has expired, sync to live."""
-    from custom_components.home_rules.rules import HomeOutput
+    from custom_components.home_rules.rules import R_REACTIVATE_WAIT, HomeOutput
 
     # Timer has expired, aircon is off — timer finished while HA was down.
     coordinator = await coord_factory(
         climate="off",
-        generation="0",
+        generation="6000",
     )
     # Simulate stale stored state: session said TIMER but reality is now OFF.
     coordinator._session.last = HomeOutput.TIMER
@@ -136,6 +136,7 @@ async def test_restart_with_stale_timer_state_syncs_to_live(hass, coord_factory)
 
     # Startup sync should have resolved TIMER → OFF (live state).
     assert coordinator._session.last is HomeOutput.OFF
+    assert coordinator._last_record["reason"] == R_REACTIVATE_WAIT
 
 
 async def test_timer_expiry_callback_triggers_immediate_evaluation(hass, coord_factory) -> None:
@@ -254,7 +255,9 @@ async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling
     assert coordinator._aircon_timer_finishes_at is None
 
 
-async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass, coord_factory) -> None:
+async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass, coord_factory, freezer) -> None:
+    from datetime import timedelta
+
     from pytest_homeassistant_custom_component.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
@@ -284,9 +287,9 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     assert coordinator._timer_expiry_handle is None
 
     hass.states.async_set("climate.test", "off")
+    await hass.async_block_till_done()
     hass.states.async_set("sensor.generation", "6000", {"unit_of_measurement": "W"})
-    for _ in range(coordinator.parameters.reactivate_delay):
-        await coordinator.async_run_evaluation("poll")
+    freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
     hass.states.async_set("sensor.temperature", "23", {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")
     assert coordinator._last_record["reason"] == R_BELOW_THRESHOLD
@@ -298,7 +301,9 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     assert coordinator.data.auto_mode
 
 
-async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory) -> None:
+async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory, freezer) -> None:
+    from datetime import timedelta
+
     from pytest_homeassistant_custom_component.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
@@ -312,9 +317,148 @@ async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factor
     assert coordinator.data.timer_finishes_at is not None
 
     hass.states.async_set("climate.test", "off")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
     await coordinator.async_run_evaluation("poll")
     automatic = coordinator.data
     assert automatic.adjustment is HomeOutput.COOL
     assert automatic.auto_mode
     assert automatic.timer_finishes_at is None
     assert coordinator._timer_expiry_handle is None
+
+
+@pytest.mark.parametrize("unavailable_before_off", [False, True])
+async def test_manual_off_cooldown_survives_extra_evaluations_and_reload(
+    hass, coord_factory, freezer, unavailable_before_off
+) -> None:
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.coordinator import HomeRulesCoordinator
+    from custom_components.home_rules.rules import R_REACTIVATE_WAIT
+
+    starts = async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    coordinator = await coord_factory()
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    hass.states.async_set("climate.test", "cool")
+    await hass.async_block_till_done()
+    if unavailable_before_off:
+        hass.states.async_set("climate.test", "unavailable")
+        await hass.async_block_till_done()
+    hass.states.async_set("climate.test", "off")
+    await hass.async_block_till_done()
+    deadline = dt_util.utcnow().timestamp() + coordinator.parameters.reactivate_delay * 60
+
+    hass.states.async_set("climate.test", "off", {"temperature": 22})
+    for _ in range(10):
+        await coordinator.async_run_evaluation("manual")
+    assert coordinator._last_record["reason"] == R_REACTIVATE_WAIT
+    assert coordinator._session.reactivate_at == deadline
+    assert len(starts) == 1
+    await coordinator.async_shutdown()
+
+    restored = HomeRulesCoordinator(hass, coordinator.config_entry)
+    try:
+        await restored.async_initialize()
+        freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay, seconds=-1))
+        await restored.async_run_evaluation("restart")
+        assert restored._last_record["reason"] == R_REACTIVATE_WAIT
+        assert restored._session.reactivate_at == deadline
+        assert len(starts) == 1
+        freezer.tick(1)
+        await restored.async_run_evaluation("poll")
+        assert len(starts) == 2
+    finally:
+        await restored.async_shutdown()
+
+
+async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, coord_factory, freezer) -> None:
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import (
+        CONF_SMOOTHING_WINDOW,
+        CONF_SOLAR_RUN_ON_MINUTES,
+        ControlMode,
+        PowerPolicy,
+    )
+    from custom_components.home_rules.coordinator import HomeRulesCoordinator
+    from custom_components.home_rules.rules import R_PAID_POWER, R_RUN_ON_EXPIRED, HomeOutput
+
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(options={CONF_SMOOTHING_WINDOW: 1, CONF_SOLAR_RUN_ON_MINUTES: 60})
+    coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    hass.states.async_set("climate.test", "cool")
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.generation", "0", {"unit_of_measurement": "W"})
+    await coordinator.async_run_evaluation("poll")
+    lost_at = coordinator._session.solar_lost_at
+    deadline = coordinator._session.solar_run_on_deadline(coordinator.parameters)
+    assert coordinator._last_record["reason"] == R_PAID_POWER
+    assert coordinator._solar_expiry_handle is not None
+    await coordinator.async_shutdown()
+    assert coordinator._solar_expiry_handle is None
+
+    freezer.tick(timedelta(minutes=20))
+    restored = HomeRulesCoordinator(hass, coordinator.config_entry)
+    try:
+        await restored.async_initialize()
+        for _ in range(5):
+            await restored.async_run_evaluation("manual")
+        assert restored._session.solar_lost_at == lost_at
+        assert restored._session.solar_run_on_deadline(restored.parameters) == deadline
+        assert restored._solar_expiry_handle is not None
+        assert not stops
+        freezer.tick(
+            timedelta(
+                minutes=40, seconds=restored.parameters.grid_usage_delay * restored.parameters.evaluation_interval
+            )
+        )
+        await restored.async_run_evaluation("poll")
+        assert restored._last_record["reason"] == R_RUN_ON_EXPIRED
+        assert restored.data.adjustment is HomeOutput.OFF
+        assert len(stops) == 1
+        assert restored._solar_expiry_handle is None
+    finally:
+        await restored.async_shutdown()
+
+
+async def test_solar_run_on_expiry_callback_stops_without_another_poll(hass, coord_factory) -> None:
+    import asyncio
+
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import (
+        CONF_GRID_USAGE_DELAY,
+        CONF_SMOOTHING_WINDOW,
+        CONF_SOLAR_RUN_ON_MINUTES,
+        ControlMode,
+        PowerPolicy,
+    )
+    from custom_components.home_rules.rules import R_RUN_ON_EXPIRED
+
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(
+        options={CONF_GRID_USAGE_DELAY: 0, CONF_SMOOTHING_WINDOW: 1, CONF_SOLAR_RUN_ON_MINUTES: 0.001}
+    )
+    coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    hass.states.async_set("climate.test", "cool")
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.generation", "0", {"unit_of_measurement": "W"})
+    await coordinator.async_run_evaluation("poll")
+    await asyncio.sleep(0.15)
+    await hass.async_block_till_done()
+    assert coordinator._last_record["trigger"] == "solar_run_on_expired"
+    assert coordinator._last_record["reason"] == R_RUN_ON_EXPIRED
+    assert len(stops) == 1

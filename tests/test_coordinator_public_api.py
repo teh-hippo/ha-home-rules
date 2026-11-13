@@ -160,12 +160,13 @@ async def test_precooling_window_sets_and_maintains_target_then_returns_to_comfo
     ("generation", "temperature", "adjustment", "reason"),
     [
         ("6000", "23", "No Change", "Temperature below threshold"),
-        ("1", "24", "Cool", "Battery and grid power permitted"),
-        ("0", "25", "Cool", "Battery and grid power permitted"),
-        ("unavailable", "25", "Cool", "Battery and grid power permitted"),
+        ("6000", "24", "Cool", "Solar above cool threshold"),
+        ("1", "24", "No Change", "No change"),
+        ("0", "25", "No Change", "No solar available"),
+        ("unavailable", "25", "No Change", "No solar available"),
     ],
 )
-async def test_boost_works_in_morning_with_any_solar(
+async def test_run_on_policy_still_requires_solar_to_start(
     hass, coord_factory, monkeypatch, generation, temperature, adjustment, reason
 ) -> None:
     from datetime import datetime
@@ -205,7 +206,7 @@ async def test_evaluation_fires_ha_event(hass, coord_factory) -> None:
 
 
 async def test_user_setpoint_stays_automatic_across_window_and_reload(hass, coord_factory, monkeypatch) -> None:
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     from homeassistant.util import dt as dt_util
     from pytest_homeassistant_custom_component.common import async_mock_service
@@ -243,6 +244,8 @@ async def test_user_setpoint_stays_automatic_across_window_and_reload(hass, coor
         assert restored._last_record["target_temperature"] == 19
         hass.states.async_set("climate.test", "off")
         await hass.async_block_till_done()
+        utc_now = dt_util.utcnow() + timedelta(minutes=restored.parameters.reactivate_delay)
+        monkeypatch.setattr(dt_util, "utcnow", lambda: utc_now)
         await restored.async_run_evaluation("poll")
         assert targets[-1].data["temperature"] == 22
         assert restored._adjusted_setpoint is None

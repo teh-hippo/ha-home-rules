@@ -75,7 +75,11 @@ async def test_unavailable_humidity_biases_away_from_dry(coord_factory) -> None:
 
 
 @pytest.mark.parametrize("temperature", ["unknown", "unavailable", "nan"])
-async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(hass, coord_factory, temperature) -> None:
+async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(
+    hass, coord_factory, freezer, temperature
+) -> None:
+    from datetime import timedelta
+
     from pytest_homeassistant_custom_component.common import async_mock_service
 
     from custom_components.home_rules.const import CONF_TEMPERATURE_COOL, CONF_TEMPERATURE_THRESHOLD, ControlMode
@@ -99,6 +103,8 @@ async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(hass,
     assert not stops
 
     hass.states.async_set("climate.test", "off")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
     assert coordinator._last_record["reason"] == R_TEMPERATURE_UNAVAILABLE

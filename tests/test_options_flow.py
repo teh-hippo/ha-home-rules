@@ -19,14 +19,16 @@ def _valid_options_input() -> dict[str, str | int | float]:
         CONF_GRID_ENTITY_ID,
         CONF_GRID_USAGE_DELAY,
         CONF_HUMIDITY_ENTITY_ID,
-        CONF_REACTIVATE_DELAY,
+        CONF_REACTIVATE_DELAY_MINUTES,
+        CONF_SOLAR_RUN_ON_MINUTES,
         CONF_TEMPERATURE_ENTITY_ID,
         DEFAULT_AIRCON_TIMER_DURATION,
         DEFAULT_EVAL_INTERVAL,
         DEFAULT_GENERATION_COOL_THRESHOLD,
         DEFAULT_GENERATION_DRY_THRESHOLD,
         DEFAULT_GRID_USAGE_DELAY,
-        DEFAULT_REACTIVATE_DELAY,
+        DEFAULT_REACTIVATE_DELAY_MINUTES,
+        DEFAULT_SOLAR_RUN_ON_MINUTES,
     )
 
     return {
@@ -40,13 +42,18 @@ def _valid_options_input() -> dict[str, str | int | float]:
         CONF_GENERATION_COOL_THRESHOLD: DEFAULT_GENERATION_COOL_THRESHOLD,
         CONF_GENERATION_DRY_THRESHOLD: DEFAULT_GENERATION_DRY_THRESHOLD,
         CONF_GRID_USAGE_DELAY: DEFAULT_GRID_USAGE_DELAY,
-        CONF_REACTIVATE_DELAY: DEFAULT_REACTIVATE_DELAY,
+        CONF_REACTIVATE_DELAY_MINUTES: DEFAULT_REACTIVATE_DELAY_MINUTES,
+        CONF_SOLAR_RUN_ON_MINUTES: DEFAULT_SOLAR_RUN_ON_MINUTES,
     }
 
 
 async def test_options_flow_updates_values_and_accepts_notify_service(hass, mock_entry) -> None:
     """Options flow should accept valid inputs and persist selected notify service."""
-    from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE
+    from custom_components.home_rules.const import (
+        CONF_NOTIFICATION_SERVICE,
+        CONF_REACTIVATE_DELAY_MINUTES,
+        CONF_SOLAR_RUN_ON_MINUTES,
+    )
 
     async def _notify_service(call) -> None:
         return None
@@ -59,10 +66,14 @@ async def test_options_flow_updates_values_and_accepts_notify_service(hass, mock
 
     user_input = _valid_options_input()
     user_input[CONF_NOTIFICATION_SERVICE] = "notify.mobile_app_test"
+    user_input[CONF_REACTIVATE_DELAY_MINUTES] = 12.5
+    user_input[CONF_SOLAR_RUN_ON_MINUTES] = 37
     result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_NOTIFICATION_SERVICE] == "notify.mobile_app_test"
+    assert result["data"][CONF_REACTIVATE_DELAY_MINUTES] == 12.5
+    assert result["data"][CONF_SOLAR_RUN_ON_MINUTES] == 37
 
 
 async def test_options_flow_validates_entities(hass, mock_entry) -> None:

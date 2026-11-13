@@ -42,7 +42,7 @@ def test_solar_cooling_stops_when_battery_engaged(mode: AirconMode) -> None:
     result = adjust(PARAMS, _home(mode, battery_discharge=300), state)
     assert result.output is HomeOutput.NO_CHANGE and result.reason == R_BATTERY_TOLERATED
     result = adjust(PARAMS, _home(mode, battery_discharge=300), state)
-    assert result.output is HomeOutput.OFF and result.reason == R_BATTERY_ENGAGED and state.reactivate_delay == 2
+    assert result.output is HomeOutput.OFF and result.reason == R_BATTERY_ENGAGED and state.reactivate_at == 120
 
 
 async def test_manual_battery_run_preserves_active_timer(coord_factory, hass) -> None:

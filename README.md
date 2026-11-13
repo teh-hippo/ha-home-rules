@@ -39,9 +39,17 @@ Switch to **Automatic** once you are happy with decisions and want the integrati
 - **Solar only** (default): use generation thresholds to choose Cool or Dry; do not start while importing or discharging the battery beyond its tolerance.
   Existing automatic runs tolerate brief battery discharge or grid import, then stop after the configured **Paid-power tolerance**.
   Cool/Dry mode changes do not reset that tolerance.
-- **Allow battery and grid**: start Cool without requiring solar, including overnight and during peak tariffs.
-  This explicitly permits energy spending; the independent target-stop setting determines whether reaching Comfort Temperature stops cooling.
+- **Solar with battery/grid run-on**: starts require the same solar and temperature conditions as Solar only.
+  An existing solar-started run can continue on battery/grid for the configurable **Solar run-on allowance**, default **60 minutes**, after the paid-power tolerance period.
+  The allowance preserves the current Cool/Dry mode and cannot start a fresh run.
+  Brief solar recoveries do not reset its deadline; sufficient free solar must recover for at least the tolerance period (or one evaluation interval when tolerance is zero).
+  Setting the allowance to zero disables run-on.
   Home Rules does not enforce a battery charge reserve; inverter protections remain external.
+
+**Minimum off time** applies after every switch-off, including manual stops and timer expiry.
+It uses elapsed minutes, not evaluation counts, and its deadline survives restarts.
+Legacy reactivation settings are converted using their configured evaluation interval.
+Manual starts remain possible during the automatic-start cooldown.
 
 **Temperature control.** Normal automatic starts use **Start Temperature** (default 24°C).
 **Comfort Temperature** (default 22°C) is the actual desired room temperature and the target sent to the climate entity.
@@ -87,7 +95,8 @@ The finish time remains the explicit daily limit even when no tariff entity is c
 Window boundaries and tariff changes trigger evaluation immediately; other decisions use the configured evaluation interval.
 No tariff schedule, battery charging or export settings are changed by Home Rules.
 
-Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Allow battery and grid respectively.
+Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Solar with battery/grid run-on respectively.
+The former unrestricted Allow battery and grid policy now permits bounded continuation only, not paid-power starts.
 Existing comfort temperatures and afternoon-switch settings are preserved.
 The old afternoon start hour is used to initialise the new start-time entity.
 The former Manual cooling target behaviour option is replaced by the two switches: Auto off enables Stop at Comfort Temperature; Timer and Ask leave it off.

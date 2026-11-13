@@ -91,10 +91,11 @@ async def test_options_update_triggers_reload(hass, loaded_entry) -> None:
 
 
 async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass_storage) -> None:
+    from homeassistant.util import dt as dt_util
     from pytest_homeassistant_custom_component.common import async_mock_service
 
     from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION, ControlMode, PowerPolicy
-    from custom_components.home_rules.rules import R_MAINTAIN_TARGET, HomeOutput
+    from custom_components.home_rules.rules import R_PAID_POWER, HomeOutput
 
     stops = async_mock_service(hass, "climate", "turn_off")
     hass.states.async_set("climate.test", "cool")
@@ -103,13 +104,17 @@ async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass
     hass.states.async_set("sensor.temperature", "23", {"unit_of_measurement": "°C"})
     hass_storage[f"{DOMAIN}_{mock_entry.entry_id}"] = {
         "version": STORAGE_VERSION,
-        "data": {"controls": {"mode": "boost_cooling"}, "auto_mode": True, "session": {"last": "Cool"}},
+        "data": {
+            "controls": {"mode": "boost_cooling"},
+            "auto_mode": True,
+            "session": {"last": "Cool", "solar_run_eligible": True, "solar_lost_at": dt_util.utcnow().timestamp()},
+        },
     }
 
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
     coordinator = mock_entry.runtime_data
-    assert coordinator._last_record["reason"] == R_MAINTAIN_TARGET
+    assert coordinator._last_record["reason"] == R_PAID_POWER
     assert coordinator.control_mode is ControlMode.AUTOMATIC
     assert coordinator.power_policy is PowerPolicy.ALLOW_BATTERY_GRID
     assert coordinator.data.auto_mode
@@ -122,7 +127,7 @@ async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass
     hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
-    assert coordinator._last_record["reason"] == R_MAINTAIN_TARGET
+    assert coordinator._last_record["reason"] == R_PAID_POWER
     assert not stops
 
 
@@ -139,3 +144,31 @@ async def test_setup_retry_for_unavailable_required_entity_does_not_create_runti
 
     registry = ir.async_get(hass)
     assert registry.async_get_issue(DOMAIN, f"{mock_entry.entry_id}_{ISSUE_RUNTIME}") is None
+
+
+async def test_legacy_reactivation_counts_migrate_to_elapsed_time(hass, mock_entry, hass_storage, freezer) -> None:
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.home_rules.const import (
+        CONF_EVAL_INTERVAL,
+        CONF_REACTIVATE_DELAY,
+        CONF_REACTIVATE_DELAY_MINUTES,
+        DOMAIN,
+        STORAGE_VERSION,
+    )
+    from custom_components.home_rules.rules import R_REACTIVATE_WAIT
+
+    hass.config_entries.async_update_entry(mock_entry, options={CONF_EVAL_INTERVAL: 300, CONF_REACTIVATE_DELAY: 3})
+    storage_key = f"{DOMAIN}_{mock_entry.entry_id}"
+    hass_storage[storage_key] = {
+        "version": STORAGE_VERSION,
+        "data": {"session": {"last": "Off", "reactivate_delay": 2}},
+    }
+    expected_deadline = dt_util.utcnow().timestamp() + 600
+    assert await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done()
+    assert CONF_REACTIVATE_DELAY not in mock_entry.options
+    assert mock_entry.options[CONF_REACTIVATE_DELAY_MINUTES] == 15
+    assert mock_entry.runtime_data._last_record["reason"] == R_REACTIVATE_WAIT
+    assert mock_entry.runtime_data._session.reactivate_at == expected_deadline
+    assert "reactivate_delay" not in hass_storage[storage_key]["data"]["session"]

@@ -9,10 +9,13 @@ from .coordinator import HomeRulesCoordinator
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     retired_keys = c.RETIRED_CONFIG_KEYS
     if retired_keys.intersection(entry.data) or retired_keys.intersection(entry.options):
+        options = {key: value for key, value in entry.options.items() if key not in retired_keys}
+        if c.CONF_REACTIVATE_DELAY in entry.options:
+            options[c.CONF_REACTIVATE_DELAY_MINUTES] = c.reactivation_delay_minutes(entry.options)
         hass.config_entries.async_update_entry(
             entry,
             data={key: value for key, value in entry.data.items() if key not in retired_keys},
-            options={key: value for key, value in entry.options.items() if key not in retired_keys},
+            options=options,
         )
     registry = er.async_get(hass)
     for key in ("forecast_min_kwh", "battery_min_soc"):

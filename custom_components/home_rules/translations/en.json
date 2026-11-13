@@ -56,7 +56,8 @@
           "generation_cool_threshold": "Cool threshold (W)",
           "generation_dry_threshold": "Dry threshold (W)",
           "grid_usage_delay": "Paid-power tolerance (evaluations)",
-          "reactivate_delay": "Reactivation delay (evaluations)",
+          "reactivate_delay_minutes": "Minimum off time (minutes)",
+          "solar_run_on_minutes": "Solar run-on allowance (minutes)",
           "smoothing_window": "Smoothing window (evaluations)",
           "grid_invert": "Grid sensor reports export as positive (invert sign)",
           "notification_service": "Notification service (optional)"
@@ -128,7 +129,7 @@
         "name": "Automatic Power Use",
         "state": {
           "solar_only": "Solar only",
-          "allow_battery_grid": "Allow battery and grid"
+          "allow_battery_grid": "Solar with battery/grid run-on"
         }
       }
     },
