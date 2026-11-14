@@ -1,16 +1,20 @@
 # fmt: off
 # ruff: noqa: E501, E701, E702
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
-from homeassistant.const import UnitOfPower
+from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 from homeassistant.helpers.selector import SelectOptionDict
 
 from . import const as c
+
+if TYPE_CHECKING or (MAJOR_VERSION, MINOR_VERSION) >= (2026, 10):
+    import probatio as vol
+else:
+    import voluptuous as vol
 
 _PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number", "time")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)

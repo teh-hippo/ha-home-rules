@@ -21,6 +21,9 @@ Solar-aware aircon automation for Home Assistant.
 
 ## Installation
 
+Requires Home Assistant **2026.3.0** or newer.
+Configuration forms support both Voluptuous and the Probatio schema backend introduced in Home Assistant 2026.10.
+
 Install through HACS as a custom repository:
 1. Add `https://github.com/teh-hippo/ha-home-rules` as an **Integration** repository.
 2. Install **Home Rules**.
@@ -146,5 +149,5 @@ MIT
 [release-url]: https://github.com/teh-hippo/ha-home-rules/releases
 [validate-badge]: https://img.shields.io/github/actions/workflow/status/teh-hippo/ha-home-rules/validate.yml?branch=master&label=validate
 [validate-url]: https://github.com/teh-hippo/ha-home-rules/actions/workflows/validate.yml
-[ha-badge]: https://img.shields.io/badge/HA-2026.2%2B-blue.svg
+[ha-badge]: https://img.shields.io/badge/HA-2026.3%2B-blue.svg
 [ha-url]: https://www.home-assistant.io
