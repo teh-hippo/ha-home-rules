@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v4.0.3 (2026-11-14)
+
+### Bug Fixes
+
+- Support both Home Assistant config schema backends
+  ([`85075d2`](https://github.com/teh-hippo/ha-home-rules/commit/85075d2e71a5de3de902f7415a563e32ef0d58af))
+
+- **deps**: Keep Python updates on the supported 3.14 runtime
+  ([`5836559`](https://github.com/teh-hippo/ha-home-rules/commit/5836559123bd8f932b7ca0e232e4d7711f99c572))
+
+### Chores
+
+- **deps**: Update dependency aiohttp to v3.14.4 [security]
+  ([`f93851d`](https://github.com/teh-hippo/ha-home-rules/commit/f93851d773cdf398c2165e94bb001db2926ecb33))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 2e0589f
+  ([`f987a40`](https://github.com/teh-hippo/ha-home-rules/commit/f987a40c4453aac4ed017e5d145b6257953920d0))
+
+- **deps**: Update python to >=3.15.2,<3.16
+  ([`da13c9f`](https://github.com/teh-hippo/ha-home-rules/commit/da13c9fb19c6f9c240b2348b01f2465733c9b9aa))
+
+
 ## v4.0.2 (2026-11-13)
 
 ### Bug Fixes
