@@ -1,4 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>teh-hippo/common-repo-configs//renovate/default.json5"]
+  "extends": ["github>teh-hippo/common-repo-configs//renovate/default.json5"],
+  "packageRules": [
+    {
+      "description": "Keep the project Python requirement on the supported 3.14 runtime used by development and CI.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "matchPackageNames": ["python"],
+      "allowedVersions": "<3.15"
+    }
+  ]
 }
