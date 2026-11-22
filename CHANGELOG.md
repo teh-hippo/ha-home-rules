@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v4.0.4 (2026-11-22)
+
+### Bug Fixes
+
+- Adopt existing cooling when automatic conditions qualify
+  ([`86bf184`](https://github.com/teh-hippo/ha-home-rules/commit/86bf184163ed8e0f154ad630883a389a3de6f54e))
+
+- Restore releases with a supported Python version
+  ([`8c099ad`](https://github.com/teh-hippo/ha-home-rules/commit/8c099ad6df76fb2fe3ec9fc761bd4b672aca906b))
+
+### Chores
+
+- **deps**: Refresh Home Assistant dependency lock
+  ([`3f68175`](https://github.com/teh-hippo/ha-home-rules/commit/3f681755b7393a91c8e908faf19cbbb46db14052))
+
+- **deps**: Update mcr.microsoft.com/devcontainers/python:3.14 docker digest to 80dc800
+  ([`8bacca2`](https://github.com/teh-hippo/ha-home-rules/commit/8bacca24e824b3bf486a8724e75760601dff5bce))
+
+- **deps**: Update python docker tag to v3.15
+  ([`75ea2d7`](https://github.com/teh-hippo/ha-home-rules/commit/75ea2d714093979f39f44b50c647305c55bee598))
+
+
 ## v4.0.3 (2026-11-14)
 
 ### Bug Fixes
