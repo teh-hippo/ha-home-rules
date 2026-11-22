@@ -7,14 +7,14 @@ Decision tree (high-level):
   1. Disabled → report DISABLED
   2. Unknown aircon mode → NO_CHANGE
   3. Automatic cooling disabled, or target-stop enabled at target → OFF
-  4. Manual cooling on paid power/timer → apply timer cap
-  5. Reactivation delay active → NO_CHANGE (countdown)
-  6. Aircon OFF → evaluate temperature and solar eligibility
+  4. Expired manual cooling timer → OFF
+  5. Start or adopt cooling when temperature and solar qualify
+  6. Other manual cooling on paid power/timer → apply timer cap
   7. Battery/grid permitted → finish a solar-started run within its allowance
   8. Solar only → tolerate brief paid-power use, then stop
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from math import isfinite
 from typing import NamedTuple
@@ -292,16 +292,35 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         and h.temperature <= config.temperature_cool
     ):
         return _stop(config, h, state, R_TARGET_REACHED)
-    if not h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY):
-        if state.last is HomeOutput.TIMER and not h.timer:
-            return _stop(config, h, state, R_TIMER_EXPIRED)
+    manual_cooling = not h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
+    if manual_cooling and state.last is HomeOutput.TIMER and not h.timer:
+        return _stop(config, h, state, R_TIMER_EXPIRED)
+    if h.aircon_mode is AirconMode.OFF and h.now < state.reactivate_at:
+        return AdjustResult(HomeOutput.NO_CHANGE, R_REACTIVATE_WAIT)
+
+    target = _evaluate_target_mode(config, replace(h, aircon_mode=AirconMode.OFF) if manual_cooling else h)
+    if (
+        (h.aircon_mode is AirconMode.OFF or manual_cooling)
+        and h.cooling_enabled
+        and h.battery_discharge <= 0
+        and h.grid_usage <= 0
+        and config.temperature_range_valid
+        and (not h.pre_cooling or config.precooling_range_valid)
+        and h.temperature_available
+        and h.temperature >= config.temperature_threshold
+        and target.output is not None
+    ):
+        state.tolerated = 0
+        state.solar_run_eligible = True
+        return AdjustResult(target.output, target.reason)
+
+    if manual_cooling:
         if h.timer or not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0:
             state.tolerated = 0
             if h.timer:
                 return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
             return AdjustResult(HomeOutput.TIMER, R_MANUAL)
 
-    target = _evaluate_target_mode(config, h)
     if h.auto and h.aircon_mode is AirconMode.DRY and not config.dry_mode_enabled:
         if (
             target.output is HomeOutput.COOL
@@ -312,26 +331,11 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             state.tolerated = 0
             return AdjustResult(target.output, target.reason)
         return _stop(config, h, state, R_DRY_DISABLED)
-    if h.aircon_mode is AirconMode.OFF and h.now < state.reactivate_at:
-        return AdjustResult(HomeOutput.NO_CHANGE, R_REACTIVATE_WAIT)
-
     activation = target.reason if target.is_actionable else None
 
     # --- Aircon is OFF ---
     if h.aircon_mode == AirconMode.OFF:
         state.tolerated = 0
-        if (
-            h.cooling_enabled
-            and h.battery_discharge <= 0
-            and h.grid_usage <= 0
-            and config.temperature_range_valid
-            and (not h.pre_cooling or config.precooling_range_valid)
-            and h.temperature_available
-            and h.temperature >= config.temperature_threshold
-            and target.output is not None
-        ):
-            state.solar_run_eligible = True
-            return AdjustResult(target.output, target.reason)
         if h.auto:
             return AdjustResult(HomeOutput.OFF, _idle_reason(config, h, activation, R_AUTO_IDLE))
         if state.last is HomeOutput.TIMER and not h.timer:

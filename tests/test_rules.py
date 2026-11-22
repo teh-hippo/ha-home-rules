@@ -758,21 +758,27 @@ class TestAdjustOnFreeSolar:
         assert r.output is OUT.NO_CHANGE
         assert r.reason == R_NO_CHANGE
 
-    def test_manual_no_change(self):
-        """Not auto -> NO_CHANGE R_NO_CHANGE."""
+    @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
+    @pytest.mark.parametrize("timer", [False, True])
+    @pytest.mark.parametrize(
+        ("generation", "output", "reason"), [(6000, OUT.COOL, R_SOLAR_COOL), (4000, OUT.DRY, R_SOLAR_DRY)]
+    )
+    def test_manual_cooling_is_adopted_when_start_conditions_qualify(self, mode, timer, generation, output, reason):
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
             home(
-                aircon_mode=AirconMode.COOL,
-                generation=6000,
-                humidity=60,
+                aircon_mode=mode,
+                generation=generation,
+                humidity=70,
+                timer=timer,
                 grid_usage=0,
                 auto=False,
             ),
             state,
         )
-        assert r == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+        assert r == AdjustResult(output, reason)
+        assert state.solar_run_eligible
 
     def test_free_solar_resets_tolerated(self):
         """Auto free solar path resets tolerated counter."""
@@ -1313,12 +1319,12 @@ def test_solar_only_does_not_start_while_importing():
 
 
 class TestAdjustManualFreeSolar:
-    """Free solar allows uncapped manual cooling, but cannot override an existing timer cap."""
+    """Qualifying solar adopts manual cooling, but cannot override an expired timer cap."""
 
-    def test_free_solar_manual_stays_uncapped(self):
+    def test_free_solar_manual_below_start_threshold_stays_uncapped(self):
         r = adjust(
             TEST_PARAMS,
-            home(aircon_mode=AirconMode.COOL, have_solar=True, generation=6000, auto=False),
+            home(aircon_mode=AirconMode.COOL, have_solar=True, generation=6000, temperature=23, auto=False),
             CachedState(last=OUT.COOL),
         )
         assert r == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
@@ -1330,6 +1336,34 @@ class TestAdjustManualFreeSolar:
             CachedState(last=OUT.TIMER),
         )
         assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
+
+
+@pytest.mark.parametrize(
+    ("parameters", "inputs"),
+    [
+        ({}, {"cooling_enabled": False}),
+        ({}, {"enabled": False}),
+        ({}, {"temperature": 23}),
+        ({}, {"temperature_available": False}),
+        ({}, {"have_solar": False}),
+        ({}, {"generation": 3000}),
+        ({}, {"grid_usage": 500}),
+        ({}, {"battery_discharge": 500}),
+        ({"temperature_threshold": 22}, {}),
+        ({"temperature_precool": 23}, {"pre_cooling": True}),
+        ({"dry_mode_enabled": False}, {"generation": 4000}),
+        ({}, {"generation": 4000, "humidity": 60}),
+    ],
+)
+def test_manual_timer_is_not_adopted_without_automatic_start_eligibility(parameters, inputs):
+    state = CachedState(last=OUT.TIMER)
+    result = adjust(
+        replace(TEST_PARAMS, **parameters),
+        replace(home(aircon_mode=AirconMode.COOL, timer=True, generation=6000), **inputs),
+        state,
+    )
+    assert result.output not in (OUT.COOL, OUT.DRY)
+    assert not state.solar_run_eligible
 
 
 @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])

@@ -301,30 +301,38 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     assert coordinator.data.auto_mode
 
 
-async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory, freezer) -> None:
+@pytest.mark.parametrize("climate", ["heat", "cool", "dry"])
+async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory, freezer, climate) -> None:
     from datetime import timedelta
 
     from pytest_homeassistant_custom_component.common import async_mock_service
 
-    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.const import CONF_SMOOTHING_WINDOW, ControlMode
     from custom_components.home_rules.rules import HomeOutput
 
     async_mock_service(hass, "climate", "set_hvac_mode")
-    async_mock_service(hass, "climate", "set_temperature")
-    coordinator = await coord_factory(climate="heat")
+    targets = async_mock_service(hass, "climate", "set_temperature")
+    coordinator = await coord_factory(climate=climate, generation="0", options={CONF_SMOOTHING_WINDOW: 1})
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     assert coordinator.data.adjustment is HomeOutput.TIMER
     assert coordinator.data.timer_finishes_at is not None
 
-    hass.states.async_set("climate.test", "off")
-    await hass.async_block_till_done()
-    freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
+    if climate == "heat":
+        hass.states.async_set("climate.test", "off")
+        await hass.async_block_till_done()
+        freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
+    hass.states.async_set("sensor.generation", "6000", {"unit_of_measurement": "W"})
     await coordinator.async_run_evaluation("poll")
     automatic = coordinator.data
     assert automatic.adjustment is HomeOutput.COOL
     assert automatic.auto_mode
     assert automatic.timer_finishes_at is None
     assert coordinator._timer_expiry_handle is None
+    assert targets[-1].data["temperature"] == coordinator.parameters.temperature_cool
+    assert coordinator._session.solar_run_eligible
+    stored = await coordinator._store.async_load()
+    assert stored["auto_mode"]
+    assert stored["aircon_timer_finishes_at"] is None
 
 
 @pytest.mark.parametrize("unavailable_before_off", [False, True])
