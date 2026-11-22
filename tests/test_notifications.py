@@ -342,7 +342,9 @@ async def test_free_manual_target_alert_ignores_automatic_notification_switch(ha
 
     notifications = async_mock_service(hass, "notify", "mobile_app_test")
     stops = async_mock_service(hass, "climate", "turn_off")
-    coordinator = await coord_factory(climate="cool", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"})
+    coordinator = await coord_factory(
+        climate="cool", temperature="23", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"}
+    )
     coordinator.automatic_target_notifications = False
     coordinator.stop_at_comfort_temperature = stop
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)

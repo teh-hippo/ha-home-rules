@@ -110,7 +110,9 @@ Automatic Target Notifications initially defaults on, and manual target alerts r
 **Battery Discharge Tolerance** ignores discharge up to the configured wattage.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
-Manually started cooling remains uncapped while free solar is available.
+Existing Cool/Dry sessions become automatic when the normal automatic-start temperature, solar and power checks qualify, including sessions with an active manual timer.
+Adoption applies the automatic target temperature and clears the manual timer.
+Otherwise, manually started cooling remains uncapped while free solar is available.
 Once it uses battery/grid power or solar is unavailable, the configured timer cap starts independently of Automatic Power Use.
 Automatic cooling does not receive a manual timer merely because battery/grid use is permitted.
 Manual target alerts offer **Turn off**, **Keep running**, and **5 mins** buttons while cooling remains on; a target-based stop sends an information-only alert.
@@ -119,7 +121,7 @@ No response or **Keep running** leaves the original deadline unchanged.
 **5 mins** shortens the remaining timer to five minutes from the response, without extending a shorter remaining time.
 If a manual run is still uncapped, **5 mins** explicitly starts a five-minute timer.
 Target prompts and pending responses survive HA restarts, and buttons from completed or replaced timer sessions are ignored.
-Timer expiry still stops the run if solar generation recovers.
+An expired manual timer still stops the run if solar generation recovers; only a still-active timer can be replaced by automatic cooling.
 Unavailable temperature readings cannot trigger target prompts or target-based stops.
 Heat and other non-cooling manual modes retain their timer-only behaviour.
 
