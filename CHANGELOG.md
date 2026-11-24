@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.2.0 (2026-11-24)
+
+### Features
+
+- Show settings behind each aircon decision
+  ([`8f325b9`](https://github.com/teh-hippo/ha-home-rules/commit/8f325b918dd40e2d18cb10d8f8d3f2b913664b5f))
+
+
 ## v4.1.0 (2026-11-24)
 
 ### Bug Fixes
