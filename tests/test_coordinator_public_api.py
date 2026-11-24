@@ -12,6 +12,7 @@ This file serves as the Phase 0 behavior contract for subsequent refactoring.
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -33,6 +34,20 @@ async def test_evaluation_produces_coordinator_data(coord_factory) -> None:
     snapshot = coordinator.last_evaluation
     snapshot["fallback_inputs"]["changed"] = True
     assert "changed" not in coordinator.last_evaluation["fallback_inputs"]
+
+
+async def test_manual_evaluation_reports_runtime_issue(hass, coord_factory) -> None:
+    from homeassistant.helpers import issue_registry as ir
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    from custom_components.home_rules.const import DOMAIN, ISSUE_RUNTIME
+
+    coordinator = await coord_factory()
+    with patch.object(coordinator, "_evaluate", AsyncMock(side_effect=ValueError("broken input"))):
+        with pytest.raises(UpdateFailed, match="Failed to evaluate Home Rules: broken input"):
+            await coordinator.async_run_evaluation("manual")
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, f"{coordinator.config_entry.entry_id}_{ISSUE_RUNTIME}")
 
 
 async def test_default_control_mode_is_monitor(coord_factory) -> None:

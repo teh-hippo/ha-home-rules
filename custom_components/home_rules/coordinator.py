@@ -173,8 +173,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         for unsub in self._schedule_unsubs: unsub()
         self._schedule_unsubs.clear()
         if self._tariff_unsub is not None: self._tariff_unsub(); self._tariff_unsub = None
-    # WTF: manual, timer and event-triggered errors bypass the poll path that creates repair issues.
-    async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate(trigger))
+    async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate_with_error_handling(trigger))
 
     def _schedule_precooling(self) -> None:
         for unsub in self._schedule_unsubs: unsub()
@@ -186,7 +185,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _async_handle_tariff_change(self, event: Event[EventStateChangedData]) -> None: self.hass.async_create_task(self.async_run_evaluation("tariff"))
 
     async def _async_update_data(self) -> CoordinatorData:
-        try: return await self._evaluate("poll")
+        return await self._evaluate_with_error_handling("poll")
+
+    async def _evaluate_with_error_handling(self, trigger: str, *, notification_action: str | None = None) -> CoordinatorData:
+        try: return await self._evaluate(trigger, notification_action=notification_action)
         except ConfigEntryNotReady as err: raise UpdateFailed(str(err)) from err
         except Exception as err:  # noqa: BLE001
             self._create_issue(c.ISSUE_RUNTIME, {"error": str(err)})
@@ -265,7 +267,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _async_handle_notification_action(self, event: Event[dict[str, Any]]) -> None:
         action = event.data.get("action")
         if not isinstance(action, str) or action not in self._target_notification_actions(): return
-        self.async_set_updated_data(await self._evaluate("notification_action", notification_action=action))
+        self.async_set_updated_data(await self._evaluate_with_error_handling("notification_action", notification_action=action))
 
     def _unsubscribe_notifications(self) -> None:
         if self._notification_unsub is not None: self._notification_unsub(); self._notification_unsub = None
