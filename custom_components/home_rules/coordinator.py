@@ -4,6 +4,7 @@
 import asyncio
 from collections import deque
 from contextlib import suppress
+from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, time, timedelta
 from math import isfinite
@@ -73,6 +74,11 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         super().__init__(hass, c.LOGGER, name=name, update_interval=interval, always_update=True, config_entry=config_entry); self.data = CoordinatorData()
 
     def get_parameter(self, key: str, default: float) -> float: return float(self._parameters.get(key, self.config_entry.options.get(key, default)))
+    @property
+    def last_evaluation(self) -> dict[str, Any]: return deepcopy(self._last_record)
+    @property
+    def recent_evaluations(self) -> list[dict[str, Any]]: return deepcopy(list(self._recent))
+
     async def async_set_parameter(self, key: str, value: float) -> None:
         if key in (c.CONF_TEMPERATURE_THRESHOLD, c.CONF_TEMPERATURE_COOL, c.CONF_TEMPERATURE_PRECOOL):
             candidate = replace(self.parameters, temperature_threshold=value) if key == c.CONF_TEMPERATURE_THRESHOLD else replace(self.parameters, temperature_cool=value) if key == c.CONF_TEMPERATURE_COOL else replace(self.parameters, temperature_precool=value)
@@ -167,6 +173,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         for unsub in self._schedule_unsubs: unsub()
         self._schedule_unsubs.clear()
         if self._tariff_unsub is not None: self._tariff_unsub(); self._tariff_unsub = None
+    # WTF: manual, timer and event-triggered errors bypass the poll path that creates repair issues.
     async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate(trigger))
 
     def _schedule_precooling(self) -> None:
@@ -203,6 +210,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 result = AdjustResult(HomeOutput.OFF, "Turned off from notification")
             else: result = adjust(params, decision_home, self._session)
             adjustment, reason = result.output, result.reason; target_temperature = self._adjusted_setpoint if home.auto and self._adjusted_setpoint is not None else params.cooling_target(home) if home.auto or adjustment in (HomeOutput.COOL, HomeOutput.DRY) else params.temperature_cool
+            # WTF: the service call happens before the repeated-adjustment failure budget is checked.
             await self._execute_adjustment(adjustment, target_temperature)
             self._schedule_solar_expiry()
             if adjustment is HomeOutput.NO_CHANGE and home.auto and home.enabled and home.temperature_available and home.aircon_mode in (AirconMode.COOL, AirconMode.DRY) and self.control_mode is c.ControlMode.AUTOMATIC:
@@ -352,6 +360,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._create_issue(c.ISSUE_ENTITY_UNAVAILABLE, {"entity_id": entity_id, "label": label}); raise ValueError(f"entity unavailable: {entity_id}")
         self._fallback_inputs[label] = raw
         if label in self._FALLBACK_DEFAULTS: return State(entity_id, self._FALLBACK_DEFAULTS[label], state.attributes)
+        # WTF: unavailable temperature and humidity sensors become plausible values that bias the rules.
         if label == "temperature": return State(entity_id, str(self.parameters.temperature_threshold - 0.1), state.attributes)
         if label == "humidity": return State(entity_id, str(c.DRY_MODE_HUMIDITY_CUTOFF - 1.0), state.attributes)
         return state
@@ -423,6 +432,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _save_state(self) -> None:
         session = asdict(self._session); session["last"] = self._session.last.value if self._session.last else None
+        # WTF: this persists the full 50-record diagnostic history on every evaluation.
         await self._store.async_save({"controls": {"mode": self.control_mode.value, c.CONF_POWER_POLICY: self.power_policy.value, c.CONF_PRECOOL_START: self.pre_cooling_start.isoformat(), c.CONF_PRECOOL_FINISH: self.pre_cooling_finish.isoformat(), "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_AFTERNOON_COOLING: self.afternoon_cooling, c.CONF_STOP_AT_COMFORT_TEMPERATURE: self.stop_at_comfort_temperature, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS: self.automatic_target_notifications}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent), "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "target_notified": self._target_notified, "target_prompt_id": self._target_prompt_id, "automatic_setpoint": self._automatic_setpoint, "adjusted_setpoint": self._adjusted_setpoint, "parameters": dict(self._parameters)})
 
     def _create_issue(self, issue: str, placeholders: dict[str, str]) -> None:

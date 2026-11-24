@@ -72,7 +72,7 @@ class HomeRulesSensor(HomeRulesEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         key = self.entity_description.key
-        if key == "decision": return {**dict(self.coordinator._last_record), "recent": list(self.coordinator._recent)[:10]}
+        if key == "decision": return {**self.coordinator.last_evaluation, "recent": self.coordinator.recent_evaluations[:10]}
         return None
 
 

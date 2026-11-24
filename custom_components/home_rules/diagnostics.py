@@ -9,6 +9,7 @@ from . import const as c
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     coordinator = entry.runtime_data
+    # WTF: the redaction helper receives no sensitive keys, so this currently redacts nothing.
     return {
         "config": async_redact_data(dict(entry.data), set()),
         "options": async_redact_data(dict(entry.options), set()),
@@ -32,6 +33,6 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "reactivate_delay_minutes": coordinator.parameters.reactivate_delay,
             "solar_run_on_minutes": coordinator.parameters.solar_run_on_minutes,
         },
-        "session": dict(coordinator._last_record),
-        "recent_evaluations": list(coordinator._recent),
+        "session": coordinator.last_evaluation,
+        "recent_evaluations": coordinator.recent_evaluations,
     }

@@ -3,6 +3,7 @@
 These tests validate behavior through public interfaces only:
 - async_run_evaluation, async_set_mode, async_set_control
 - coordinator.data, coordinator.control_mode, coordinator.cooling_enabled
+- coordinator.last_evaluation, coordinator.recent_evaluations
 
 No private methods (_evaluate, _execute_adjustment, _session, etc.) are called.
 This file serves as the Phase 0 behavior contract for subsequent refactoring.
@@ -25,9 +26,13 @@ async def test_evaluation_produces_coordinator_data(coord_factory) -> None:
     await coordinator.async_run_evaluation("test")
 
     assert coordinator.data.adjustment is HomeOutput.COOL
-    assert coordinator._last_record["dry_run"] is True  # safety default
-    assert coordinator._last_record["generation"] == 6000.0
-    assert coordinator._last_record["have_solar"] is True
+    assert coordinator.last_evaluation["dry_run"] is True  # safety default
+    assert coordinator.last_evaluation["generation"] == 6000.0
+    assert coordinator.last_evaluation["have_solar"] is True
+
+    snapshot = coordinator.last_evaluation
+    snapshot["fallback_inputs"]["changed"] = True
+    assert "changed" not in coordinator.last_evaluation["fallback_inputs"]
 
 
 async def test_default_control_mode_is_monitor(coord_factory) -> None:
