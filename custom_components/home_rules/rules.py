@@ -48,6 +48,7 @@ R_BATTERY_ENGAGED = "Battery engaged"
 R_BATTERY_TOLERATED = "Battery discharge tolerated"
 R_TARGET_REACHED = "Cooling target reached"
 R_TEMPERATURE_UNAVAILABLE = "Temperature unavailable"
+R_HUMIDITY_UNAVAILABLE = "Humidity unavailable"
 R_INVALID_TEMPERATURE_RANGE = "Start temperature must be above comfort temperature"
 
 
@@ -83,8 +84,8 @@ class HomeInput:
     generation: float
     grid_usage: float
     timer: bool
-    temperature: float
-    humidity: float
+    temperature: float | None
+    humidity: float | None
     auto: bool
     allow_paid_power: bool
     enabled: bool
@@ -92,6 +93,7 @@ class HomeInput:
     pre_cooling: bool = False
     battery_discharge: float = 0.0
     temperature_available: bool = True
+    humidity_available: bool = True
     now: float = 0.0
 
 
@@ -196,6 +198,8 @@ def _evaluate_target_mode(config: RuleParameters, home: HomeInput) -> TargetResu
             return TargetResult(None, R_DRY_DISABLED, True)
         if h.aircon_mode == AirconMode.DRY:
             return TargetResult(None, R_ALREADY_DRYING, False)
+        if not h.humidity_available or h.humidity is None:
+            return TargetResult(None, R_HUMIDITY_UNAVAILABLE, True)
         if h.humidity < config.dry_mode_humidity_cutoff:
             return TargetResult(None, R_HUMIDITY_TOO_LOW, True)
         return TargetResult(HomeOutput.DRY, R_SOLAR_DRY, True)
@@ -226,7 +230,7 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
         return R_INVALID_TEMPERATURE_RANGE
     if home.pre_cooling and not config.precooling_range_valid:
         return R_INVALID_TEMPERATURE_RANGE
-    if not home.temperature_available:
+    if not home.temperature_available or home.temperature is None:
         return R_TEMPERATURE_UNAVAILABLE
     if home.battery_discharge > 0:
         return R_BATTERY_ENGAGED
@@ -289,6 +293,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         and config.stop_at_comfort_temperature
         and not (h.auto and h.pre_cooling)
         and h.temperature_available
+        and h.temperature is not None
         and h.temperature <= config.temperature_cool
     ):
         return _stop(config, h, state, R_TARGET_REACHED)
@@ -307,6 +312,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         and config.temperature_range_valid
         and (not h.pre_cooling or config.precooling_range_valid)
         and h.temperature_available
+        and h.temperature is not None
         and h.temperature >= config.temperature_threshold
         and target.output is not None
     ):
@@ -368,7 +374,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
     # --- Cooling run + free solar ---
     if h.auto:
         state.tolerated = 0
-        if not h.temperature_available:
+        if not h.temperature_available or h.temperature is None:
             return AdjustResult(HomeOutput.NO_CHANGE, R_TEMPERATURE_UNAVAILABLE)
         if target.output is not None:
             return AdjustResult(target.output, target.reason)

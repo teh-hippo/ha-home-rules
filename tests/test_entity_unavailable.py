@@ -45,8 +45,8 @@ async def test_required_entity_unavailable_during_startup_is_wrapped_without_run
     assert registry.async_get_issue(DOMAIN, f"{coordinator.config_entry.entry_id}_{ISSUE_RUNTIME}") is None
 
 
-async def test_unavailable_temperature_uses_below_threshold_default(coord_factory) -> None:
-    """Unavailable temperature defaults to threshold-0.1°C so cooling is not triggered."""
+async def test_unavailable_temperature_is_not_synthesised(coord_factory) -> None:
+    """Unavailable temperature remains unavailable rather than becoming a plausible value."""
     from custom_components.home_rules.rules import HomeOutput
 
     # High generation but temperature unknown: fallback keeps temp below threshold.
@@ -54,24 +54,25 @@ async def test_unavailable_temperature_uses_below_threshold_default(coord_factor
     await coordinator.async_run_evaluation("poll")
 
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
-    assert coordinator._last_record["temperature"] < coordinator.parameters.temperature_threshold
+    assert coordinator._last_record["temperature"] is None
+    assert coordinator._last_record["temperature_available"] is False
 
 
-async def test_unavailable_humidity_biases_away_from_dry(coord_factory) -> None:
-    """Unavailable humidity falls below the DRY cutoff so COOL can still be chosen."""
-    from custom_components.home_rules.rules import HomeOutput
+async def test_unavailable_humidity_is_not_synthesised(coord_factory) -> None:
+    """Unavailable humidity remains unavailable and only blocks decisions that need it."""
+    from custom_components.home_rules.rules import R_HUMIDITY_UNAVAILABLE, HomeOutput
 
     # High generation should still allow COOL, and mid generation should avoid DRY.
     coordinator = await coord_factory(humidity="unavailable")
     await coordinator.async_run_evaluation("poll")
 
     assert coordinator.data.adjustment is HomeOutput.COOL
-    assert coordinator._last_record["humidity"] < coordinator.parameters.dry_mode_humidity_cutoff
+    assert coordinator._last_record["humidity"] is None
 
     coordinator = await coord_factory(generation="3500", humidity="unavailable")
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
-    assert coordinator._last_record["reason"] == "Humidity too low for dry mode"
+    assert coordinator._last_record["reason"] == R_HUMIDITY_UNAVAILABLE
 
 
 @pytest.mark.parametrize("temperature", ["unknown", "unavailable", "nan"])

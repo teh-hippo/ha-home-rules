@@ -41,7 +41,7 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "have_solar", "auto", "aircon_mode", "pre_cooling", "battery_discharge")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "humidity_available", "have_solar", "auto", "aircon_mode", "pre_cooling", "battery_discharge")
 _SESSION_RECORD_FIELDS = ("tolerated", "reactivate_at", "solar_run_eligible", "solar_lost_at", "solar_recovered_at")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
@@ -254,7 +254,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if self._target_notified or home.aircon_mode not in (AirconMode.COOL, AirconMode.DRY): return
         if self.control_mode in (c.ControlMode.DISABLED, c.ControlMode.MONITOR): return
         if home.auto and (home.pre_cooling or not self.automatic_target_notifications): return
-        if not home.temperature_available or home.temperature > self.parameters.temperature_cool: return
+        if not home.temperature_available or home.temperature is None or home.temperature > self.parameters.temperature_cool: return
         data: dict[str, Any] = {"title": "Aircon target reached", "message": f"Room: {home.temperature:g}°C. Target: {self.parameters.temperature_cool:g}°C."}
         if not home.auto and adjustment is not HomeOutput.OFF:
             self._target_prompt_id = uuid4().hex
@@ -300,8 +300,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         tariff = self._tariff_state(); now = dt_util.now().time()
         pre_cooling = self.afternoon_cooling and self.parameters.precooling_range_valid and self.pre_cooling_start <= now < self.pre_cooling_finish and (not self.config_entry.options.get(c.CONF_TARIFF_ENTITY_ID) or (tariff is not None and tariff != str(self.config_entry.options.get(c.CONF_PEAK_TARIFF, c.DEFAULT_PEAK_TARIFF))))
         aggressive = self.power_policy is c.PowerPolicy.ALLOW_BATTERY_GRID; enabled = self.control_mode is not c.ControlMode.DISABLED
-        temperature = self._normalized_temperature(temp); temperature_available = "temperature" not in self._fallback_inputs and isfinite(temperature)
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, temperature, self._state_to_float(hum, "humidity"), self._auto_mode, aggressive, enabled, self.cooling_enabled, pre_cooling, battery_discharge, temperature_available, now=dt_util.utcnow().timestamp()), timer
+        raw_temperature = self._normalized_temperature(temp) if "temperature" not in self._fallback_inputs else None; temperature_available = raw_temperature is not None and isfinite(raw_temperature)
+        raw_humidity = self._state_to_float(hum, "humidity") if "humidity" not in self._fallback_inputs else None; humidity_available = raw_humidity is not None and isfinite(raw_humidity)
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, raw_temperature if temperature_available else None, raw_humidity if humidity_available else None, self._auto_mode, aggressive, enabled, self.cooling_enabled, pre_cooling, battery_discharge, temperature_available, humidity_available, now=dt_util.utcnow().timestamp()), timer
 
     def _tariff_state(self) -> str | None:
         return state.state if (state := self._optional_state(c.CONF_TARIFF_ENTITY_ID, "tariff")) is not None else None
@@ -360,9 +361,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._create_issue(c.ISSUE_ENTITY_UNAVAILABLE, {"entity_id": entity_id, "label": label}); raise ValueError(f"entity unavailable: {entity_id}")
         self._fallback_inputs[label] = raw
         if label in self._FALLBACK_DEFAULTS: return State(entity_id, self._FALLBACK_DEFAULTS[label], state.attributes)
-        # WTF: unavailable temperature and humidity sensors become plausible values that bias the rules.
-        if label == "temperature": return State(entity_id, str(self.parameters.temperature_threshold - 0.1), state.attributes)
-        if label == "humidity": return State(entity_id, str(c.DRY_MODE_HUMIDITY_CUTOFF - 1.0), state.attributes)
         return state
 
     @staticmethod
