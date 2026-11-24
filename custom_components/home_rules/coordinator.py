@@ -218,6 +218,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             await self._maybe_notify_target(home, adjustment)
             mode = self._session.last or current
             record = {"time": now, "trigger": trigger, "current": current.value, "adjustment": adjustment.value, "mode": mode.value, "reason": reason, "dry_run": is_monitor, "control_mode": self.control_mode.value, "power_policy": self.power_policy.value, "target_temperature": target_temperature, "adjusted_setpoint": self._adjusted_setpoint, "stop_at_comfort_temperature": params.stop_at_comfort_temperature, "automatic_target_notifications": self.automatic_target_notifications, "raw_generation": home.generation, "smoothed_generation": round(smoothed_gen, 1), "fallback_inputs": dict(self._fallback_inputs), "reactivate_delay_remaining": max(0.0, self._session.reactivate_at - home.now), "solar_run_on_deadline": self._session.solar_run_on_deadline(params)} | {k: getattr(home, k) for k in _HOME_RECORD_FIELDS} | {k: getattr(self._session, k) for k in _SESSION_RECORD_FIELDS}
+            record["parameters"] = asdict(params)
             self._last_record = record; self._recent.appendleft(record); await self._save_state(); self.hass.bus.async_fire(c.EVENT_EVALUATION, record)
             for issue in _CLEAR_ISSUES: self._clear_issue(issue)
             self._first_refresh_done = True

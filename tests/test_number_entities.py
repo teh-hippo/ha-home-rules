@@ -51,6 +51,7 @@ async def test_set_number_entity_updates_parameter(hass, loaded_entry) -> None:
     await hass.async_block_till_done()
 
     assert float(hass.states.get("number.home_rules_temperature_threshold").state) == 26.0
+    assert hass.states.get("sensor.home_rules_decision").attributes["parameters"]["temperature_threshold"] == 26.0
 
 
 async def test_get_parameter_falls_back_to_options(coord_factory) -> None:
@@ -86,15 +87,23 @@ async def test_get_parameter_override_takes_precedence(coord_factory) -> None:
 
 
 async def test_parameter_override_affects_evaluation(coord_factory) -> None:
-    from custom_components.home_rules.const import CONF_TEMPERATURE_THRESHOLD
+    from custom_components.home_rules.const import CONF_GENERATION_COOL_THRESHOLD, CONF_TEMPERATURE_THRESHOLD
     from custom_components.home_rules.rules import HomeOutput
 
-    coordinator = await coord_factory(temperature="25", generation="6000")
+    coordinator = await coord_factory(
+        temperature="25", generation="6000", options={CONF_GENERATION_COOL_THRESHOLD: 5800.0}
+    )
     await coordinator.async_run_evaluation("test")
     assert coordinator.data.adjustment is HomeOutput.COOL
+    before = coordinator.last_evaluation["parameters"]
+    assert before["generation_cool_threshold"] == 5800.0
+    assert before["temperature_threshold"] == 24.0
 
     await coordinator.async_set_parameter(CONF_TEMPERATURE_THRESHOLD, 30.0)
     assert coordinator._last_record["reason"] == "Temperature below comfort temperature"
+    assert coordinator.last_evaluation["parameters"]["temperature_threshold"] == 30.0
+    assert before["temperature_threshold"] == 24.0
+    assert coordinator.recent_evaluations[1]["parameters"]["temperature_threshold"] == 24.0
 
 
 @pytest.mark.parametrize(
