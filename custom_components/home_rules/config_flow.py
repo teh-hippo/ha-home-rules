@@ -55,7 +55,7 @@ def _validate_entities(
 
 
 class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None: self._data: dict[str, Any] = {}
     @staticmethod
@@ -89,6 +89,7 @@ class HomeRulesOptionsFlow(OptionsFlow):
         errors = _validate_entities(self.hass, user_input, [*_OPTIONS_ENTITY_FIELDS, *(k for k in c.OPTIONAL_ENTITY_KEYS if user_input.get(k))]) if user_input else {}
         if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k not in c.RETIRED_CONFIG_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional entities are cleared by omission
         cur = self.config_entry.options
+        # WTF: a notify service disappears from the options whenever it is temporarily unregistered.
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Optional(key, description={"suggested_value": cur[key]} if cur.get(key) else None): _ENTITY_SELECTORS[key] for key in c.OPTIONAL_ENTITY_KEYS})

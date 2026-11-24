@@ -76,9 +76,16 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
     assert not {"forecast_low", "forecast_kwh", "battery_low", "battery_soc"}.intersection(coordinator._last_record)
 
     assert await hass.config_entries.async_unload(mock_entry.entry_id)
+    recreated = registry.async_get_or_create(
+        "number",
+        DOMAIN,
+        f"{mock_entry.entry_id}_forecast_min_kwh",
+        config_entry=mock_entry,
+        suggested_object_id="hallway_home_rules_forecast_minimum_remaining",
+    )
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
-    assert all(registry.async_get(entity.entity_id) is None for entity in retired)
+    assert registry.async_get(recreated.entity_id) is not None
 
 
 async def test_options_update_triggers_reload(hass, loaded_entry) -> None:
