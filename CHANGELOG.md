@@ -1,6 +1,73 @@
 # CHANGELOG
 
 
+## v4.1.0 (2026-11-24)
+
+### Bug Fixes
+
+- Bound persisted evaluation history
+  ([`4ae30b0`](https://github.com/teh-hippo/ha-home-rules/commit/4ae30b0523cd015bf8e431cca7b24f2a40de0484))
+
+- Clarify battery cooling reason
+  ([`0da7616`](https://github.com/teh-hippo/ha-home-rules/commit/0da7616a2609ab81d0beae68c94603811e8b18f5))
+
+- Guard repeated climate adjustments early
+  ([`d4d9f58`](https://github.com/teh-hippo/ha-home-rules/commit/d4d9f58785d1bf44ce79407c253dd1bb3c10ae3b))
+
+- Handle all evaluation failures consistently
+  ([`1471976`](https://github.com/teh-hippo/ha-home-rules/commit/1471976b3d4c62187582175faca89d609aa74cc4))
+
+- Preserve missing notification options
+  ([`78e890f`](https://github.com/teh-hippo/ha-home-rules/commit/78e890f43ab9438425756b4a68fbac389ccec19e))
+
+- Preserve unavailable comfort inputs
+  ([`733c2d2`](https://github.com/teh-hippo/ha-home-rules/commit/733c2d26598a905335a76e4be04c227d9c5f4d62))
+
+- Redact configured identifiers
+  ([`9d7c081`](https://github.com/teh-hippo/ha-home-rules/commit/9d7c0812a294e8e09172750538e5899ce273ce3a))
+
+- Release battery run authorisation on arrival
+  ([`2877947`](https://github.com/teh-hippo/ha-home-rules/commit/2877947a98bbefd7f4b8cd3cb0c43d43aaa1f335))
+
+- Run config migration once
+  ([`d84a227`](https://github.com/teh-hippo/ha-home-rules/commit/d84a227c11135d7ab186748414b647b4c23c3845))
+
+- **ci**: Use supported Python for releases
+  ([`72c9730`](https://github.com/teh-hippo/ha-home-rules/commit/72c9730949e37f2bd2d13b4ae09f3b04c4785319))
+
+### Chores
+
+- **deps**: Update astral-sh/setup-uv action to v10.4.0
+  ([`862f3f7`](https://github.com/teh-hippo/ha-home-rules/commit/862f3f74d690b92113dcdc103a1e6cbc68e85e58))
+
+- **deps**: Update python docker tag to v3.15.2
+  ([`f497529`](https://github.com/teh-hippo/ha-home-rules/commit/f497529a2174dce9149ef0220999e2ee5174601f))
+
+### Features
+
+- Add occupancy-aware battery cooling
+  ([`aafd477`](https://github.com/teh-hippo/ha-home-rules/commit/aafd477b79a3978ced8e445d1a8adfc754ea5720))
+
+- Clarify comfort and ideal temperatures
+  ([`e72ba78`](https://github.com/teh-hippo/ha-home-rules/commit/e72ba78901b78c55f075a516e847a7f763bf1d79))
+
+- Remove afternoon pre-cooling
+  ([`4485b1d`](https://github.com/teh-hippo/ha-home-rules/commit/4485b1d4b8c92f448a8a56e5c4b89f5693070744))
+
+### Refactoring
+
+- Derive initial options from schema
+  ([`7e8893b`](https://github.com/teh-hippo/ha-home-rules/commit/7e8893b2910c05feb3b601e9dee4077927214979))
+
+- Expose diagnostic snapshots
+  ([`c0d3873`](https://github.com/teh-hippo/ha-home-rules/commit/c0d38735751531c4303d2a6e7829365be6c8a514))
+
+### Testing
+
+- Align evaluation error assertions
+  ([`fd4dc9a`](https://github.com/teh-hippo/ha-home-rules/commit/fd4dc9ac252233ed27f76959d9162325f6747bd8))
+
+
 ## v4.0.4 (2026-11-22)
 
 ### Bug Fixes
