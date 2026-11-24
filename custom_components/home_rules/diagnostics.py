@@ -6,13 +6,23 @@ from homeassistant.core import HomeAssistant
 
 from . import const as c
 
+_REDACT_KEYS = {
+    c.CONF_BATTERY_POWER_ENTITY_ID,
+    c.CONF_CLIMATE_ENTITY_ID,
+    c.CONF_GENERATION_ENTITY_ID,
+    c.CONF_GRID_ENTITY_ID,
+    c.CONF_HUMIDITY_ENTITY_ID,
+    c.CONF_NOTIFICATION_SERVICE,
+    c.CONF_TARIFF_ENTITY_ID,
+    c.CONF_TEMPERATURE_ENTITY_ID,
+}
+
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     coordinator = entry.runtime_data
-    # WTF: the redaction helper receives no sensitive keys, so this currently redacts nothing.
     return {
-        "config": async_redact_data(dict(entry.data), set()),
-        "options": async_redact_data(dict(entry.options), set()),
+        "config": async_redact_data(dict(entry.data), _REDACT_KEYS),
+        "options": async_redact_data(dict(entry.options), _REDACT_KEYS),
         "controls": {
             "mode": coordinator.control_mode.value,
             "enabled": coordinator.control_mode is not c.ControlMode.DISABLED,
