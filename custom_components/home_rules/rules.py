@@ -54,6 +54,7 @@ R_NO_ONE_HOME = "No one home"
 R_OCCUPANCY_UNAVAILABLE = "Home occupancy unavailable"
 R_BATTERY_SOC_UNAVAILABLE = "Battery state of charge unavailable"
 R_BATTERY_FULL = "Battery full"
+R_BATTERY_COOLING = "Battery-authorised cooling"
 R_BATTERY_RESERVE = "Battery reserve reached"
 
 
@@ -433,7 +434,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
                 return _stop(config, h, state, R_GRID_TOO_HIGH)
         else:
             state.tolerated = 0
-        return AdjustResult(HomeOutput.NO_CHANGE, R_BATTERY_FULL)
+        return AdjustResult(HomeOutput.NO_CHANGE, R_BATTERY_COOLING)
 
     if h.auto and (run_on := _solar_run_on(config, h, state)) is not None:
         return run_on

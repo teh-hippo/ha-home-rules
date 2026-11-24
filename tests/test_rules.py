@@ -15,6 +15,7 @@ from custom_components.home_rules.rules import (
     R_ALREADY_COOLING,
     R_ALREADY_DRYING,
     R_AUTO_IDLE,
+    R_BATTERY_COOLING,
     R_BATTERY_FULL,
     R_BATTERY_RESERVE,
     R_BATTERY_SOC_UNAVAILABLE,
@@ -482,7 +483,7 @@ class TestAdjustOffSolar:
             allow_away_battery_cooling=True,
             battery_discharge=500,
         )
-        assert adjust(TEST_PARAMS, running, state) == AdjustResult(OUT.NO_CHANGE, R_BATTERY_FULL)
+        assert adjust(TEST_PARAMS, running, state) == AdjustResult(OUT.NO_CHANGE, R_BATTERY_COOLING)
 
         running.battery_soc = 79
         assert adjust(TEST_PARAMS, running, state) == AdjustResult(OUT.OFF, R_BATTERY_RESERVE)
