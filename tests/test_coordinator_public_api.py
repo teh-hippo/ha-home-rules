@@ -54,6 +54,25 @@ async def test_async_set_mode_solar_cooling(coord_factory) -> None:
     assert coordinator._last_record["dry_run"] is False
 
 
+async def test_adjustment_failure_budget_prevents_extra_service_calls(hass, coord_factory) -> None:
+    from homeassistant.exceptions import HomeAssistantError
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.rules import ALLOWED_FAILURES
+
+    hvac_modes = async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    coordinator = await coord_factory()
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    for _ in range(ALLOWED_FAILURES):
+        await coordinator.async_run_evaluation("poll")
+    with pytest.raises(HomeAssistantError, match="failed to apply adjustment"):
+        await coordinator.async_run_evaluation("poll")
+
+    assert len(hvac_modes) == ALLOWED_FAILURES + 1
+
+
 async def test_async_set_mode_disabled(coord_factory) -> None:
     """async_set_mode(DISABLED) disables the coordinator."""
     from custom_components.home_rules.const import ControlMode

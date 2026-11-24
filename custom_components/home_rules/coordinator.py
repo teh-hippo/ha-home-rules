@@ -210,7 +210,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 result = AdjustResult(HomeOutput.OFF, "Turned off from notification")
             else: result = adjust(params, decision_home, self._session)
             adjustment, reason = result.output, result.reason; target_temperature = self._adjusted_setpoint if home.auto and self._adjusted_setpoint is not None else params.cooling_target(home) if home.auto or adjustment in (HomeOutput.COOL, HomeOutput.DRY) else params.temperature_cool
-            # WTF: the service call happens before the repeated-adjustment failure budget is checked.
+            previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
+            if is_monitor: self._session.failed_to_change, applied = 0, True
+            if not applied: raise HomeAssistantError("failed to apply adjustment")
             await self._execute_adjustment(adjustment, target_temperature)
             self._schedule_solar_expiry()
             if adjustment is HomeOutput.NO_CHANGE and home.auto and home.enabled and home.temperature_available and home.aircon_mode in (AirconMode.COOL, AirconMode.DRY) and self.control_mode is c.ControlMode.AUTOMATIC:
@@ -218,9 +220,6 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 if climate.attributes.get("temperature") is not None and climate.attributes["temperature"] != target_temperature: await self._set_climate_target(target_temperature)
             timer = self._active_aircon_timer()
             if notification_action is not None: self._target_prompt_id = None
-            previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
-            if is_monitor: self._session.failed_to_change, applied = 0, True
-            if not applied: raise HomeAssistantError("failed to apply adjustment")
             if previous is not None and previous != self._session.last and adjustment is not HomeOutput.RESET: self._last_changed = now; await self._maybe_notify(previous, current, adjustment)
             await self._maybe_notify_target(home, adjustment)
             mode = self._session.last or current
