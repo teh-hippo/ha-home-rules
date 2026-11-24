@@ -18,6 +18,7 @@ from custom_components.home_rules.rules import (
     R_BATTERY_FULL,
     R_BATTERY_RESERVE,
     R_BATTERY_SOC_UNAVAILABLE,
+    R_BATTERY_TOLERATED,
     R_BELOW_COOL_SETPOINT,
     R_BELOW_THRESHOLD,
     R_COOLING_DISABLED,
@@ -535,6 +536,64 @@ class TestAdjustOffSolar:
             CachedState(last=OUT.COOL, battery_run_authorized=True),
         )
         assert result == AdjustResult(OUT.OFF, R_BATTERY_SOC_UNAVAILABLE)
+
+    def test_arrival_returns_battery_run_to_normal_power_policy(self):
+        state = CachedState(last=OUT.COOL, battery_run_authorized=True)
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                aircon_mode=AirconMode.COOL,
+                auto=True,
+                generation=6000,
+                temperature=25,
+                someone_home=True,
+                only_cool_when_home=True,
+                battery_soc=90,
+                allow_away_battery_cooling=True,
+                battery_discharge=500,
+            ),
+            state,
+        )
+
+        assert result == AdjustResult(OUT.NO_CHANGE, R_BATTERY_TOLERATED)
+        assert not state.battery_run_authorized
+
+    def test_disabling_occupancy_rule_returns_battery_run_to_normal_power_policy(self):
+        state = CachedState(last=OUT.COOL, battery_run_authorized=True)
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                aircon_mode=AirconMode.COOL,
+                auto=True,
+                generation=6000,
+                temperature=25,
+                someone_home=False,
+                only_cool_when_home=False,
+                battery_soc=90,
+                allow_away_battery_cooling=True,
+            ),
+            state,
+        )
+
+        assert result == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+        assert not state.battery_run_authorized
+
+    def test_disabling_away_exception_stops_empty_house_battery_run(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                aircon_mode=AirconMode.COOL,
+                auto=True,
+                temperature=25,
+                someone_home=False,
+                only_cool_when_home=True,
+                battery_soc=90,
+                allow_away_battery_cooling=False,
+            ),
+            CachedState(last=OUT.COOL, battery_run_authorized=True),
+        )
+
+        assert result == AdjustResult(OUT.OFF, R_NO_ONE_HOME)
 
     def test_dry_activation_gen_above_dry(self):
         """gen>=dry + temp>=threshold -> DRY."""

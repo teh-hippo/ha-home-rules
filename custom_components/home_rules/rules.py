@@ -393,6 +393,9 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
                 state.battery_run_authorized = True
             elif not state.battery_run_authorized:
                 return _stop(config, h, state, R_NO_ONE_HOME)
+    if h.auto and state.battery_run_authorized and (not h.only_cool_when_home or h.someone_home is True):
+        state.battery_run_authorized = False
+        state.clear_solar_run()
 
     # --- Aircon is OFF ---
     if h.aircon_mode == AirconMode.OFF:
