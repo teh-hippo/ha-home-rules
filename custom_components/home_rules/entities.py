@@ -24,7 +24,7 @@ from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 _DIAG, _CONF, _TS, _DUR = EntityCategory.DIAGNOSTIC, EntityCategory.CONFIG, SensorDeviceClass.TIMESTAMP, SensorDeviceClass.DURATION
 type Entry = HomeRulesConfigEntry
 type Coord = HomeRulesCoordinator
-_ENTITY_IDS = {"mode": f"sensor.{c.DOMAIN}_mode", "adjustment": f"sensor.{c.DOMAIN}_action", "timer_finishes_at": f"sensor.{c.DOMAIN}_timer_countdown", "temperature_cool": f"number.{c.DOMAIN}_cool_setpoint", "temperature_threshold": f"number.{c.DOMAIN}_temperature_threshold", "power_policy": f"select.{c.DOMAIN}_power_policy", c.CONF_ALLOW_AWAY_BATTERY_COOLING: f"switch.{c.DOMAIN}_{c.CONF_ALLOW_AWAY_BATTERY_COOLING}", c.CONF_BATTERY_RESERVE_THRESHOLD: f"number.{c.DOMAIN}_{c.CONF_BATTERY_RESERVE_THRESHOLD}"}
+_ENTITY_IDS = {"mode": f"sensor.{c.DOMAIN}_mode", "adjustment": f"sensor.{c.DOMAIN}_action", "timer_finishes_at": f"sensor.{c.DOMAIN}_timer_countdown", "temperature_cool": f"number.{c.DOMAIN}_cool_setpoint", "temperature_threshold": f"number.{c.DOMAIN}_temperature_threshold", c.CONF_STOP_AT_COMFORT_TEMPERATURE: f"switch.{c.DOMAIN}_{c.CONF_STOP_AT_COMFORT_TEMPERATURE}", "power_policy": f"select.{c.DOMAIN}_power_policy", c.CONF_ALLOW_AWAY_BATTERY_COOLING: f"switch.{c.DOMAIN}_{c.CONF_ALLOW_AWAY_BATTERY_COOLING}", c.CONF_BATTERY_RESERVE_THRESHOLD: f"number.{c.DOMAIN}_{c.CONF_BATTERY_RESERVE_THRESHOLD}"}
 
 
 def _sensor(key: str, **kwargs: Any) -> SensorEntityDescription: return SensorEntityDescription(key=key, translation_key=key, **kwargs)

@@ -53,15 +53,15 @@ It uses elapsed minutes, not evaluation counts, and its deadline survives restar
 Legacy reactivation settings are converted using their configured evaluation interval.
 Manual starts remain possible during the automatic-start cooldown.
 
-**Temperature control.** Normal automatic starts use **Start Temperature** (default 24°C).
-**Comfort Temperature** (default 22°C) is the actual desired room temperature and the target sent to the climate entity.
-Start Temperature must be higher than Comfort Temperature to avoid repeated starts near the target.
+**Temperature control.** Normal automatic starts use **Comfort Temperature** (default 24°C) as the upper comfort boundary.
+**Ideal Temperature** (default 22°C) is the target sent to the climate entity.
+Comfort Temperature must be higher than Ideal Temperature to avoid repeated starts near the target.
 The existing `number.home_rules_temperature_threshold` and `number.home_rules_cool_setpoint` entity IDs are retained.
 An unavailable temperature sensor prevents automatic starts and cannot be treated as proof that the target has been reached.
 
-Two independent device switches control what happens when the house reaches Comfort Temperature:
+Two independent device switches control what happens when the house reaches Ideal Temperature:
 
-- **Stop at Comfort Temperature** (`switch.home_rules_stop_at_comfort_temperature`): stops automatic and manual Cool/Dry runs at the target when on.
+- **Stop at Ideal Temperature** (`switch.home_rules_stop_at_comfort_temperature`): stops automatic and manual Cool/Dry runs at the target when on.
   When off, cooling continues under the existing power rules and any manual timer cap.
 - **Automatic Target Notifications** (`switch.home_rules_automatic_target_notifications`): enables information-only target-reached alerts for automatic runs, regardless of time.
   Manual target-reached alerts are always enabled and are not affected by this switch.
@@ -71,7 +71,7 @@ Both require the temperature input to be available; notifications require a conf
 Each run receives at most one successfully delivered target alert, including across HA restarts.
 Changing the aircon setpoint does not change run ownership or Home Rules' saved temperature settings.
 An automatic run respects the adjusted aircon setpoint until it ends, including across restarts.
-The next automatic start uses the saved temperature settings; target-stop decisions still use Comfort Temperature.
+The next automatic start uses the saved temperature settings; target-stop decisions still use Ideal Temperature.
 
 Turning **Cooling Enabled** off stops existing automatic cooling and prevents new automatic starts, without blocking manual cooling.
 Turning **Dry Mode Enabled** off during automatic Dry switches to Cool if eligible, otherwise stops the run.
@@ -95,9 +95,9 @@ Presence alone does not authorise a fresh battery or grid start; ordinary home-p
 
 Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Solar with battery/grid run-on respectively.
 The former unrestricted Allow battery and grid policy now permits bounded continuation only, not paid-power starts.
-Existing comfort temperatures are preserved.
+Existing comfort and ideal temperatures are preserved.
 Legacy afternoon pre-cooling, tariff, and battery-discharge tolerance settings are removed during config-entry migration.
-The former Manual cooling target behaviour option is replaced by the two switches: Auto off enables Stop at Comfort Temperature; Timer and Ask leave it off.
+The former Manual cooling target behaviour option is replaced by the two switches: Auto off enables Stop at Ideal Temperature; Timer and Ask leave it off.
 Automatic Target Notifications initially defaults on, and manual target alerts remain enabled regardless of the previous choice.
 
 **Battery power (optional).** Select a battery power sensor in options to detect discharge.

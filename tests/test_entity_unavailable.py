@@ -49,7 +49,7 @@ async def test_unavailable_temperature_is_not_synthesised(coord_factory) -> None
     """Unavailable temperature remains unavailable rather than becoming a plausible value."""
     from custom_components.home_rules.rules import HomeOutput
 
-    # High generation but temperature unknown: fallback keeps temp below threshold.
+    # High generation but temperature unknown: fallback keeps temperature below the comfort boundary.
     coordinator = await coord_factory(temperature="unavailable")
     await coordinator.async_run_evaluation("poll")
 

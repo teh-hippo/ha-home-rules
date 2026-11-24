@@ -146,7 +146,7 @@
         "name": "Allow Away Cooling at Full Battery"
       },
       "stop_at_comfort_temperature": {
-        "name": "Stop at Comfort Temperature"
+        "name": "Stop at Ideal Temperature"
       },
       "automatic_target_notifications": {
         "name": "Automatic Target Notifications"
@@ -159,10 +159,10 @@
     },
     "number": {
       "temperature_threshold": {
-        "name": "Start Temperature"
+        "name": "Comfort Temperature"
       },
       "temperature_cool": {
-        "name": "Comfort Temperature"
+        "name": "Ideal Temperature"
       },
       "battery_full_threshold": {
         "name": "Battery Full Threshold"
@@ -174,7 +174,7 @@
   },
   "exceptions": {
     "invalid_temperature_range": {
-      "message": "Start Temperature must be higher than Comfort Temperature."
+      "message": "Comfort Temperature must be higher than Ideal Temperature."
     },
     "invalid_battery_range": {
       "message": "Battery Reserve must be lower than the Battery Full Threshold, and both must be between 0% and 100%."

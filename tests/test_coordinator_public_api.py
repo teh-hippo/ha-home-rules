@@ -123,7 +123,7 @@ async def test_async_set_control_disables_dry_mode(coord_factory) -> None:
 @pytest.mark.parametrize(
     ("generation", "temperature", "adjustment", "reason"),
     [
-        ("6000", "23", "No Change", "Temperature below threshold"),
+        ("6000", "23", "No Change", "Temperature below comfort temperature"),
         ("6000", "24", "Cool", "Solar above cool threshold"),
         ("1", "24", "No Change", "No change"),
         ("0", "25", "No Change", "No solar available"),
