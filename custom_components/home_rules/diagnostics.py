@@ -8,6 +8,7 @@ from . import const as c
 
 _REDACT_KEYS = {
     c.CONF_BATTERY_POWER_ENTITY_ID,
+    c.CONF_BATTERY_SOC_ENTITY_ID,
     c.CONF_CLIMATE_ENTITY_ID,
     c.CONF_GENERATION_ENTITY_ID,
     c.CONF_GRID_ENTITY_ID,
@@ -27,6 +28,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "enabled": coordinator.control_mode is not c.ControlMode.DISABLED,
             "cooling_enabled": coordinator.cooling_enabled,
             "dry_mode_enabled": coordinator.dry_mode_enabled,
+            "only_cool_when_home": coordinator.only_cool_when_home,
+            "allow_away_battery_cooling": coordinator.allow_away_battery_cooling,
             "stop_at_comfort_temperature": coordinator.stop_at_comfort_temperature,
             "automatic_target_notifications": coordinator.automatic_target_notifications,
             "power_policy": coordinator.power_policy.value,
@@ -35,6 +38,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
         "policy": {
             "dry_mode_humidity_cutoff": c.DRY_MODE_HUMIDITY_CUTOFF,
             "temperature_cool": coordinator.parameters.temperature_cool,
+            "battery_full_threshold": coordinator.parameters.battery_full_threshold,
+            "battery_reserve_threshold": coordinator.parameters.battery_reserve_threshold,
             "reactivate_delay_minutes": coordinator.parameters.reactivate_delay,
             "solar_run_on_minutes": coordinator.parameters.solar_run_on_minutes,
         },

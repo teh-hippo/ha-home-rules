@@ -29,6 +29,7 @@
       "entity_not_found": "One or more selected entities could not be found.",
       "invalid_entity_selection": "Cannot select Home Rules entities as inputs.",
       "invalid_power_unit": "Power sensors must report W, kW, or MW.",
+      "invalid_percentage_unit": "Battery state of charge must report %.",
       "invalid_climate_entity": "Climate must be a climate entity.",
       "invalid_sensor_entity": "Selected entity must be a sensor."
     },
@@ -47,6 +48,7 @@
           "temperature_entity_id": "Temperature sensor",
           "humidity_entity_id": "Humidity sensor",
           "battery_power_entity_id": "Battery power sensor (optional)",
+          "battery_soc_entity_id": "Battery state-of-charge sensor (optional)",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "eval_interval": "Evaluation interval (seconds)",
@@ -137,6 +139,12 @@
       "dry_mode_enabled": {
         "name": "Dry Mode Enabled"
       },
+      "only_cool_when_home": {
+        "name": "Only Cool When Home"
+      },
+      "allow_away_battery_cooling": {
+        "name": "Allow Away Cooling at Full Battery"
+      },
       "stop_at_comfort_temperature": {
         "name": "Stop at Comfort Temperature"
       },
@@ -155,12 +163,21 @@
       },
       "temperature_cool": {
         "name": "Comfort Temperature"
+      },
+      "battery_full_threshold": {
+        "name": "Battery Full Threshold"
+      },
+      "battery_reserve_threshold": {
+        "name": "Battery Reserve"
       }
     }
   },
   "exceptions": {
     "invalid_temperature_range": {
       "message": "Start Temperature must be higher than Comfort Temperature."
+    },
+    "invalid_battery_range": {
+      "message": "Battery Reserve must be lower than the Battery Full Threshold, and both must be between 0% and 100%."
     },
     "update_failed": {
       "message": "Failed to evaluate Home Rules: {error}"

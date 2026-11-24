@@ -31,12 +31,11 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
     hass.states.async_set("sensor.forecast", forecast, {"unit_of_measurement": "kWh"})
     hass.config_entries.async_update_entry(
         mock_entry,
-        data={**mock_entry.data, "forecast_entity_id": "sensor.forecast", "battery_soc_entity_id": "sensor.missing"},
+        data={**mock_entry.data, "forecast_entity_id": "sensor.forecast"},
         options={
             "forecast_entity_id": "sensor.forecast",
             "forecast_min_kwh": 10,
             "battery_min_soc": 99,
-            "battery_soc_entity_id": "sensor.missing",
             "generation_boost_threshold": 500,
             "afternoon_cooling": True,
             "afternoon_cooling_hour": 16,
@@ -94,7 +93,7 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
     assert hass.states.get("number.home_rules_cool_setpoint").state == "21.0"
     coordinator = mock_entry.runtime_data
     assert coordinator.data.adjustment is HomeOutput.COOL
-    assert not {"forecast_low", "forecast_kwh", "battery_low", "battery_soc"}.intersection(coordinator._last_record)
+    assert not {"forecast_low", "forecast_kwh", "battery_low"}.intersection(coordinator._last_record)
 
     assert await hass.config_entries.async_unload(mock_entry.entry_id)
     recreated = registry.async_get_or_create(
@@ -107,6 +106,21 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
     assert registry.async_get(recreated.entity_id) is not None
+
+
+async def test_setup_preserves_battery_state_of_charge_option(hass, mock_entry) -> None:
+    from custom_components.home_rules.const import CONF_BATTERY_SOC_ENTITY_ID
+
+    hass.states.async_set("sensor.battery_soc", "100", {"unit_of_measurement": "%"})
+    hass.config_entries.async_update_entry(
+        mock_entry,
+        options={CONF_BATTERY_SOC_ENTITY_ID: "sensor.battery_soc"},
+    )
+
+    assert await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_entry.options[CONF_BATTERY_SOC_ENTITY_ID] == "sensor.battery_soc"
 
 
 async def test_options_update_triggers_reload(hass, loaded_entry) -> None:

@@ -43,6 +43,12 @@
       "dry_mode_enabled": {
         "default": "mdi:water-off-outline"
       },
+      "only_cool_when_home": {
+        "default": "mdi:home-account"
+      },
+      "allow_away_battery_cooling": {
+        "default": "mdi:battery-high"
+      },
       "stop_at_comfort_temperature": {
         "default": "mdi:thermometer-check"
       },
@@ -61,6 +67,12 @@
       },
       "temperature_cool": {
         "default": "mdi:thermometer-chevron-down"
+      },
+      "battery_full_threshold": {
+        "default": "mdi:battery-charging-high"
+      },
+      "battery_reserve_threshold": {
+        "default": "mdi:battery-lock"
       }
     }
   }

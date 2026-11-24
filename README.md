@@ -77,6 +77,22 @@ Turning **Cooling Enabled** off stops existing automatic cooling and prevents ne
 Turning **Dry Mode Enabled** off during automatic Dry switches to Cool if eligible, otherwise stops the run.
 Manual Dry remains allowed.
 
+Two independent switches control occupancy-aware starts:
+
+- **Only Cool When Home** requires Home Assistant's `zone.home` aggregate to contain at least one person before an automatic cooling or drying start.
+  Home Rules subscribes to zone changes, so arrivals and departures are evaluated immediately rather than waiting for the next poll.
+  A departure stops an automatic run unless it is covered by the full-battery exception.
+  Manual cooling is not blocked.
+- **Allow Away Cooling at Full Battery** permits an automatic cooling start while the house is empty once the configured battery state of charge reaches **Battery Full Threshold** (default 100%).
+  The run remains authorised until the battery reaches **Battery Reserve** (default 80%), the room reaches its target, or existing safety conditions stop it.
+  The reserve prevents a 99% reading immediately cancelling a run that started at 100%; Home Rules must see the full threshold again before a later away run can start.
+  This switch has no effect unless Only Cool When Home is enabled.
+
+Select a percentage battery state-of-charge sensor in options to use the full-battery exception.
+Away battery-authorised cooling requires no net grid import at start and retains the configured paid-power tolerance for grid use during the run.
+The existing 100 W battery-power noise floor is fixed.
+Presence alone does not authorise a fresh battery or grid start; ordinary home-present starts still follow Automatic Power Use and require its normal solar conditions.
+
 Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Solar with battery/grid run-on respectively.
 The former unrestricted Allow battery and grid policy now permits bounded continuation only, not paid-power starts.
 Existing comfort temperatures are preserved.

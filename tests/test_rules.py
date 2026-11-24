@@ -15,6 +15,9 @@ from custom_components.home_rules.rules import (
     R_ALREADY_COOLING,
     R_ALREADY_DRYING,
     R_AUTO_IDLE,
+    R_BATTERY_FULL,
+    R_BATTERY_RESERVE,
+    R_BATTERY_SOC_UNAVAILABLE,
     R_BELOW_COOL_SETPOINT,
     R_BELOW_THRESHOLD,
     R_COOLING_DISABLED,
@@ -27,7 +30,9 @@ from custom_components.home_rules.rules import (
     R_INVALID_TEMPERATURE_RANGE,
     R_MANUAL,
     R_NO_CHANGE,
+    R_NO_ONE_HOME,
     R_NO_SOLAR,
+    R_OCCUPANCY_UNAVAILABLE,
     R_PAID_POWER,
     R_REACTIVATE_WAIT,
     R_RUN_ON_EXPIRED,
@@ -380,6 +385,156 @@ class TestAdjustOffSolar:
             state,
         )
         assert r == AdjustResult(OUT.COOL, R_SOLAR_COOL)
+
+    def test_full_battery_starts_away_cooling_without_solar(self):
+        state = CachedState()
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                have_solar=False,
+                generation=0,
+                temperature=29,
+                someone_home=False,
+                only_cool_when_home=True,
+                battery_soc=100,
+                allow_away_battery_cooling=True,
+            ),
+            state,
+        )
+        assert result == AdjustResult(OUT.COOL, R_BATTERY_FULL)
+        assert state.battery_run_authorized
+
+    def test_empty_battery_does_not_start_away_cooling(self):
+        state = CachedState()
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                have_solar=False,
+                generation=0,
+                temperature=29,
+                someone_home=False,
+                only_cool_when_home=True,
+                battery_soc=50,
+                allow_away_battery_cooling=True,
+            ),
+            state,
+        )
+        assert result == AdjustResult(OUT.NO_CHANGE, R_NO_ONE_HOME)
+        assert not state.battery_run_authorized
+
+    def test_missing_battery_charge_blocks_away_cooling_explicitly(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                have_solar=False,
+                generation=0,
+                temperature=29,
+                someone_home=False,
+                only_cool_when_home=True,
+                allow_away_battery_cooling=True,
+            ),
+            CachedState(),
+        )
+        assert result == AdjustResult(OUT.NO_CHANGE, R_BATTERY_SOC_UNAVAILABLE)
+
+    def test_home_presence_only_allows_normal_solar_start(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                have_solar=False,
+                generation=0,
+                temperature=29,
+                someone_home=True,
+                only_cool_when_home=True,
+                battery_soc=100,
+                allow_away_battery_cooling=True,
+            ),
+            CachedState(),
+        )
+        assert result == AdjustResult(OUT.NO_CHANGE, R_NO_SOLAR)
+
+    def test_unavailable_occupancy_blocks_start(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                generation=6000,
+                someone_home=None,
+                only_cool_when_home=True,
+                battery_soc=100,
+                allow_away_battery_cooling=True,
+            ),
+            CachedState(),
+        )
+        assert result == AdjustResult(OUT.NO_CHANGE, R_OCCUPANCY_UNAVAILABLE)
+
+    def test_away_battery_run_continues_to_reserve_then_stops(self):
+        state = CachedState(last=OUT.COOL, battery_run_authorized=True)
+        running = home(
+            aircon_mode=AirconMode.COOL,
+            auto=True,
+            have_solar=False,
+            generation=0,
+            temperature=25,
+            someone_home=False,
+            only_cool_when_home=True,
+            battery_soc=80,
+            allow_away_battery_cooling=True,
+            battery_discharge=500,
+        )
+        assert adjust(TEST_PARAMS, running, state) == AdjustResult(OUT.NO_CHANGE, R_BATTERY_FULL)
+
+        running.battery_soc = 79
+        assert adjust(TEST_PARAMS, running, state) == AdjustResult(OUT.OFF, R_BATTERY_RESERVE)
+        assert not state.battery_run_authorized
+
+    def test_away_battery_run_stops_at_ideal_target(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                aircon_mode=AirconMode.COOL,
+                auto=True,
+                have_solar=False,
+                temperature=22,
+                someone_home=False,
+                only_cool_when_home=True,
+                battery_soc=90,
+                allow_away_battery_cooling=True,
+            ),
+            CachedState(last=OUT.COOL, battery_run_authorized=True),
+        )
+        assert result == AdjustResult(OUT.OFF, R_TARGET_REACHED)
+
+    def test_departure_stops_normal_automatic_run_without_full_battery(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                aircon_mode=AirconMode.COOL,
+                auto=True,
+                generation=6000,
+                someone_home=False,
+                only_cool_when_home=True,
+                battery_soc=79,
+                allow_away_battery_cooling=True,
+            ),
+            CachedState(last=OUT.COOL),
+        )
+        assert result == AdjustResult(OUT.OFF, R_NO_ONE_HOME)
+
+    def test_automatic_run_stops_when_battery_state_is_unavailable(self):
+        result = adjust(
+            TEST_PARAMS,
+            home(
+                aircon_mode=AirconMode.COOL,
+                auto=True,
+                have_solar=False,
+                temperature=25,
+                someone_home=False,
+                only_cool_when_home=True,
+                allow_away_battery_cooling=True,
+            ),
+            CachedState(last=OUT.COOL, battery_run_authorized=True),
+        )
+        assert result == AdjustResult(OUT.OFF, R_BATTERY_SOC_UNAVAILABLE)
 
     def test_dry_activation_gen_above_dry(self):
         """gen>=dry + temp>=threshold -> DRY."""

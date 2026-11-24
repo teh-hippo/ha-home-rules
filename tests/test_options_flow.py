@@ -90,6 +90,32 @@ async def test_options_flow_preserves_temporarily_missing_notify_service(hass, m
     assert result["data"][CONF_NOTIFICATION_SERVICE] == service
 
 
+async def test_options_flow_accepts_percentage_battery_sensor(hass, mock_entry) -> None:
+    from custom_components.home_rules.const import CONF_BATTERY_SOC_ENTITY_ID
+
+    hass.states.async_set("sensor.battery_soc", "100", {"unit_of_measurement": "%"})
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    user_input = _valid_options_input()
+    user_input[CONF_BATTERY_SOC_ENTITY_ID] = "sensor.battery_soc"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_BATTERY_SOC_ENTITY_ID] == "sensor.battery_soc"
+
+
+async def test_options_flow_rejects_non_percentage_battery_sensor(hass, mock_entry) -> None:
+    from custom_components.home_rules.const import CONF_BATTERY_SOC_ENTITY_ID
+
+    hass.states.async_set("sensor.battery_soc", "100", {"unit_of_measurement": "V"})
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    user_input = _valid_options_input()
+    user_input[CONF_BATTERY_SOC_ENTITY_ID] = "sensor.battery_soc"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_percentage_unit"}
+
+
 async def test_options_flow_validates_entities(hass, mock_entry) -> None:
     """Options flow should return entity_not_found for missing entities."""
     from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID

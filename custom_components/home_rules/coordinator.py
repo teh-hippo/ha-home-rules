@@ -41,8 +41,8 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "humidity_available", "have_solar", "auto", "aircon_mode", "battery_discharge")
-_SESSION_RECORD_FIELDS = ("tolerated", "reactivate_at", "solar_run_eligible", "solar_lost_at", "solar_recovered_at")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "humidity_available", "have_solar", "auto", "aircon_mode", "battery_discharge", "battery_soc", "someone_home")
+_SESSION_RECORD_FIELDS = ("tolerated", "reactivate_at", "solar_run_eligible", "solar_lost_at", "solar_recovered_at", "battery_run_authorized")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
 
@@ -61,11 +61,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self.hass, self.config_entry = hass, config_entry; self._lock, self._session = asyncio.Lock(), CachedState(); self.control_mode, self.cooling_enabled, self.dry_mode_enabled = c.ControlMode.MONITOR, True, True
+        self.only_cool_when_home, self.allow_away_battery_cooling = False, False
         self.power_policy = c.PowerPolicy.SOLAR_ONLY
         self.stop_at_comfort_temperature, self.automatic_target_notifications = False, True
         self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record, self._fallback_inputs = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}, {}; self._aircon_timer_finishes_at: datetime | None = None; self._timer_expiry_handle: asyncio.TimerHandle | None = None
         self._target_notified = False; self._target_prompt_id: str | None = None; self._notification_unsub: CALLBACK_TYPE | None = None
         self._climate_unsub: CALLBACK_TYPE | None = None; self._climate_write_in_progress = False
+        self._occupancy_unsub: CALLBACK_TYPE | None = None; self._battery_soc_unsub: CALLBACK_TYPE | None = None
         self._solar_expiry_handle: asyncio.TimerHandle | None = None
         self._automatic_setpoint: float | None = None; self._adjusted_setpoint: float | None = None; self._observed_setpoint: float | None = None
         self._store = Store[dict[str, Any]](hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
@@ -82,12 +84,15 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if key in (c.CONF_TEMPERATURE_THRESHOLD, c.CONF_TEMPERATURE_COOL):
             candidate = replace(self.parameters, temperature_threshold=value) if key == c.CONF_TEMPERATURE_THRESHOLD else replace(self.parameters, temperature_cool=value)
             if not candidate.temperature_range_valid: raise ServiceValidationError(translation_domain=c.DOMAIN, translation_key="invalid_temperature_range")
+        if key in (c.CONF_BATTERY_FULL_THRESHOLD, c.CONF_BATTERY_RESERVE_THRESHOLD):
+            candidate = replace(self.parameters, battery_full_threshold=value) if key == c.CONF_BATTERY_FULL_THRESHOLD else replace(self.parameters, battery_reserve_threshold=value)
+            if not candidate.battery_range_valid: raise ServiceValidationError(translation_domain=c.DOMAIN, translation_key="invalid_battery_range")
         self._parameters[key] = value; await self._save_state(); await self.async_run_evaluation("parameter")
 
     @property
     def parameters(self) -> RuleParameters:
         g, o = self.get_parameter, self.config_entry.options
-        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), c.reactivation_delay_minutes(o), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL), self.stop_at_comfort_temperature, solar_run_on_minutes=float(o.get(c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES)), evaluation_interval=float(o.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL)))
+        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), c.reactivation_delay_minutes(o), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL), self.stop_at_comfort_temperature, solar_run_on_minutes=float(o.get(c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES)), evaluation_interval=float(o.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL)), battery_full_threshold=g(c.CONF_BATTERY_FULL_THRESHOLD, c.DEFAULT_BATTERY_FULL_THRESHOLD), battery_reserve_threshold=g(c.CONF_BATTERY_RESERVE_THRESHOLD, c.DEFAULT_BATTERY_RESERVE_THRESHOLD))
 
     async def async_set_mode(self, mode: c.ControlMode) -> None: self.control_mode = mode; await self._save_state(); await self.async_run_evaluation("control_mode")
     async def async_set_power_policy(self, policy: c.PowerPolicy) -> None: self.power_policy = policy; self._session.tolerated = 0; await self._save_state(); await self.async_run_evaluation("power_policy")
@@ -99,11 +104,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         with suppress(ValueError): self.control_mode = c.ControlMode.AUTOMATIC if mode in {"solar_cooling", "boost_cooling"} else c.ControlMode(mode)
         with suppress(ValueError): self.power_policy = c.PowerPolicy(controls.get(c.CONF_POWER_POLICY, c.PowerPolicy.ALLOW_BATTERY_GRID if mode == "boost_cooling" else c.PowerPolicy.SOLAR_ONLY))
         self.cooling_enabled, self.dry_mode_enabled = bool(controls.get("cooling_enabled", True)), bool(controls.get(c.CONF_DRY_MODE_ENABLED, True))
+        self.only_cool_when_home = bool(controls.get(c.CONF_ONLY_COOL_WHEN_HOME, False))
+        self.allow_away_battery_cooling = bool(controls.get(c.CONF_ALLOW_AWAY_BATTERY_COOLING, False))
         self.stop_at_comfort_temperature = bool(controls.get(c.CONF_STOP_AT_COMFORT_TEMPERATURE, self.config_entry.options.get(c.CONF_MANUAL_COOLING_BEHAVIOUR) == "stop"))
         self.automatic_target_notifications = bool(controls.get(c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS, True))
         last = session.get("last")
         legacy_delay = float(session.get("reactivate_delay", 0)) * float(self.config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))
-        self._session = CachedState(reactivate_at=float(session.get("reactivate_at", dt_util.utcnow().timestamp() + legacy_delay if legacy_delay else 0)), tolerated=int(session.get("tolerated", 0)), last=HomeOutput(last) if last else None, failed_to_change=int(session.get("failed_to_change", 0)), solar_run_eligible=bool(session.get("solar_run_eligible", False)), solar_lost_at=session.get("solar_lost_at"), solar_recovered_at=session.get("solar_recovered_at"))
+        self._session = CachedState(reactivate_at=float(session.get("reactivate_at", dt_util.utcnow().timestamp() + legacy_delay if legacy_delay else 0)), tolerated=int(session.get("tolerated", 0)), last=HomeOutput(last) if last else None, failed_to_change=int(session.get("failed_to_change", 0)), solar_run_eligible=bool(session.get("solar_run_eligible", False)), solar_lost_at=session.get("solar_lost_at"), solar_recovered_at=session.get("solar_recovered_at"), battery_run_authorized=bool(session.get("battery_run_authorized", False)))
         self._auto_mode, self._last_changed = bool(stored.get("auto_mode", False)), stored.get("last_changed")
         self._recent = deque(stored.get("recent_evaluations", []), maxlen=c.MAX_RECENT_EVALUATIONS)
         self._aircon_timer_finishes_at = dt_util.parse_datetime(str(v)) if (v := stored.get("aircon_timer_finishes_at")) else None
@@ -122,11 +129,19 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if self._climate_unsub is None:
             self._climate_unsub = async_track_state_change_event(self.hass, [self._entity_id(c.CONF_CLIMATE_ENTITY_ID)], self._async_handle_climate_change)
             self.config_entry.async_on_unload(self._unsubscribe_climate)
+        if self._occupancy_unsub is None:
+            self._occupancy_unsub = async_track_state_change_event(self.hass, [c.HOME_ZONE_ENTITY_ID], self._async_handle_occupancy_change)
+            self.config_entry.async_on_unload(self._unsubscribe_policy_inputs)
+        if self._battery_soc_unsub is None and (battery_soc := str(self.config_entry.options.get(c.CONF_BATTERY_SOC_ENTITY_ID, self.config_entry.data.get(c.CONF_BATTERY_SOC_ENTITY_ID, ""))).strip()):
+            self._battery_soc_unsub = async_track_state_change_event(self.hass, [battery_soc], self._async_handle_battery_soc_change)
 
     async def async_set_control(self, key: str, value: bool) -> None: setattr(self, key, value); await self._save_state(); await self.async_run_evaluation("control")
-    async def async_shutdown(self) -> None: self._cancel_timer_expiry(); self._cancel_solar_expiry(); self._unsubscribe_notifications(); self._unsubscribe_climate()
+    async def async_shutdown(self) -> None: self._cancel_timer_expiry(); self._cancel_solar_expiry(); self._unsubscribe_notifications(); self._unsubscribe_climate(); self._unsubscribe_policy_inputs()
     def _unsubscribe_climate(self) -> None:
         if self._climate_unsub is not None: self._climate_unsub(); self._climate_unsub = None
+    def _unsubscribe_policy_inputs(self) -> None:
+        if self._occupancy_unsub is not None: self._occupancy_unsub(); self._occupancy_unsub = None
+        if self._battery_soc_unsub is not None: self._battery_soc_unsub(); self._battery_soc_unsub = None
 
     @staticmethod
     def _valid_setpoint(value: object) -> float | None:
@@ -143,7 +158,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if new.state == AirconMode.OFF:
             was_running = self._auto_mode or self._session.last in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.ON, HomeOutput.TIMER) or (old is not None and old.state not in (AirconMode.OFF, STATE_UNKNOWN, STATE_UNAVAILABLE))
             self._auto_mode = False; self._reset_target_tracking(); self._clear_aircon_timer(); self._session.last = None
-            self._session.clear_solar_run(); self._cancel_solar_expiry()
+            self._session.clear_power_run(); self._cancel_solar_expiry()
             if was_running:
                 self._session.record_stop(dt_util.utcnow().timestamp(), self.parameters.reactivate_delay)
                 self.hass.async_create_task(self.async_run_evaluation("climate_off"))
@@ -153,6 +168,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if not self._climate_write_in_progress or target == self._automatic_setpoint: self._observed_setpoint = target
         elif new.state in (AirconMode.AUTO, AirconMode.HEAT, AirconMode.HEAT_COOL, AirconMode.FAN_ONLY):
             self._auto_mode = False; self._reset_target_tracking()
+    @callback
+    def _async_handle_occupancy_change(self, event: Event[EventStateChangedData]) -> None:
+        if self.only_cool_when_home: self.hass.async_create_task(self.async_run_evaluation("occupancy"))
+    @callback
+    def _async_handle_battery_soc_change(self, event: Event[EventStateChangedData]) -> None:
+        if self.allow_away_battery_cooling: self.hass.async_create_task(self.async_run_evaluation("battery_state_of_charge"))
     async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate_with_error_handling(trigger))
 
     async def _async_update_data(self) -> CoordinatorData:
@@ -262,6 +283,21 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid", invert=bool(self.config_entry.options.get(c.CONF_GRID_INVERT, False))) if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
         have_solar = gen_live and generation > 0.0
         battery_discharge = max(0.0, (discharge or 0.0) - c.BATTERY_DISCHARGE_TOLERANCE)  # a battery covering the load hides the draw from the grid meter: pass it to the rules separately from grid usage
+        someone_home: bool | None = None
+        if self.only_cool_when_home:
+            zone = self.hass.states.get(c.HOME_ZONE_ENTITY_ID)
+            if zone is None or str(zone.state).lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
+                self._fallback_inputs["occupancy"] = "missing" if zone is None else str(zone.state).lower()
+            else:
+                with suppress(TypeError, ValueError): someone_home = float(zone.state) > 0
+        battery_soc: float | None = None
+        if (self.only_cool_when_home and self.allow_away_battery_cooling) or self._session.battery_run_authorized:
+            soc = self._optional_state(c.CONF_BATTERY_SOC_ENTITY_ID, "battery_state_of_charge")
+            if soc is not None:
+                with suppress(TypeError, ValueError):
+                    candidate = self._state_to_float(soc, "battery state of charge")
+                    if isfinite(candidate) and 0 <= candidate <= 100: battery_soc = candidate
+                if battery_soc is None: self._fallback_inputs["battery_state_of_charge"] = "invalid"
         mode = AirconMode.UNKNOWN
         with suppress(ValueError): mode = AirconMode(str(climate.state).lower().strip())
         if mode not in (AirconMode.COOL, AirconMode.DRY): self._auto_mode = False; self._reset_target_tracking()
@@ -272,7 +308,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         aggressive = self.power_policy is c.PowerPolicy.ALLOW_BATTERY_GRID; enabled = self.control_mode is not c.ControlMode.DISABLED
         raw_temperature = self._normalized_temperature(temp) if "temperature" not in self._fallback_inputs else None; temperature_available = raw_temperature is not None and isfinite(raw_temperature)
         raw_humidity = self._state_to_float(hum, "humidity") if "humidity" not in self._fallback_inputs else None; humidity_available = raw_humidity is not None and isfinite(raw_humidity)
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, raw_temperature if temperature_available else None, raw_humidity if humidity_available else None, self._auto_mode, aggressive, enabled, self.cooling_enabled, battery_discharge, temperature_available, humidity_available, now=dt_util.utcnow().timestamp()), timer
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, raw_temperature if temperature_available else None, raw_humidity if humidity_available else None, self._auto_mode, aggressive, enabled, self.cooling_enabled, battery_discharge, temperature_available, humidity_available, now=dt_util.utcnow().timestamp(), someone_home=someone_home, only_cool_when_home=self.only_cool_when_home, battery_soc=battery_soc, allow_away_battery_cooling=self.allow_away_battery_cooling), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if home.aircon_mode is AirconMode.OFF and self._session.last in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.ON, HomeOutput.TIMER) and self._session.reactivate_at <= home.now:
@@ -398,7 +434,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _save_state(self) -> None:
         session = asdict(self._session); session["last"] = self._session.last.value if self._session.last else None
         history_size = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
-        await self._store.async_save({"controls": {"mode": self.control_mode.value, c.CONF_POWER_POLICY: self.power_policy.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_STOP_AT_COMFORT_TEMPERATURE: self.stop_at_comfort_temperature, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS: self.automatic_target_notifications}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent)[:history_size], "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "target_notified": self._target_notified, "target_prompt_id": self._target_prompt_id, "automatic_setpoint": self._automatic_setpoint, "adjusted_setpoint": self._adjusted_setpoint, "parameters": dict(self._parameters)})
+        await self._store.async_save({"controls": {"mode": self.control_mode.value, c.CONF_POWER_POLICY: self.power_policy.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_ONLY_COOL_WHEN_HOME: self.only_cool_when_home, c.CONF_ALLOW_AWAY_BATTERY_COOLING: self.allow_away_battery_cooling, c.CONF_STOP_AT_COMFORT_TEMPERATURE: self.stop_at_comfort_temperature, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS: self.automatic_target_notifications}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent)[:history_size], "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "target_notified": self._target_notified, "target_prompt_id": self._target_prompt_id, "automatic_setpoint": self._automatic_setpoint, "adjusted_setpoint": self._adjusted_setpoint, "parameters": dict(self._parameters)})
 
     def _create_issue(self, issue: str, placeholders: dict[str, str]) -> None:
         ir.async_create_issue(self.hass, c.DOMAIN, f"{self.config_entry.entry_id}_{issue}", is_fixable=False, is_persistent=False, severity=ir.IssueSeverity.ERROR, translation_key=issue, translation_placeholders=placeholders)

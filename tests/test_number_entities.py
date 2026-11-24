@@ -11,6 +11,8 @@ async def test_number_entities_register_on_setup(hass, loaded_entry) -> None:
     for entity_id in (
         "number.home_rules_temperature_threshold",
         "number.home_rules_cool_setpoint",
+        "number.home_rules_battery_full_threshold",
+        "number.home_rules_battery_reserve_threshold",
     ):
         assert hass.states.get(entity_id) is not None, f"{entity_id} not found"
 
@@ -23,12 +25,18 @@ async def test_number_entities_register_on_setup(hass, loaded_entry) -> None:
 
 async def test_number_entities_show_default_values(hass, loaded_entry) -> None:
     from custom_components.home_rules.const import (
+        DEFAULT_BATTERY_FULL_THRESHOLD,
+        DEFAULT_BATTERY_RESERVE_THRESHOLD,
         DEFAULT_TEMPERATURE_COOL,
         DEFAULT_TEMPERATURE_THRESHOLD,
     )
 
     assert float(hass.states.get("number.home_rules_temperature_threshold").state) == DEFAULT_TEMPERATURE_THRESHOLD
     assert float(hass.states.get("number.home_rules_cool_setpoint").state) == DEFAULT_TEMPERATURE_COOL
+    assert float(hass.states.get("number.home_rules_battery_full_threshold").state) == DEFAULT_BATTERY_FULL_THRESHOLD
+    assert (
+        float(hass.states.get("number.home_rules_battery_reserve_threshold").state) == DEFAULT_BATTERY_RESERVE_THRESHOLD
+    )
 
 
 async def test_set_number_entity_updates_parameter(hass, loaded_entry) -> None:
@@ -50,6 +58,22 @@ async def test_get_parameter_falls_back_to_options(coord_factory) -> None:
 
     coordinator = await coord_factory(options={CONF_TEMPERATURE_THRESHOLD: 27.0})
     assert coordinator.get_parameter(CONF_TEMPERATURE_THRESHOLD, DEFAULT_TEMPERATURE_THRESHOLD) == 27.0
+
+
+async def test_invalid_battery_threshold_order_preserves_values(hass, loaded_entry) -> None:
+    from homeassistant.exceptions import ServiceValidationError
+
+    before = hass.states.get("number.home_rules_battery_full_threshold").state
+    with pytest.raises(ServiceValidationError) as error:
+        await hass.services.async_call(
+            "number",
+            "set_value",
+            {"entity_id": "number.home_rules_battery_full_threshold", "value": 70},
+            blocking=True,
+        )
+
+    assert error.value.translation_key == "invalid_battery_range"
+    assert hass.states.get("number.home_rules_battery_full_threshold").state == before
 
 
 async def test_get_parameter_override_takes_precedence(coord_factory) -> None:
