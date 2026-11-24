@@ -89,8 +89,9 @@ class HomeRulesOptionsFlow(OptionsFlow):
         errors = _validate_entities(self.hass, user_input, [*_OPTIONS_ENTITY_FIELDS, *(k for k in c.OPTIONAL_ENTITY_KEYS if user_input.get(k))]) if user_input else {}
         if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k not in c.RETIRED_CONFIG_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional entities are cleared by omission
         cur = self.config_entry.options
-        # WTF: a notify service disappears from the options whenever it is temporarily unregistered.
-        notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": f"notify.{name}", "value": f"notify.{name}"} for name in sorted(self.hass.services.async_services_for_domain("notify"))])
+        notify_services = {f"notify.{name}" for name in self.hass.services.async_services_for_domain("notify")}
+        if current_notify := str(cur.get(c.CONF_NOTIFICATION_SERVICE, "")).strip(): notify_services.add(current_notify)
+        notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": service, "value": service} for service in sorted(notify_services)])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Optional(key, description={"suggested_value": cur[key]} if cur.get(key) else None): _ENTITY_SELECTORS[key] for key in c.OPTIONAL_ENTITY_KEYS})
         schema[vol.Optional(c.CONF_PEAK_TARIFF, default=cur.get(c.CONF_PEAK_TARIFF, c.DEFAULT_PEAK_TARIFF))] = selector.TextSelector()

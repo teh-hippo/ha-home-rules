@@ -76,6 +76,20 @@ async def test_options_flow_updates_values_and_accepts_notify_service(hass, mock
     assert result["data"][CONF_SOLAR_RUN_ON_MINUTES] == 37
 
 
+async def test_options_flow_preserves_temporarily_missing_notify_service(hass, mock_entry) -> None:
+    from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE
+
+    service = "notify.mobile_app_temporarily_missing"
+    hass.config_entries.async_update_entry(mock_entry, options={CONF_NOTIFICATION_SERVICE: service})
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    user_input = _valid_options_input()
+    user_input[CONF_NOTIFICATION_SERVICE] = service
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_NOTIFICATION_SERVICE] == service
+
+
 async def test_options_flow_validates_entities(hass, mock_entry) -> None:
     """Options flow should return entity_not_found for missing entities."""
     from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID
