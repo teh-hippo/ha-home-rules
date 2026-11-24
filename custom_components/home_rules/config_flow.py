@@ -31,6 +31,9 @@ _NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION
 _OPTIONS_ENTITY_FIELDS: tuple[str, ...] = (c.CONF_CLIMATE_ENTITY_ID, c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)
 
 
+def _initial_options() -> dict[str, int | float | str]: return {key: default for key, default, _selector in _NUMBER_FIELDS}
+
+
 def _schema(required: tuple[str, ...]) -> vol.Schema:
     return vol.Schema({vol.Required(key): _ENTITY_SELECTORS[key] for key in required})
 
@@ -72,7 +75,7 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
         errors = _validate_entities(self.hass, user_input, list(required)) if user_input else {}
         if not user_input or errors: return self.async_show_form(step_id=step_id, data_schema=_schema(required), errors=errors)
         self._data.update(user_input)
-        return await getattr(self, f"async_step_{next_step}")() if next_step else self.async_create_entry(title="Home Rules", data=self._data, options=c.DEFAULT_OPTIONS)
+        return await getattr(self, f"async_step_{next_step}")() if next_step else self.async_create_entry(title="Home Rules", data=self._data, options=_initial_options())
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         await self.async_set_unique_id(c.DOMAIN); self._abort_if_unique_id_configured(); return await self._step("user", user_input, (c.CONF_CLIMATE_ENTITY_ID,), next_step="solar")
