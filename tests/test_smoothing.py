@@ -68,3 +68,15 @@ async def test_default_smoothing_window_is_five() -> None:
     from custom_components.home_rules.const import DEFAULT_SMOOTHING_WINDOW
 
     assert DEFAULT_SMOOTHING_WINDOW == 5
+
+
+async def test_only_smoothing_history_is_persisted(hass_storage, coord_factory) -> None:
+    from custom_components.home_rules.const import CONF_SMOOTHING_WINDOW, DOMAIN
+
+    coordinator = await coord_factory(options={CONF_SMOOTHING_WINDOW: 3})
+    for _ in range(5):
+        await coordinator.async_run_evaluation("poll")
+
+    stored = hass_storage[f"{DOMAIN}_{coordinator.config_entry.entry_id}"]["data"]
+    assert len(stored["recent_evaluations"]) == 3
+    assert len(coordinator.recent_evaluations) == 5
