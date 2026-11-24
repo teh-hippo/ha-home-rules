@@ -13,7 +13,6 @@ _REDACT_KEYS = {
     c.CONF_GRID_ENTITY_ID,
     c.CONF_HUMIDITY_ENTITY_ID,
     c.CONF_NOTIFICATION_SERVICE,
-    c.CONF_TARIFF_ENTITY_ID,
     c.CONF_TEMPERATURE_ENTITY_ID,
 }
 
@@ -28,18 +27,14 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "enabled": coordinator.control_mode is not c.ControlMode.DISABLED,
             "cooling_enabled": coordinator.cooling_enabled,
             "dry_mode_enabled": coordinator.dry_mode_enabled,
-            "afternoon_cooling": coordinator.afternoon_cooling,
             "stop_at_comfort_temperature": coordinator.stop_at_comfort_temperature,
             "automatic_target_notifications": coordinator.automatic_target_notifications,
             "power_policy": coordinator.power_policy.value,
-            "pre_cooling_start": coordinator.pre_cooling_start.isoformat(),
-            "pre_cooling_finish": coordinator.pre_cooling_finish.isoformat(),
             "dry_run": coordinator.control_mode is c.ControlMode.MONITOR,
         },
         "policy": {
             "dry_mode_humidity_cutoff": c.DRY_MODE_HUMIDITY_CUTOFF,
             "temperature_cool": coordinator.parameters.temperature_cool,
-            "temperature_precool": coordinator.parameters.temperature_precool,
             "reactivate_delay_minutes": coordinator.parameters.reactivate_delay,
             "solar_run_on_minutes": coordinator.parameters.solar_run_on_minutes,
         },

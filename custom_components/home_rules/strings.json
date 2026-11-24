@@ -30,8 +30,7 @@
       "invalid_entity_selection": "Cannot select Home Rules entities as inputs.",
       "invalid_power_unit": "Power sensors must report W, kW, or MW.",
       "invalid_climate_entity": "Climate must be a climate entity.",
-      "invalid_sensor_entity": "Selected entity must be a sensor.",
-      "invalid_tariff_entity": "Tariff entity must be a select or sensor."
+      "invalid_sensor_entity": "Selected entity must be a sensor."
     },
     "abort": {
       "already_configured": "Home Rules is already configured."
@@ -48,8 +47,6 @@
           "temperature_entity_id": "Temperature sensor",
           "humidity_entity_id": "Humidity sensor",
           "battery_power_entity_id": "Battery power sensor (optional)",
-          "tariff_entity_id": "Current tariff entity (optional)",
-          "peak_tariff": "Peak tariff state",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "eval_interval": "Evaluation interval (seconds)",
@@ -140,9 +137,6 @@
       "dry_mode_enabled": {
         "name": "Dry Mode Enabled"
       },
-      "afternoon_cooling": {
-        "name": "Afternoon Pre-cooling"
-      },
       "stop_at_comfort_temperature": {
         "name": "Stop at Comfort Temperature"
       },
@@ -161,32 +155,12 @@
       },
       "temperature_cool": {
         "name": "Comfort Temperature"
-      },
-      "temperature_precool": {
-        "name": "Pre-cooling Temperature"
-      },
-      "battery_discharge_tolerance": {
-        "name": "Battery Discharge Tolerance"
-      }
-    },
-    "time": {
-      "pre_cooling_start": {
-        "name": "Pre-cooling Start"
-      },
-      "pre_cooling_finish": {
-        "name": "Pre-cooling Finish"
       }
     }
   },
   "exceptions": {
     "invalid_temperature_range": {
       "message": "Start Temperature must be higher than Comfort Temperature."
-    },
-    "invalid_precooling_temperature": {
-      "message": "Pre-cooling Temperature must be finite and no higher than Comfort Temperature."
-    },
-    "invalid_precooling_window": {
-      "message": "Pre-cooling Start must be earlier than Pre-cooling Finish on the same day."
     },
     "update_failed": {
       "message": "Failed to evaluate Home Rules: {error}"

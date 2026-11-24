@@ -2,7 +2,7 @@
 # ruff: noqa: E501, E701, E702
 
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
@@ -11,7 +11,6 @@ from homeassistant.components.number import NumberEntity, NumberEntityDescriptio
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
-from homeassistant.components.time import TimeEntity
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -25,7 +24,7 @@ from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 _DIAG, _CONF, _TS, _DUR = EntityCategory.DIAGNOSTIC, EntityCategory.CONFIG, SensorDeviceClass.TIMESTAMP, SensorDeviceClass.DURATION
 type Entry = HomeRulesConfigEntry
 type Coord = HomeRulesCoordinator
-_ENTITY_IDS = {"mode": f"sensor.{c.DOMAIN}_mode", "adjustment": f"sensor.{c.DOMAIN}_action", "timer_finishes_at": f"sensor.{c.DOMAIN}_timer_countdown", "temperature_cool": f"number.{c.DOMAIN}_cool_setpoint", "temperature_threshold": f"number.{c.DOMAIN}_temperature_threshold", "temperature_precool": f"number.{c.DOMAIN}_temperature_precool", "afternoon_cooling": f"switch.{c.DOMAIN}_afternoon_cooling", "power_policy": f"select.{c.DOMAIN}_power_policy"}
+_ENTITY_IDS = {"mode": f"sensor.{c.DOMAIN}_mode", "adjustment": f"sensor.{c.DOMAIN}_action", "timer_finishes_at": f"sensor.{c.DOMAIN}_timer_countdown", "temperature_cool": f"number.{c.DOMAIN}_cool_setpoint", "temperature_threshold": f"number.{c.DOMAIN}_temperature_threshold", "power_policy": f"select.{c.DOMAIN}_power_policy"}
 
 
 def _sensor(key: str, **kwargs: Any) -> SensorEntityDescription: return SensorEntityDescription(key=key, translation_key=key, **kwargs)
@@ -43,7 +42,7 @@ BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
     BinarySensorEntityDescription(key="auto_mode", translation_key="auto_mode", entity_category=_DIAG),
 )
-SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", "afternoon_cooling", c.CONF_STOP_AT_COMFORT_TEMPERATURE, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS))
+SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", c.CONF_STOP_AT_COMFORT_TEMPERATURE, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS))
 
 
 class HomeRulesEntity(CoordinatorEntity[HomeRulesCoordinator]):
@@ -116,16 +115,6 @@ class HomeRulesPowerPolicySelect(HomeRulesEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None: await self.coordinator.async_set_power_policy(c.PowerPolicy(option))
 
 
-class HomeRulesTime(HomeRulesEntity, TimeEntity):
-    _attr_entity_category = _CONF
-
-    def __init__(self, entry: Entry, coordinator: Coord, key: str) -> None:
-        super().__init__(entry, coordinator, key); self._attr_translation_key = key; self._key = key
-    @property
-    def native_value(self) -> time: return self.coordinator.pre_cooling_start if self._key == c.CONF_PRECOOL_START else self.coordinator.pre_cooling_finish
-    async def async_set_value(self, value: time) -> None: await self.coordinator.async_set_time(self._key, value)
-
-
 class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):
     _attr_translation_key = "evaluate_now"
 
@@ -148,8 +137,6 @@ NUMBERS = tuple(
     for spec in (
         ("temperature_threshold", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD),
         ("temperature_cool", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL),
-        ("temperature_precool", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_PRECOOL, c.DEFAULT_TEMPERATURE_PRECOOL),
-        ("battery_discharge_tolerance", 0, 5000, 50, "W", c.CONF_BATTERY_DISCHARGE_TOLERANCE, c.DEFAULT_BATTERY_DISCHARGE_TOLERANCE),
     )
 )
 
@@ -172,4 +159,3 @@ async def async_setup_select_entry(hass: HomeAssistant, entry: Entry, add: AddEn
 async def async_setup_switch_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesSwitch(entry, entry.runtime_data, description) for description in SWITCHES)
 async def async_setup_button_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add([HomeRulesEvaluateButton(entry, entry.runtime_data)])
 async def async_setup_number_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesNumberEntity(entry, entry.runtime_data, description) for description in NUMBERS)
-async def async_setup_time_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesTime(entry, entry.runtime_data, key) for key in (c.CONF_PRECOOL_START, c.CONF_PRECOOL_FINISH))

@@ -228,20 +228,11 @@ class TestIdleReason:
         """cooling_enabled=False wins even if other conditions match."""
         r = _idle_reason(
             TEST_PARAMS,
-            home(cooling_enabled=False, pre_cooling=True, allow_paid_power=True, temperature=20),
+            home(cooling_enabled=False, allow_paid_power=True, temperature=20),
             "activation",
             "default",
         )
         assert r == R_COOLING_DISABLED
-
-    def test_precooling_uses_lower_temperature_target(self):
-        r = _idle_reason(
-            TEST_PARAMS,
-            home(pre_cooling=True, allow_paid_power=True, temperature=20),
-            "activation",
-            "default",
-        )
-        assert r == R_BELOW_COOL_SETPOINT
 
     def test_boost_below_cool_setpoint(self):
         """aggressive + temp <= cool_setpoint -> R_BELOW_COOL_SETPOINT."""
@@ -363,14 +354,21 @@ class TestAdjustOffSolar:
 
     @pytest.mark.parametrize("temperature", [21, 23.9, 24])
     @pytest.mark.parametrize("generation,mode,reason", [(6000, OUT.COOL, R_SOLAR_COOL), (3500, OUT.DRY, R_SOLAR_DRY)])
-    def test_precooling_respects_normal_start_temperature(self, temperature, generation, mode, reason):
+    def test_activation_respects_start_temperature(self, temperature, generation, mode, reason):
         state = CachedState()
         r = adjust(
             TEST_PARAMS,
-            home(generation=generation, humidity=65, temperature=temperature, pre_cooling=True, auto=True),
+            home(generation=generation, humidity=65, temperature=temperature, auto=True),
             state,
         )
-        expected = AdjustResult(mode, reason) if temperature >= 24 else AdjustResult(OUT.OFF, R_BELOW_THRESHOLD)
+        expected = (
+            AdjustResult(mode, reason)
+            if temperature >= 24
+            else AdjustResult(
+                OUT.OFF,
+                R_BELOW_COOL_SETPOINT if temperature <= TEST_PARAMS.temperature_cool else R_BELOW_THRESHOLD,
+            )
+        )
         assert r == expected
 
     def test_high_humidity_does_not_block_cool(self):
@@ -1350,7 +1348,6 @@ class TestAdjustManualFreeSolar:
         ({}, {"grid_usage": 500}),
         ({}, {"battery_discharge": 500}),
         ({"temperature_threshold": 22}, {}),
-        ({"temperature_precool": 23}, {"pre_cooling": True}),
         ({"dry_mode_enabled": False}, {"generation": 4000}),
         ({}, {"generation": 4000, "humidity": 60}),
     ],
@@ -1442,24 +1439,21 @@ def test_disabling_dry_rechecks_cool_eligibility(auto, generation, paid, grid, t
 
 
 @pytest.mark.parametrize(
-    ("auto", "paid", "stop", "precool", "expected"),
+    ("auto", "paid", "stop", "expected"),
     [
-        (True, False, False, False, OUT.NO_CHANGE),
-        (True, False, True, False, OUT.OFF),
-        (True, True, True, False, OUT.OFF),
-        (False, False, True, False, OUT.OFF),
-        (True, True, True, True, OUT.NO_CHANGE),
-        (True, False, True, True, OUT.NO_CHANGE),
+        (True, False, False, OUT.NO_CHANGE),
+        (True, False, True, OUT.OFF),
+        (True, True, True, OUT.OFF),
+        (False, False, True, OUT.OFF),
     ],
 )
-def test_target_stop_is_independent_of_power_and_preserves_precooling(auto, paid, stop, precool, expected):
+def test_target_stop_is_independent_of_power(auto, paid, stop, expected):
     result = adjust(
         replace(TEST_PARAMS, stop_at_comfort_temperature=stop),
         home(
             aircon_mode=AirconMode.COOL,
             auto=auto,
             allow_paid_power=paid,
-            pre_cooling=precool,
             generation=6000,
             temperature=20,
         ),

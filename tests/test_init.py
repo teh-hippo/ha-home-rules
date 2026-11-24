@@ -38,26 +38,47 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
             "battery_min_soc": 99,
             "battery_soc_entity_id": "sensor.missing",
             "generation_boost_threshold": 500,
+            "afternoon_cooling": True,
+            "afternoon_cooling_hour": 16,
+            "pre_cooling_start": "16:00:00",
+            "pre_cooling_finish": "17:00:00",
+            "temperature_precool": 20,
+            "tariff_entity_id": "select.tariff",
+            "peak_tariff": "peak",
+            "battery_discharge_tolerance": 50,
             CONF_TEMPERATURE_COOL: 20,
         },
     )
     storage_key = f"{DOMAIN}_{mock_entry.entry_id}"
     hass_storage[storage_key] = {
         "version": STORAGE_VERSION,
-        "data": {"parameters": {"forecast_min_kwh": 20, "battery_min_soc": 99, CONF_TEMPERATURE_COOL: 21}},
+        "data": {
+            "parameters": {
+                "forecast_min_kwh": 20,
+                "battery_min_soc": 99,
+                "temperature_precool": 20,
+                "battery_discharge_tolerance": 50,
+                CONF_TEMPERATURE_COOL: 21,
+            }
+        },
     }
     registry = er.async_get(hass)
     retired = [
         registry.async_get_or_create(
-            "number",
+            platform,
             DOMAIN,
             f"{mock_entry.entry_id}_{key}",
             config_entry=mock_entry,
             suggested_object_id=f"hallway_home_rules_{name}",
         )
-        for key, name in (
-            ("forecast_min_kwh", "forecast_minimum_remaining"),
-            ("battery_min_soc", "battery_minimum_charge"),
+        for platform, key, name in (
+            ("number", "forecast_min_kwh", "forecast_minimum_remaining"),
+            ("number", "battery_min_soc", "battery_minimum_charge"),
+            ("number", "temperature_precool", "temperature_precool"),
+            ("number", "battery_discharge_tolerance", "battery_discharge_tolerance"),
+            ("switch", "afternoon_cooling", "afternoon_cooling"),
+            ("time", "pre_cooling_start", "pre_cooling_start"),
+            ("time", "pre_cooling_finish", "pre_cooling_finish"),
         )
     ]
 

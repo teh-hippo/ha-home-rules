@@ -90,7 +90,6 @@ class HomeInput:
     allow_paid_power: bool
     enabled: bool
     cooling_enabled: bool
-    pre_cooling: bool = False
     battery_discharge: float = 0.0
     temperature_available: bool = True
     humidity_available: bool = True
@@ -108,7 +107,6 @@ class RuleParameters:
     reactivate_delay: float
     temperature_cool: float
     stop_at_comfort_temperature: bool = False
-    temperature_precool: float = 20.0
     solar_run_on_minutes: float = 60.0
     evaluation_interval: float = 180.0
 
@@ -119,13 +117,6 @@ class RuleParameters:
             and isfinite(self.temperature_threshold)
             and self.temperature_threshold > self.temperature_cool
         )
-
-    def cooling_target(self, home: HomeInput) -> float:
-        return self.temperature_precool if home.pre_cooling else self.temperature_cool
-
-    @property
-    def precooling_range_valid(self) -> bool:
-        return isfinite(self.temperature_precool) and self.temperature_precool <= self.temperature_cool
 
 
 @dataclass
@@ -228,15 +219,13 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
         return R_COOLING_DISABLED
     if not config.temperature_range_valid:
         return R_INVALID_TEMPERATURE_RANGE
-    if home.pre_cooling and not config.precooling_range_valid:
-        return R_INVALID_TEMPERATURE_RANGE
     if not home.temperature_available or home.temperature is None:
         return R_TEMPERATURE_UNAVAILABLE
     if home.battery_discharge > 0:
         return R_BATTERY_ENGAGED
     if home.grid_usage > 0:
         return R_GRID_TOO_HIGH
-    if home.temperature <= (config.temperature_precool if home.pre_cooling else config.temperature_cool):
+    if home.temperature <= config.temperature_cool:
         return R_BELOW_COOL_SETPOINT
     if home.temperature < config.temperature_threshold:
         return R_BELOW_THRESHOLD
@@ -291,7 +280,6 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
     if (
         h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
         and config.stop_at_comfort_temperature
-        and not (h.auto and h.pre_cooling)
         and h.temperature_available
         and h.temperature is not None
         and h.temperature <= config.temperature_cool
@@ -310,7 +298,6 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         and h.battery_discharge <= 0
         and h.grid_usage <= 0
         and config.temperature_range_valid
-        and (not h.pre_cooling or config.precooling_range_valid)
         and h.temperature_available
         and h.temperature is not None
         and h.temperature >= config.temperature_threshold

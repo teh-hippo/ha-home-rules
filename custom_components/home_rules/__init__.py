@@ -25,8 +25,17 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if c.CONF_REACTIVATE_DELAY in entry.options:
             options[c.CONF_REACTIVATE_DELAY_MINUTES] = c.reactivation_delay_minutes(entry.options)
         registry = er.async_get(hass)
-        for key in ("forecast_min_kwh", "battery_min_soc"):
-            if entity_id := registry.async_get_entity_id("number", c.DOMAIN, f"{entry.entry_id}_{key}"):
+        retired_entities = (
+            ("number", "forecast_min_kwh"),
+            ("number", "battery_min_soc"),
+            ("number", "temperature_precool"),
+            ("number", "battery_discharge_tolerance"),
+            ("switch", "afternoon_cooling"),
+            ("time", "pre_cooling_start"),
+            ("time", "pre_cooling_finish"),
+        )
+        for platform, key in retired_entities:
+            if entity_id := registry.async_get_entity_id(platform, c.DOMAIN, f"{entry.entry_id}_{key}"):
                 registry.async_remove(entity_id)
         hass.config_entries.async_update_entry(
             entry,

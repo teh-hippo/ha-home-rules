@@ -14,7 +14,6 @@ Solar-aware aircon automation for Home Assistant.
 ## Features
 
 - Separates **Control Mode** (**Disabled / Monitor / Automatic**) from **Automatic Power Use**.
-- Supports solar-powered afternoon pre-cooling with configurable start and finish times.
 - Exposes decision sensors so you can see why a mode/action was chosen.
 - Can optionally send mode-change alerts to a `notify.*` target.
 - Runtime integration code is intentionally compact to keep maintenance overhead low.
@@ -71,43 +70,22 @@ Automatic target notifications default on and target stopping defaults off.
 Both require the temperature input to be available; notifications require a configured notification service.
 Each run receives at most one successfully delivered target alert, including across HA restarts.
 Changing the aircon setpoint does not change run ownership or Home Rules' saved temperature settings.
-An automatic run respects the adjusted aircon setpoint until it ends, including across pre-cooling boundaries and restarts.
+An automatic run respects the adjusted aircon setpoint until it ends, including across restarts.
 The next automatic start uses the saved temperature settings; target-stop decisions still use Comfort Temperature.
 
 Turning **Cooling Enabled** off stops existing automatic cooling and prevents new automatic starts, without blocking manual cooling.
 Turning **Dry Mode Enabled** off during automatic Dry switches to Cool if eligible, otherwise stops the run.
 Manual Dry remains allowed.
 
-**Afternoon Pre-cooling** is an independent switch, initially off.
-Enable it to use **Pre-cooling Temperature** (default 20°C) during the local-time window:
-
-- `time.home_rules_pre_cooling_start`: defaults to **14:00**.
-- `time.home_rules_pre_cooling_finish`: defaults to **17:00**.
-
-Automatic starts always require the configured Start Temperature (default 24°C), including during pre-cooling.
-The lower pre-cooling target only applies after cooling starts.
-It lets the aircon maintain that target until the window ends, subject to Automatic Power Use.
-The target-stop and automatic target-notification switches apply outside the pre-cooling window; power limits still apply throughout it.
-Outside the window, the target returns to Comfort Temperature unless you adjusted the aircon setpoint during the run.
-An already-cool run stops only when Stop at Comfort Temperature is enabled.
-Normal cooling remains available before and after the window, and pre-cooling does not resume when an evening tariff changes back to off-peak.
-Times are adjustable on the integration device; the start must precede the finish on the same day.
-
-Optionally select your existing **Current tariff entity** in integration options and specify its **Peak tariff state** (default `peak`).
-Peak or unavailable tariff readings suppress pre-cooling, without blocking ordinary comfort cooling.
-The finish time remains the explicit daily limit even when no tariff entity is configured.
-Window boundaries and tariff changes trigger evaluation immediately; other decisions use the configured evaluation interval.
-No tariff schedule, battery charging or export settings are changed by Home Rules.
-
 Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Solar with battery/grid run-on respectively.
 The former unrestricted Allow battery and grid policy now permits bounded continuation only, not paid-power starts.
-Existing comfort temperatures and afternoon-switch settings are preserved.
-The old afternoon start hour is used to initialise the new start-time entity.
+Existing comfort temperatures are preserved.
+Legacy afternoon pre-cooling, tariff, and battery-discharge tolerance settings are removed during config-entry migration.
 The former Manual cooling target behaviour option is replaced by the two switches: Auto off enables Stop at Comfort Temperature; Timer and Ask leave it off.
 Automatic Target Notifications initially defaults on, and manual target alerts remain enabled regardless of the previous choice.
 
 **Battery power (optional).** Select a battery power sensor in options to detect discharge.
-**Battery Discharge Tolerance** ignores discharge up to the configured wattage.
+Battery discharge readings up to 100 W are treated as noise.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
 Existing Cool/Dry sessions become automatic when the normal automatic-start temperature, solar and power checks qualify, including sessions with an active manual timer.

@@ -31,9 +31,11 @@ async def test_battery_discharge_reported_separately_from_grid(coord_factory, ha
     from custom_components.home_rules.const import CONF_BATTERY_POWER_ENTITY_ID
 
     hass.states.async_set("sensor.batt", "1100", {"unit_of_measurement": "W"})
-    coordinator = await coord_factory(options={CONF_BATTERY_POWER_ENTITY_ID: "sensor.batt"})
+    coordinator = await coord_factory(
+        options={CONF_BATTERY_POWER_ENTITY_ID: "sensor.batt", "battery_discharge_tolerance": 50}
+    )
     home, _ = coordinator._build_home_input()
-    assert home.grid_usage == 0.0 and home.battery_discharge == 1000.0  # 1100 W less the 100 W default tolerance
+    assert home.grid_usage == 0.0 and home.battery_discharge == 1000.0
 
 
 @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
@@ -99,9 +101,9 @@ def test_paid_power_maintains_target_on_battery() -> None:
     assert result.output is HomeOutput.NO_CHANGE
 
 
-def test_precooling_still_stops_on_sustained_battery_use_and_resets_after_recovery() -> None:
+def test_cooling_stops_on_sustained_battery_use_and_resets_after_recovery() -> None:
     state = CachedState()
-    run = _home(AirconMode.COOL, pre_cooling=True, temperature=20, battery_discharge=300)
+    run = _home(AirconMode.COOL, temperature=20, battery_discharge=300)
     assert adjust(PARAMS, run, state).reason == R_BATTERY_TOLERATED
     run.battery_discharge = 0
     assert adjust(PARAMS, run, state).output is HomeOutput.NO_CHANGE
