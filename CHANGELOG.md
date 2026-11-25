@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v4.2.1 (2026-11-25)
+
+### Bug Fixes
+
+- Show Off correctly when timer cooling stops
+  ([`c0afa2f`](https://github.com/teh-hippo/ha-home-rules/commit/c0afa2ff5d761115ad867f73b26ecc32e7a5a6b0))
+
+- **ci**: Restore supported Python for releases
+  ([`994c46a`](https://github.com/teh-hippo/ha-home-rules/commit/994c46a43727f7b85ec6825adf0aa78d1feb333d))
+
+### Chores
+
+- **deps**: Update python docker tag to v3.15.1
+  ([`26a844e`](https://github.com/teh-hippo/ha-home-rules/commit/26a844e719fec9567f1c96543dcccef6e745f373))
+
+
 ## v4.2.0 (2026-11-24)
 
 ### Features
