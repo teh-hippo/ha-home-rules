@@ -75,6 +75,31 @@ async def test_timer_target_prompt_once_without_changing_deadline(hass, manual_t
     assert coordinator.data.last_changed == changed
 
 
+async def test_timer_stop_notification_with_live_climate_callback(hass, manual_timer) -> None:
+    import asyncio
+
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator, notifications, _ = manual_timer
+
+    async def turn_off(call):
+        hass.states.async_set("climate.test", "off")
+        await asyncio.sleep(0)
+
+    hass.services.async_register("climate", "turn_off", turn_off)
+    coordinator.stop_at_comfort_temperature = True
+    hass.states.async_set("sensor.temperature", "21.6", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    await hass.async_block_till_done()
+
+    transitions = [call.data["message"] for call in notifications if "Switched from" in call.data["message"]]
+    assert transitions[-1] == "Switched from Timer to Off"
+    stopped = next(record for record in coordinator._recent if record["adjustment"] == HomeOutput.OFF.value)
+    assert stopped["mode"] == HomeOutput.OFF.value
+    assert coordinator.data.mode is HomeOutput.OFF
+    assert coordinator.data.timer_finishes_at is None
+
+
 @pytest.mark.parametrize(("choice", "remaining"), [("off", 45), ("keep", 45), ("five", 45), ("five", 2)])
 async def test_timer_notification_response(hass, manual_timer, monkeypatch, choice, remaining) -> None:
     from datetime import timedelta

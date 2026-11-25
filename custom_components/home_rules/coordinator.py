@@ -157,7 +157,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if new is None: return
         if new.state == AirconMode.OFF:
             was_running = self._auto_mode or self._session.last in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.ON, HomeOutput.TIMER) or (old is not None and old.state not in (AirconMode.OFF, STATE_UNKNOWN, STATE_UNAVAILABLE))
-            self._auto_mode = False; self._reset_target_tracking(); self._clear_aircon_timer(); self._session.last = None
+            self._auto_mode = False; self._reset_target_tracking(); self._clear_aircon_timer(); self._session.last = HomeOutput.OFF
             self._session.clear_power_run(); self._cancel_solar_expiry()
             if was_running:
                 self._session.record_stop(dt_util.utcnow().timestamp(), self.parameters.reactivate_delay)
