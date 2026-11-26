@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v4.3.1 (2026-11-26)
+
+### Bug Fixes
+
+- Evaluate on scheduled polls only
+  ([`11d7bd5`](https://github.com/teh-hippo/ha-home-rules/commit/11d7bd51210d271641f387835d3358e30332362e))
+
+### Chores
+
+- **deps**: Refresh dependency lock
+  ([`d5332a8`](https://github.com/teh-hippo/ha-home-rules/commit/d5332a8b2ad655cb9366f593e5d40d6f862bd26c))
+
+### Refactoring
+
+- Isolate legacy state migration
+  ([`83f9f75`](https://github.com/teh-hippo/ha-home-rules/commit/83f9f7593d4e9b0dbcf18beb68ebed48262dc6a2))
+
+### Testing
+
+- Migrate to pytest-homeassistant
+  ([`f75df84`](https://github.com/teh-hippo/ha-home-rules/commit/f75df84af43401272d527b2de9dc94409c606881))
+
+
 ## v4.3.0 (2026-11-26)
 
 ### Features
