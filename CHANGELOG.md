@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.4.0 (2026-11-26)
+
+### Features
+
+- Create a repair for a full dehumidifier tank
+  ([`7e7de87`](https://github.com/teh-hippo/ha-home-rules/commit/7e7de877dd113a540a666e7bf350b6fde9dd12d1))
+
+
 ## v4.3.1 (2026-11-26)
 
 ### Bug Fixes
