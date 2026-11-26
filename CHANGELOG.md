@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.3.0 (2026-11-26)
+
+### Features
+
+- Support configurable comfort occupancy
+  ([`1cf344c`](https://github.com/teh-hippo/ha-home-rules/commit/1cf344cb6f14d408b7f01a858e542a4655a6c05c))
+
+
 ## v4.2.1 (2026-11-25)
 
 ### Bug Fixes
