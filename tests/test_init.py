@@ -25,7 +25,7 @@ async def test_setup_and_unload_entry(hass, mock_entry) -> None:
 async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, forecast) -> None:
     from homeassistant.helpers import entity_registry as er
 
-    from custom_components.home_rules.const import CONF_TEMPERATURE_COOL, DOMAIN, RETIRED_CONFIG_KEYS, STORAGE_VERSION
+    from custom_components.home_rules.const import CONF_TEMPERATURE_COOL, DOMAIN, STORAGE_VERSION
     from custom_components.home_rules.rules import HomeOutput
 
     hass.states.async_set("sensor.forecast", forecast, {"unit_of_measurement": "kWh"})
@@ -57,6 +57,7 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
                 "battery_min_soc": 99,
                 "temperature_precool": 20,
                 "battery_discharge_tolerance": 50,
+                "generation_cool_threshold": 12345,
                 CONF_TEMPERATURE_COOL: 21,
             }
         },
@@ -87,7 +88,22 @@ async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, fo
     for entity in retired:
         assert registry.async_get(entity.entity_id) is None
         assert hass.states.get(entity.entity_id) is None
-    assert not RETIRED_CONFIG_KEYS.intersection(mock_entry.data)
+    assert mock_entry.data.keys().isdisjoint(
+        {
+            "forecast_entity_id",
+            "forecast_min_kwh",
+            "battery_min_soc",
+            "generation_boost_threshold",
+            "afternoon_cooling",
+            "afternoon_cooling_hour",
+            "pre_cooling_start",
+            "pre_cooling_finish",
+            "temperature_precool",
+            "tariff_entity_id",
+            "peak_tariff",
+            "battery_discharge_tolerance",
+        }
+    )
     assert mock_entry.options == {CONF_TEMPERATURE_COOL: 20}
     assert hass_storage[storage_key]["data"]["parameters"] == {CONF_TEMPERATURE_COOL: 21}
     assert hass.states.get("number.home_rules_cool_setpoint").state == "21.0"
@@ -193,14 +209,13 @@ async def test_legacy_reactivation_counts_migrate_to_elapsed_time(hass, mock_ent
 
     from custom_components.home_rules.const import (
         CONF_EVAL_INTERVAL,
-        CONF_REACTIVATE_DELAY,
         CONF_REACTIVATE_DELAY_MINUTES,
         DOMAIN,
         STORAGE_VERSION,
     )
     from custom_components.home_rules.rules import R_REACTIVATE_WAIT
 
-    hass.config_entries.async_update_entry(mock_entry, options={CONF_EVAL_INTERVAL: 300, CONF_REACTIVATE_DELAY: 3})
+    hass.config_entries.async_update_entry(mock_entry, options={CONF_EVAL_INTERVAL: 300, "reactivate_delay": 3})
     storage_key = f"{DOMAIN}_{mock_entry.entry_id}"
     hass_storage[storage_key] = {
         "version": STORAGE_VERSION,
@@ -209,7 +224,7 @@ async def test_legacy_reactivation_counts_migrate_to_elapsed_time(hass, mock_ent
     expected_deadline = dt_util.utcnow().timestamp() + 600
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
-    assert CONF_REACTIVATE_DELAY not in mock_entry.options
+    assert "reactivate_delay" not in mock_entry.options
     assert mock_entry.options[CONF_REACTIVATE_DELAY_MINUTES] == 15
     assert mock_entry.runtime_data._last_record["reason"] == R_REACTIVATE_WAIT
     assert mock_entry.runtime_data._session.reactivate_at == expected_deadline

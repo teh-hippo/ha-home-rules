@@ -1,7 +1,5 @@
-from collections.abc import Mapping
 from enum import StrEnum
 from logging import Logger, getLogger
-from typing import Any
 
 from homeassistant.const import Platform as Plat
 
@@ -31,7 +29,7 @@ CONF_DRY_MODE_ENABLED = "dry_mode_enabled"
 CONF_POWER_POLICY = "power_policy"
 CONF_TEMPERATURE_THRESHOLD = "temperature_threshold"
 CONF_GRID_USAGE_DELAY = "grid_usage_delay"
-CONF_REACTIVATE_DELAY, CONF_TEMPERATURE_COOL = "reactivate_delay", "temperature_cool"
+CONF_TEMPERATURE_COOL = "temperature_cool"
 CONF_REACTIVATE_DELAY_MINUTES = "reactivate_delay_minutes"
 CONF_SOLAR_RUN_ON_MINUTES = "solar_run_on_minutes"
 CONF_EVAL_INTERVAL, CONF_AIRCON_TIMER_DURATION = "eval_interval", "aircon_timer_duration"
@@ -51,30 +49,21 @@ CONF_BATTERY_RESERVE_THRESHOLD = "battery_reserve_threshold"
 HOME_ZONE_ENTITY_ID = "zone.home"
 OPTIONAL_ENTITY_KEYS = (CONF_BATTERY_POWER_ENTITY_ID, CONF_BATTERY_SOC_ENTITY_ID, CONF_OCCUPANCY_ENTITY_ID)
 BATTERY_DISCHARGE_TOLERANCE = 100.0
-RETIRED_CONFIG_KEYS = frozenset(
+PERSISTED_PARAMETER_KEYS = frozenset(
     {
-        "forecast_entity_id",
-        "forecast_min_kwh",
-        "battery_min_soc",
-        "generation_boost_threshold",
-        "afternoon_cooling",
-        "afternoon_cooling_hour",
-        "pre_cooling_start",
-        "pre_cooling_finish",
-        "temperature_precool",
-        "tariff_entity_id",
-        "peak_tariff",
-        "battery_discharge_tolerance",
-        CONF_REACTIVATE_DELAY,
+        CONF_TEMPERATURE_THRESHOLD,
+        CONF_TEMPERATURE_COOL,
+        CONF_BATTERY_FULL_THRESHOLD,
+        CONF_BATTERY_RESERVE_THRESHOLD,
     }
 )
 
 DEFAULT_GENERATION_COOL_THRESHOLD, DEFAULT_GENERATION_DRY_THRESHOLD = 5500.0, 3500.0
 DEFAULT_TEMPERATURE_THRESHOLD, DRY_MODE_HUMIDITY_CUTOFF = 24.0, 65.0
-DEFAULT_GRID_USAGE_DELAY, DEFAULT_REACTIVATE_DELAY = 2, 2
+DEFAULT_GRID_USAGE_DELAY = 2
 DEFAULT_TEMPERATURE_COOL, DEFAULT_EVAL_INTERVAL, DEFAULT_AIRCON_TIMER_DURATION = 22.0, 180, 60
 DEFAULT_BATTERY_FULL_THRESHOLD, DEFAULT_BATTERY_RESERVE_THRESHOLD = 100.0, 80.0
-DEFAULT_REACTIVATE_DELAY_MINUTES = DEFAULT_REACTIVATE_DELAY * DEFAULT_EVAL_INTERVAL / 60
+DEFAULT_REACTIVATE_DELAY_MINUTES = 6.0
 DEFAULT_SOLAR_RUN_ON_MINUTES = 60
 DEFAULT_SMOOTHING_WINDOW = 5
 
@@ -83,13 +72,3 @@ EVENT_EVALUATION = "home_rules_evaluation"
 EVENT_NOTIFICATION_ACTION = "mobile_app_notification_action"
 ISSUE_RUNTIME, ISSUE_ENTITY_MISSING, ISSUE_ENTITY_UNAVAILABLE = "runtime_error", "entity_missing", "entity_unavailable"
 ISSUE_INVALID_UNIT, ISSUE_NOTIFICATION_SERVICE = "invalid_unit", "notification_service"
-
-
-def reactivation_delay_minutes(options: Mapping[str, Any]) -> float:
-    if CONF_REACTIVATE_DELAY_MINUTES in options:
-        return float(options[CONF_REACTIVATE_DELAY_MINUTES])
-    return (
-        float(options.get(CONF_REACTIVATE_DELAY, DEFAULT_REACTIVATE_DELAY))
-        * float(options.get(CONF_EVAL_INTERVAL, DEFAULT_EVAL_INTERVAL))
-        / 60
-    )

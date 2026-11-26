@@ -92,7 +92,7 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors = _validate_entities(self.hass, user_input, [*_OPTIONS_ENTITY_FIELDS, *(k for k in c.OPTIONAL_ENTITY_KEYS if user_input.get(k))]) if user_input else {}
-        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k not in c.RETIRED_CONFIG_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional entities are cleared by omission
+        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional entities are cleared by omission
         cur = self.config_entry.options
         notify_services = {f"notify.{name}" for name in self.hass.services.async_services_for_domain("notify")}
         if current_notify := str(cur.get(c.CONF_NOTIFICATION_SERVICE, "")).strip(): notify_services.add(current_notify)
@@ -100,7 +100,7 @@ class HomeRulesOptionsFlow(OptionsFlow):
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Optional(key, description={"suggested_value": cur[key]} if cur.get(key) else None): _ENTITY_SELECTORS[key] for key in c.OPTIONAL_ENTITY_KEYS})
         schema[vol.Optional(c.CONF_BATTERY_INVERT, default=bool(cur.get(c.CONF_BATTERY_INVERT, False)))] = selector.BooleanSelector()
-        schema.update({vol.Required(key, default=c.reactivation_delay_minutes(cur) if key == c.CONF_REACTIVATE_DELAY_MINUTES else cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
+        schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
         schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()
         schema[vol.Optional(c.CONF_NOTIFICATION_SERVICE, default=cur.get(c.CONF_NOTIFICATION_SERVICE, ""))] = selector.SelectSelector(selector.SelectSelectorConfig(options=notify_options))
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)

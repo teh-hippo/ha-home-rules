@@ -50,7 +50,6 @@ Switch to **Automatic** once you are happy with decisions and want the integrati
 
 **Minimum off time** applies after every switch-off, including manual stops and timer expiry.
 It uses elapsed minutes, not evaluation counts, and its deadline survives restarts.
-Legacy reactivation settings are converted using their configured evaluation interval.
 Manual starts remain possible during the automatic-start cooldown.
 
 **Temperature control.** Normal automatic starts use **Comfort Temperature** (default 24°C) as the upper comfort boundary.
@@ -94,12 +93,8 @@ Away battery-authorised cooling requires no net grid import at start and retains
 The existing 100 W battery-power noise floor is fixed.
 Presence alone does not authorise a fresh battery or grid start; ordinary home-present starts still follow Automatic Power Use and require its normal solar conditions.
 
-Saved Solar Cooling and Boost Cooling modes migrate to Automatic with Solar only and Solar with battery/grid run-on respectively.
-The former unrestricted Allow battery and grid policy now permits bounded continuation only, not paid-power starts.
 Existing comfort and ideal temperatures are preserved.
-Legacy afternoon pre-cooling, tariff, and battery-discharge tolerance settings are removed during config-entry migration.
-The former Manual cooling target behaviour option is replaced by the two switches: Auto off enables Stop at Ideal Temperature; Timer and Ask leave it off.
-Automatic Target Notifications initially defaults on, and manual target alerts remain enabled regardless of the previous choice.
+Supported earlier releases migrate saved settings automatically during an upgrade.
 
 **Battery power (optional).** Select a battery power sensor in options to detect discharge.
 Battery discharge readings up to 100 W are treated as noise.
