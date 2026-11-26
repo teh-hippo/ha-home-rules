@@ -152,7 +152,8 @@ class HomeRulesNumberEntity(HomeRulesEntity, NumberEntity):
 
     @property
     def native_value(self) -> float: return self.coordinator.get_parameter(self.entity_description.conf_key, self.entity_description.default)
-    async def async_set_native_value(self, value: float) -> None: await self.coordinator.async_set_parameter(self.entity_description.conf_key, value)
+    async def async_set_native_value(self, value: float) -> None:
+        await self.coordinator.async_set_parameter(self.entity_description.conf_key, value); self.async_write_ha_state()
 
 
 async def async_setup_sensor_entry(hass: HomeAssistant, entry: Entry, add: AddEntitiesCallback) -> None: add(HomeRulesSensor(entry, entry.runtime_data, description) for description in SENSORS)

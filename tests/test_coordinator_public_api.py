@@ -64,7 +64,21 @@ async def test_async_set_mode_solar_cooling(coord_factory) -> None:
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
 
     assert coordinator.control_mode is ControlMode.AUTOMATIC
+    assert coordinator._last_record == {}
+
+    await coordinator.async_run_evaluation("manual")
     assert coordinator._last_record["dry_run"] is False
+    assert coordinator._last_record["trigger"] == "manual"
+
+
+async def test_climate_mode_change_waits_for_evaluation(hass, coord_factory) -> None:
+    coordinator = await coord_factory()
+    await coordinator.async_run_evaluation("initial")
+
+    hass.states.async_set("climate.test", "cool", {"temperature": 22})
+    await hass.async_block_till_done()
+
+    assert coordinator._last_record["trigger"] == "initial"
 
 
 async def test_adjustment_failure_budget_prevents_extra_service_calls(hass, coord_factory) -> None:
@@ -78,6 +92,7 @@ async def test_adjustment_failure_budget_prevents_extra_service_calls(hass, coor
     async_mock_service(hass, "climate", "set_temperature")
     coordinator = await coord_factory()
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     for _ in range(ALLOWED_FAILURES):
         await coordinator.async_run_evaluation("poll")
     with pytest.raises(UpdateFailed):
@@ -102,6 +117,7 @@ async def test_async_set_control_disables_cooling(coord_factory) -> None:
 
     coordinator = await coord_factory()
     await coordinator.async_set_control("cooling_enabled", False)
+    await coordinator.async_run_evaluation("poll")
 
     assert coordinator.cooling_enabled is False
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
@@ -112,6 +128,7 @@ async def test_async_set_control_disables_dry_mode(coord_factory) -> None:
 
     coordinator = await coord_factory(generation="3500", humidity="70")
     await coordinator.async_set_control("dry_mode_enabled", False)
+    await coordinator.async_run_evaluation("poll")
 
     assert coordinator.dry_mode_enabled is False
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
@@ -146,6 +163,7 @@ async def test_run_on_policy_still_requires_solar_to_start(
 
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
 
     assert coordinator.data.adjustment == adjustment
     assert coordinator._last_record["reason"] == reason
@@ -184,6 +202,7 @@ async def test_user_setpoint_stays_automatic_across_reload(hass, coord_factory, 
     coordinator = await coord_factory(temperature="25")
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     hass.states.async_set("climate.test", "cool", {"temperature": 20})
     await hass.async_block_till_done()
     hass.states.async_set("climate.test", "cool", {"temperature": 19})
@@ -223,9 +242,11 @@ async def test_off_on_between_polls_starts_new_manual_run_even_with_cooling_disa
     stops = async_mock_service(hass, "climate", "turn_off")
     coordinator = await coord_factory()
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     hass.states.async_set("climate.test", "cool", {"temperature": 22})
     await hass.async_block_till_done()
     await coordinator.async_set_control("cooling_enabled", False)
+    await coordinator.async_run_evaluation("poll")
     assert len(stops) == 1
     hass.states.async_set("climate.test", "off")
     hass.states.async_set("climate.test", "cool", {"temperature": 19})

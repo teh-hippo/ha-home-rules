@@ -94,6 +94,7 @@ async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(
 
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("initial")
     hass.states.async_set("climate.test", "cool")
     hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")

@@ -72,15 +72,14 @@ async def test_manual_battery_run_preserves_active_timer(coord_factory, hass) ->
     coordinator._session.last = HomeOutput.TIMER
     deadline = dt_util.utcnow() + timedelta(minutes=2)
     coordinator._aircon_timer_finishes_at = deadline
-    coordinator._schedule_timer_expiry()
 
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
 
     assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
     assert coordinator._auto_mode is False
     assert not turned_off
     assert coordinator.data.timer_finishes_at == deadline
-    assert coordinator._timer_expiry_handle is not None
 
 
 def test_solar_cooling_does_not_start_while_battery_engaged() -> None:

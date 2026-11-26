@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-async def test_full_battery_event_starts_away_cooling(hass, coord_factory) -> None:
+async def test_full_battery_starts_away_cooling_on_next_poll(hass, coord_factory) -> None:
     from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
@@ -31,15 +31,18 @@ async def test_full_battery_event_starts_away_cooling(hass, coord_factory) -> No
 
     hass.states.async_set("sensor.battery_soc", "100", {"unit_of_measurement": "%"})
     await hass.async_block_till_done()
+    assert coordinator._last_record["trigger"] == "initial"
+    assert not starts
 
-    assert coordinator._last_record["trigger"] == "battery_state_of_charge"
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator._last_record["trigger"] == "poll"
     assert coordinator.data.adjustment.value == HomeOutput.COOL.value
     assert starts[-1].data["hvac_mode"] == "cool"
     assert targets[-1].data["temperature"] == 22
     assert coordinator._session.battery_run_authorized
 
 
-async def test_departure_event_stops_normal_automatic_run(hass, coord_factory) -> None:
+async def test_departure_is_applied_on_next_evaluation(hass, coord_factory) -> None:
     from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
@@ -68,8 +71,11 @@ async def test_departure_event_stops_normal_automatic_run(hass, coord_factory) -
     await hass.async_block_till_done()
     hass.states.async_set("zone.home", "0")
     await hass.async_block_till_done()
+    assert coordinator._last_record["trigger"] == "initial"
+    assert not stops
 
-    assert coordinator._last_record["trigger"] == "occupancy"
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator._last_record["trigger"] == "poll"
     assert coordinator.data.adjustment.value == HomeOutput.OFF.value
     assert len(stops) == 1
 
@@ -107,7 +113,11 @@ async def test_selected_person_controls_home_comfort_independently_of_zone(hass,
 
     hass.states.async_set("person.camille", "home")
     await hass.async_block_till_done()
-    assert coordinator._last_record["trigger"] == "occupancy"
+    assert coordinator._last_record["trigger"] == "initial"
+    assert not starts
+
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator._last_record["trigger"] == "poll"
     assert coordinator.data.adjustment.value == HomeOutput.COOL.value
     assert len(starts) == 1
 
@@ -115,6 +125,9 @@ async def test_selected_person_controls_home_comfort_independently_of_zone(hass,
     await hass.async_block_till_done()
     hass.states.async_set("person.camille", "not_home")
     await hass.async_block_till_done()
+    assert len(stops) == 0
+
+    await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment.value == HomeOutput.OFF.value
     assert coordinator._last_record["reason"] == R_NO_ONE_HOME
     assert len(stops) == 1
@@ -126,6 +139,7 @@ async def test_policy_controls_persist_and_unavailable_occupancy_fails_closed(co
 
     coordinator = await coord_factory(temperature="29")
     await coordinator.async_set_control(CONF_ONLY_COOL_WHEN_HOME, True)
+    await coordinator.async_run_evaluation("poll")
     assert coordinator.only_cool_when_home
     assert coordinator._last_record["reason"] == R_OCCUPANCY_UNAVAILABLE
 

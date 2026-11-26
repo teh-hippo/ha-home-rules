@@ -49,6 +49,8 @@ async def test_set_number_entity_updates_parameter(hass, loaded_entry) -> None:
     await hass.async_block_till_done()
 
     assert float(hass.states.get("number.home_rules_temperature_threshold").state) == 26.0
+    assert hass.states.get("sensor.home_rules_decision").attributes["parameters"]["temperature_threshold"] == 24.0
+    await loaded_entry.runtime_data.async_run_evaluation("manual")
     assert hass.states.get("sensor.home_rules_decision").attributes["parameters"]["temperature_threshold"] == 26.0
 
 
@@ -98,6 +100,7 @@ async def test_parameter_override_affects_evaluation(coord_factory) -> None:
     assert before["temperature_threshold"] == 24.0
 
     await coordinator.async_set_parameter(CONF_TEMPERATURE_THRESHOLD, 30.0)
+    await coordinator.async_run_evaluation("poll")
     assert coordinator._last_record["reason"] == "Temperature below comfort temperature"
     assert coordinator.last_evaluation["parameters"]["temperature_threshold"] == 30.0
     assert before["temperature_threshold"] == 24.0
@@ -141,5 +144,6 @@ async def test_legacy_invalid_temperature_pair_can_be_corrected(coord_factory, s
     assert coordinator._last_record["reason"] == R_INVALID_TEMPERATURE_RANGE
 
     await coordinator.async_set_parameter(CONF_TEMPERATURE_THRESHOLD, 24)
+    await coordinator.async_run_evaluation("poll")
     corrected = coordinator.data
     assert corrected.adjustment is HomeOutput.COOL

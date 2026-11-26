@@ -67,7 +67,6 @@ async def test_monitor_timer_runs_for_configured_duration_without_climate_calls(
         deadline = initial.timer_finishes_at
         assert initial.adjustment is HomeOutput.TIMER
         assert deadline == now + timedelta(minutes=90)
-        assert coordinator._timer_expiry_handle is not None
 
         for minutes in (5, 60, 89):
             utcnow.return_value = now + timedelta(minutes=minutes)
@@ -83,20 +82,17 @@ async def test_monitor_timer_runs_for_configured_duration_without_climate_calls(
         assert expired.adjustment is HomeOutput.OFF
         assert coordinator._last_record["reason"] == "Timer expired"
         assert expired.timer_finishes_at is None
-        assert coordinator._timer_expiry_handle is None
         call_service.assert_not_awaited()
 
 
-async def test_timer_adjustment_schedules_expiry_callback(coord_factory) -> None:
+async def test_timer_adjustment_persists_deadline(coord_factory) -> None:
     from custom_components.home_rules.const import ControlMode
 
     coordinator = await coord_factory(climate="cool", grid="100")
     coordinator.control_mode = ControlMode.AUTOMATIC
     await coordinator.async_run_evaluation("poll")
 
-    assert coordinator._timer_expiry_handle is not None
-    await coordinator.async_shutdown()
-    assert coordinator._timer_expiry_handle is None
+    assert coordinator.data.timer_finishes_at is not None
 
 
 async def test_monitor_timer_preserves_deadline_when_enabling_solar_cooling(coord_factory) -> None:
@@ -112,6 +108,7 @@ async def test_monitor_timer_preserves_deadline_when_enabling_solar_cooling(coor
         assert deadline is not None
 
         await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+        await coordinator.async_run_evaluation("poll")
         assert coordinator.data.mode is HomeOutput.TIMER
         assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
         assert coordinator.data.timer_finishes_at == deadline

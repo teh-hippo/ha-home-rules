@@ -137,8 +137,7 @@ async def test_restart_with_stale_timer_state_syncs_to_live(hass, coord_factory)
     assert coordinator._last_record["reason"] == R_REACTIVATE_WAIT
 
 
-async def test_timer_expiry_callback_triggers_immediate_evaluation(hass, coord_factory) -> None:
-    import asyncio
+async def test_timer_expiry_waits_for_next_evaluation(coord_factory) -> None:
     from datetime import timedelta
 
     from homeassistant.util import dt as dt_util
@@ -148,13 +147,10 @@ async def test_timer_expiry_callback_triggers_immediate_evaluation(hass, coord_f
     coordinator = await coord_factory(climate="cool", grid="100")
     coordinator._initialized = True
     coordinator._session.last = HomeOutput.TIMER
-    coordinator._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(milliseconds=20)
-    coordinator._schedule_timer_expiry()
-
-    await asyncio.sleep(0.1)
-    await hass.async_block_till_done()
-
-    assert coordinator._last_record["trigger"] == "timer_expired"
+    coordinator._aircon_timer_finishes_at = dt_util.utcnow() - timedelta(milliseconds=20)
+    assert coordinator._last_record == {}
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator._last_record["trigger"] == "poll"
     assert coordinator.data.adjustment is HomeOutput.OFF
     await coordinator.async_shutdown()
 
@@ -180,6 +176,7 @@ async def test_missing_generation_telemetry_arms_overnight_timer(coord_factory) 
 
     coordinator = await coord_factory(generation="unknown", grid="unknown", climate="heat")
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
 
     assert coordinator._last_record["have_solar"] is False
     assert coordinator.data.solar_available is False
@@ -242,9 +239,6 @@ async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling
     coordinator = await coord_factory(climate="heat", generation="unknown", grid="unknown")
     coordinator._session.last = HomeOutput.TIMER
     coordinator._aircon_timer_finishes_at = dt_util.utcnow() - timedelta(minutes=5)  # elapsed while HA was down
-    coordinator._schedule_timer_expiry()  # as async_initialize would on restart
-
-    assert coordinator._timer_expiry_handle is None  # an already-elapsed cap must not schedule a racing callback
 
     coordinator._initialized = False  # startup sync runs on the first evaluation
     await coordinator.async_run_evaluation("restart")
@@ -267,6 +261,7 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     coordinator = await coord_factory(generation="6000", temperature="24")
     coordinator.stop_at_comfort_temperature = True
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     assert len(starts) == 1
     assert coordinator.data.auto_mode
 
@@ -282,8 +277,6 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     assert coordinator._last_record["reason"] == R_TARGET_REACHED
     assert not coordinator.data.auto_mode
     assert coordinator.data.timer_finishes_at is None
-    assert coordinator._timer_expiry_handle is None
-
     hass.states.async_set("climate.test", "off")
     await hass.async_block_till_done()
     hass.states.async_set("sensor.generation", "6000", {"unit_of_measurement": "W"})
@@ -312,6 +305,7 @@ async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factor
     targets = async_mock_service(hass, "climate", "set_temperature")
     coordinator = await coord_factory(climate=climate, generation="0", options={CONF_SMOOTHING_WINDOW: 1})
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.TIMER
     assert coordinator.data.timer_finishes_at is not None
 
@@ -325,7 +319,6 @@ async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factor
     assert automatic.adjustment is HomeOutput.COOL
     assert automatic.auto_mode
     assert automatic.timer_finishes_at is None
-    assert coordinator._timer_expiry_handle is None
     assert targets[-1].data["temperature"] == coordinator.parameters.temperature_cool
     assert coordinator._session.solar_run_eligible
     stored = await coordinator._store.async_load()
@@ -350,6 +343,7 @@ async def test_manual_off_cooldown_survives_extra_evaluations_and_reload(
     async_mock_service(hass, "climate", "set_temperature")
     coordinator = await coord_factory()
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     hass.states.async_set("climate.test", "cool")
     await hass.async_block_till_done()
     if unavailable_before_off:
@@ -402,6 +396,7 @@ async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, c
     coordinator = await coord_factory(options={CONF_SMOOTHING_WINDOW: 1, CONF_SOLAR_RUN_ON_MINUTES: 60})
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     hass.states.async_set("climate.test", "cool")
     await hass.async_block_till_done()
     hass.states.async_set("sensor.generation", "0", {"unit_of_measurement": "W"})
@@ -409,9 +404,7 @@ async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, c
     lost_at = coordinator._session.solar_lost_at
     deadline = coordinator._session.solar_run_on_deadline(coordinator.parameters)
     assert coordinator._last_record["reason"] == R_PAID_POWER
-    assert coordinator._solar_expiry_handle is not None
     await coordinator.async_shutdown()
-    assert coordinator._solar_expiry_handle is None
 
     freezer.tick(timedelta(minutes=20))
     restored = HomeRulesCoordinator(hass, coordinator.config_entry)
@@ -421,7 +414,6 @@ async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, c
             await restored.async_run_evaluation("manual")
         assert restored._session.solar_lost_at == lost_at
         assert restored._session.solar_run_on_deadline(restored.parameters) == deadline
-        assert restored._solar_expiry_handle is not None
         assert not stops
         freezer.tick(
             timedelta(
@@ -432,12 +424,11 @@ async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, c
         assert restored._last_record["reason"] == R_RUN_ON_EXPIRED
         assert restored.data.adjustment is HomeOutput.OFF
         assert len(stops) == 1
-        assert restored._solar_expiry_handle is None
     finally:
         await restored.async_shutdown()
 
 
-async def test_solar_run_on_expiry_callback_stops_without_another_poll(hass, coord_factory) -> None:
+async def test_solar_run_on_expiry_waits_for_next_poll(hass, coord_factory) -> None:
     import asyncio
 
     from pytest_homeassistant.common import async_mock_service
@@ -449,7 +440,7 @@ async def test_solar_run_on_expiry_callback_stops_without_another_poll(hass, coo
         ControlMode,
         PowerPolicy,
     )
-    from custom_components.home_rules.rules import R_RUN_ON_EXPIRED
+    from custom_components.home_rules.rules import R_PAID_POWER, R_RUN_ON_EXPIRED
 
     async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
@@ -459,12 +450,14 @@ async def test_solar_run_on_expiry_callback_stops_without_another_poll(hass, coo
     )
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     hass.states.async_set("climate.test", "cool")
     await hass.async_block_till_done()
     hass.states.async_set("sensor.generation", "0", {"unit_of_measurement": "W"})
     await coordinator.async_run_evaluation("poll")
     await asyncio.sleep(0.15)
-    await hass.async_block_till_done()
-    assert coordinator._last_record["trigger"] == "solar_run_on_expired"
+    assert coordinator._last_record["reason"] == R_PAID_POWER
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator._last_record["trigger"] == "poll"
     assert coordinator._last_record["reason"] == R_RUN_ON_EXPIRED
     assert len(stops) == 1

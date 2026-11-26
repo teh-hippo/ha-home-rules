@@ -50,6 +50,7 @@ async def manual_timer(hass, coord_factory):
 
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     return coordinator, notifications, off_calls
 
 
@@ -181,7 +182,6 @@ async def test_response_at_expiry_still_turns_off_without_waiting_for_poll(
     assert coordinator.data.mode is HomeOutput.OFF
     assert coordinator._last_record["reason"] == "Timer expired"
     assert coordinator.data.timer_finishes_at is None
-    assert coordinator._timer_expiry_handle is None
 
 
 async def test_failed_target_notification_is_persisted_as_unsent_and_retried(hass, manual_timer) -> None:
@@ -316,6 +316,7 @@ async def test_manual_timer_non_interactive_modes(hass, coord_factory, behaviour
 
     coordinator.power_policy = PowerPolicy.ALLOW_BATTERY_GRID
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     deadline = coordinator.data.timer_finishes_at
     hass.states.async_set("sensor.temperature", "21.8", {"unit_of_measurement": "°C"})
     await coordinator.async_run_evaluation("poll")
@@ -342,6 +343,7 @@ async def test_automatic_target_alert_is_optional_information_only(hass, coord_f
     coordinator.stop_at_comfort_temperature = stop
     coordinator.automatic_target_notifications = notify
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     hass.states.async_set("climate.test", "cool", {"temperature": 22})
     hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
     await hass.async_block_till_done()
@@ -371,6 +373,7 @@ async def test_free_manual_target_alert_ignores_automatic_notification_switch(ha
     coordinator.automatic_target_notifications = False
     coordinator.stop_at_comfort_temperature = stop
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("poll")
     initial = coordinator.data
     assert initial.timer_finishes_at is None
     hass.states.async_set("sensor.temperature", "22", {"unit_of_measurement": "°C"})
