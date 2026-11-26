@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_execute_adjustment_sets_explicit_hvac_mode(hass, coord_factory) -> None:
     """Verify set_hvac_mode is called explicitly before set_temperature in solar cooling mode."""

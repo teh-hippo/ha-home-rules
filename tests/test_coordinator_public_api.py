@@ -16,8 +16,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_evaluation_produces_coordinator_data(coord_factory) -> None:
     """async_run_evaluation populates coordinator.data via the public interface."""
@@ -71,7 +69,7 @@ async def test_async_set_mode_solar_cooling(coord_factory) -> None:
 
 async def test_adjustment_failure_budget_prevents_extra_service_calls(hass, coord_factory) -> None:
     from homeassistant.helpers.update_coordinator import UpdateFailed
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
     from custom_components.home_rules.rules import ALLOWED_FAILURES
@@ -136,7 +134,7 @@ async def test_run_on_policy_still_requires_solar_to_start(
     from datetime import datetime
 
     from homeassistant.util import dt as dt_util
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
 
@@ -173,7 +171,7 @@ async def test_user_setpoint_stays_automatic_across_reload(hass, coord_factory, 
     from datetime import datetime, timedelta
 
     from homeassistant.util import dt as dt_util
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode, PowerPolicy
     from custom_components.home_rules.coordinator import HomeRulesCoordinator
@@ -215,7 +213,7 @@ async def test_user_setpoint_stays_automatic_across_reload(hass, coord_factory, 
 
 
 async def test_off_on_between_polls_starts_new_manual_run_even_with_cooling_disabled(hass, coord_factory) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
     from custom_components.home_rules.rules import HomeOutput

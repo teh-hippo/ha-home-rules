@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_full_battery_event_starts_away_cooling(hass, coord_factory) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_BATTERY_SOC_ENTITY_ID,
@@ -44,7 +40,7 @@ async def test_full_battery_event_starts_away_cooling(hass, coord_factory) -> No
 
 
 async def test_departure_event_stops_normal_automatic_run(hass, coord_factory) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_BATTERY_SOC_ENTITY_ID,
@@ -79,7 +75,7 @@ async def test_departure_event_stops_normal_automatic_run(hass, coord_factory) -
 
 
 async def test_selected_person_controls_home_comfort_independently_of_zone(hass, coord_factory) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_BATTERY_SOC_ENTITY_ID,

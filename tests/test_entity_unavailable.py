@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_unavailable_generation_does_not_fail_evaluation(hass, coord_factory) -> None:
     from homeassistant.helpers import issue_registry as ir
@@ -81,7 +79,7 @@ async def test_missing_temperature_does_not_stop_boost_at_synthetic_target(
 ) -> None:
     from datetime import timedelta
 
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import CONF_TEMPERATURE_COOL, CONF_TEMPERATURE_THRESHOLD, ControlMode
     from custom_components.home_rules.rules import R_TEMPERATURE_UNAVAILABLE, HomeOutput

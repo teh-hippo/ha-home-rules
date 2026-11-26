@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_diagnostics_contains_expected_sections(hass, loaded_entry) -> None:
     """Diagnostics output should include key sections for config and runtime state."""

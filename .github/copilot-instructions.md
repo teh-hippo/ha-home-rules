@@ -46,8 +46,7 @@
 - Startup and runtime error handling has test-backed expectations:
   - Missing/unavailable required entities during first refresh should trigger setup retry behavior (not noisy runtime issues).
   - Runtime evaluation failures should create repair issues and raise `UpdateFailed`.
-- Tests are designed for mixed environments (with/without HA plugin):
-  - Many test modules use `pytest.importorskip("pytest_homeassistant_custom_component")`.
+- Tests use Home Assistant's supported `pytest-homeassistant` package:
   - Imports are commonly inside test functions; follow this pattern when adding tests.
   - Reuse fixtures from `tests/conftest.py` (`coord_factory`, `mock_entry`, `loaded_entry`) instead of re-creating setup boilerplate.
 - Releases are commit-message driven:

@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_notifications_fire_on_mode_change(hass, coord_factory) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE
 
@@ -29,7 +27,7 @@ async def test_notifications_fire_on_mode_change(hass, coord_factory) -> None:
 
 @pytest.fixture
 async def manual_timer(hass, coord_factory):
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_BATTERY_POWER_ENTITY_ID,
@@ -299,7 +297,7 @@ async def test_unavailable_temperature_does_not_prompt(hass, manual_timer, tempe
 
 @pytest.mark.parametrize(("behaviour", "stops"), [("timer", False), ("stop", True)])
 async def test_manual_timer_non_interactive_modes(hass, coord_factory, behaviour, stops) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_MANUAL_COOLING_BEHAVIOUR,
@@ -331,7 +329,7 @@ async def test_manual_timer_non_interactive_modes(hass, coord_factory, behaviour
 @pytest.mark.parametrize("notify", [False, True])
 @pytest.mark.parametrize("stop", [False, True])
 async def test_automatic_target_alert_is_optional_information_only(hass, coord_factory, notify, stop) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE, ControlMode, PowerPolicy
 
@@ -360,7 +358,7 @@ async def test_automatic_target_alert_is_optional_information_only(hass, coord_f
 
 @pytest.mark.parametrize("stop", [False, True])
 async def test_free_manual_target_alert_ignores_automatic_notification_switch(hass, coord_factory, stop) -> None:
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE, EVENT_NOTIFICATION_ACTION, ControlMode
     from custom_components.home_rules.rules import HomeOutput

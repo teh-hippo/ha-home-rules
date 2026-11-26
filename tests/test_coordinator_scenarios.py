@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_no_solar_generation_yields_no_change(coord_factory) -> None:
     """Zero generation → solar unavailable → no action taken."""
@@ -258,7 +256,7 @@ async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling
 async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass, coord_factory, freezer) -> None:
     from datetime import timedelta
 
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
     from custom_components.home_rules.rules import R_BELOW_THRESHOLD, R_TARGET_REACHED, HomeOutput
@@ -305,7 +303,7 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
 async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory, freezer, climate) -> None:
     from datetime import timedelta
 
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import CONF_SMOOTHING_WINDOW, ControlMode
     from custom_components.home_rules.rules import HomeOutput
@@ -342,7 +340,7 @@ async def test_manual_off_cooldown_survives_extra_evaluations_and_reload(
     from datetime import timedelta
 
     from homeassistant.util import dt as dt_util
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import ControlMode
     from custom_components.home_rules.coordinator import HomeRulesCoordinator
@@ -387,7 +385,7 @@ async def test_manual_off_cooldown_survives_extra_evaluations_and_reload(
 async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, coord_factory, freezer) -> None:
     from datetime import timedelta
 
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_SMOOTHING_WINDOW,
@@ -442,7 +440,7 @@ async def test_solar_run_on_deadline_survives_reload_and_stops_at_expiry(hass, c
 async def test_solar_run_on_expiry_callback_stops_without_another_poll(hass, coord_factory) -> None:
     import asyncio
 
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import (
         CONF_GRID_USAGE_DELAY,

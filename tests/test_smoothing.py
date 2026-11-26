@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_smoothed_fields_present_in_evaluation_record(coord_factory) -> None:
     """Each evaluation record should contain raw and smoothed generation fields."""

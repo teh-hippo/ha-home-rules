@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_number_entities_register_on_setup(hass, loaded_entry) -> None:
     for entity_id in (

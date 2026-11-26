@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 @pytest.mark.parametrize(
     ("grid", "invert", "expected"), [("-500", True, 500.0), ("500", True, 0.0), ("500", False, 500.0)]

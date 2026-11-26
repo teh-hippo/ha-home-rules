@@ -7,8 +7,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_setup_and_unload_entry(hass, mock_entry) -> None:
     """Config entry should set up and unload cleanly through HA lifecycle APIs."""
@@ -150,7 +148,7 @@ async def test_options_update_triggers_reload(hass, loaded_entry) -> None:
 
 async def test_boost_restores_automatic_run_without_solar(hass, mock_entry, hass_storage) -> None:
     from homeassistant.util import dt as dt_util
-    from pytest_homeassistant_custom_component.common import async_mock_service
+    from pytest_homeassistant.common import async_mock_service
 
     from custom_components.home_rules.const import DOMAIN, STORAGE_VERSION, ControlMode, PowerPolicy
     from custom_components.home_rules.rules import R_PAID_POWER, HomeOutput

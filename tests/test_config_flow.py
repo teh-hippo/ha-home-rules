@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-
-pytest.importorskip("pytest_homeassistant_custom_component")
 
 
 def _seed_valid_states(hass: HomeAssistant) -> None:
@@ -152,7 +149,7 @@ async def test_config_flow_rejects_invalid_power_unit(hass) -> None:
 
 async def test_config_flow_aborts_when_already_configured(hass) -> None:
     """Single entry integration should abort additional user flows."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant.common import MockConfigEntry
 
     from custom_components.home_rules.const import DOMAIN
 

@@ -6,10 +6,6 @@ when running only the pure rules-engine unit tests.
 
 from __future__ import annotations
 
-import pytest
-
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 def test_timer_countdown_sensor_is_registered() -> None:
     from custom_components.home_rules.entities import SENSORS

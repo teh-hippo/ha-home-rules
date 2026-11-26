@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
 from homeassistant.data_entry_flow import FlowResultType
-
-pytest.importorskip("pytest_homeassistant_custom_component")
 
 
 def _valid_options_input() -> dict[str, str | int | float]:

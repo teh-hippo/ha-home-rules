@@ -27,7 +27,7 @@ def _home(mode: AirconMode, **kw) -> HomeInput:
 
 
 async def test_battery_discharge_reported_separately_from_grid(coord_factory, hass) -> None:
-    pytest.importorskip("pytest_homeassistant_custom_component")
+    pytest.importorskip("pytest_homeassistant")
     from custom_components.home_rules.const import CONF_BATTERY_POWER_ENTITY_ID
 
     hass.states.async_set("sensor.batt", "1100", {"unit_of_measurement": "W"})
@@ -48,7 +48,7 @@ def test_solar_cooling_stops_when_battery_engaged(mode: AirconMode) -> None:
 
 
 async def test_manual_battery_run_preserves_active_timer(coord_factory, hass) -> None:
-    pytest.importorskip("pytest_homeassistant_custom_component")
+    pytest.importorskip("pytest_homeassistant")
     from datetime import timedelta
 
     from homeassistant.util import dt as dt_util

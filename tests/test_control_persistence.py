@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_power_and_target_controls_persist_across_reload(hass, loaded_entry) -> None:
     await hass.services.async_call(

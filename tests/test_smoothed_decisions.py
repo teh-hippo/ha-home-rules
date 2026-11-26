@@ -6,10 +6,6 @@ oscillation (e.g. COOL→DRY→COOL bouncing when solar fluctuates around 5500W)
 
 from __future__ import annotations
 
-import pytest
-
-pytest.importorskip("pytest_homeassistant_custom_component")
-
 
 async def test_smoothed_gen_prevents_transient_activation(hass, coord_factory) -> None:
     """A single-poll generation spike shouldn't activate from OFF."""
