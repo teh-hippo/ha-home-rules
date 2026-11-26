@@ -19,6 +19,35 @@ async def test_setup_and_unload_entry(hass, mock_entry) -> None:
     assert mock_entry.state == ConfigEntryState.NOT_LOADED
 
 
+async def test_dehumidifier_tank_full_repair_follows_sensor(hass, mock_entry) -> None:
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.home_rules.const import (
+        DEHUMIDIFIER_TANK_ENTITY_ID,
+        DOMAIN,
+        ISSUE_DEHUMIDIFIER_TANK_FULL,
+    )
+
+    hass.states.async_set(DEHUMIDIFIER_TANK_ENTITY_ID, "on")
+    assert await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = ir.async_get(hass)
+    issue = registry.async_get_issue(DOMAIN, ISSUE_DEHUMIDIFIER_TANK_FULL)
+    assert issue is not None
+    assert issue.is_persistent
+    assert issue.severity is ir.IssueSeverity.WARNING
+    assert issue.config_entry_id == mock_entry.entry_id
+
+    hass.states.async_set(DEHUMIDIFIER_TANK_ENTITY_ID, "unavailable")
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, ISSUE_DEHUMIDIFIER_TANK_FULL) is issue
+
+    hass.states.async_set(DEHUMIDIFIER_TANK_ENTITY_ID, "off")
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, ISSUE_DEHUMIDIFIER_TANK_FULL) is None
+
+
 @pytest.mark.parametrize("forecast", ["0", "invalid"])
 async def test_setup_removes_retired_controls(hass, mock_entry, hass_storage, forecast) -> None:
     from homeassistant.helpers import entity_registry as er

@@ -1,6 +1,8 @@
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.event import async_track_state_change_event
 
 from . import const as c
 from .config_flow import HomeRulesConfigFlow
@@ -41,8 +43,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, c.PLATFORMS)
+    _setup_dehumidifier_tank_issue(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+def _setup_dehumidifier_tank_issue(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    @callback
+    def sync_issue() -> None:
+        state = hass.states.get(c.DEHUMIDIFIER_TANK_ENTITY_ID)
+        if state is None or state.state in ("unknown", "unavailable"):
+            return
+        if state.state == "on":
+            ir.async_create_issue(
+                hass,
+                c.DOMAIN,
+                c.ISSUE_DEHUMIDIFIER_TANK_FULL,
+                config_entry_id=entry.entry_id,
+                is_fixable=False,
+                is_persistent=True,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=c.ISSUE_DEHUMIDIFIER_TANK_FULL,
+            )
+        elif state.state == "off":
+            ir.async_delete_issue(hass, c.DOMAIN, c.ISSUE_DEHUMIDIFIER_TANK_FULL)
+
+    @callback
+    def handle_state_change(event: Event[EventStateChangedData]) -> None:
+        if event.data["new_state"] is not None:
+            sync_issue()
+
+    sync_issue()
+    entry.async_on_unload(
+        async_track_state_change_event(
+            hass,
+            [c.DEHUMIDIFIER_TANK_ENTITY_ID],
+            handle_state_change,
+        )
+    )
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

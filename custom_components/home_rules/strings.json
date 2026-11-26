@@ -67,6 +67,10 @@
     }
   },
   "issues": {
+    "dehumidifier_tank_full": {
+      "title": "Dehumidifier tank full",
+      "description": "The dehumidifier tank needs to be emptied. This repair clears automatically after the tank is emptied and reseated."
+    },
     "runtime_error": {
       "title": "Home Rules evaluation failed",
       "description": "Home Rules failed during evaluation: **{error}**"

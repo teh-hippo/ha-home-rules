@@ -70,5 +70,7 @@ DEFAULT_SMOOTHING_WINDOW = 5
 MAX_RECENT_EVALUATIONS, STORAGE_VERSION = 50, 1
 EVENT_EVALUATION = "home_rules_evaluation"
 EVENT_NOTIFICATION_ACTION = "mobile_app_notification_action"
+DEHUMIDIFIER_TANK_ENTITY_ID = "binary_sensor.dehumidifier_tank_full"
+ISSUE_DEHUMIDIFIER_TANK_FULL = "dehumidifier_tank_full"
 ISSUE_RUNTIME, ISSUE_ENTITY_MISSING, ISSUE_ENTITY_UNAVAILABLE = "runtime_error", "entity_missing", "entity_unavailable"
 ISSUE_INVALID_UNIT, ISSUE_NOTIFICATION_SERVICE = "invalid_unit", "notification_service"
