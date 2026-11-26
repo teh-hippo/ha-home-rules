@@ -79,8 +79,9 @@ Manual Dry remains allowed.
 
 Two independent switches control occupancy-aware starts:
 
-- **Only Cool When Home** requires Home Assistant's `zone.home` aggregate to contain at least one person before an automatic cooling or drying start.
-  Home Rules subscribes to zone changes, so arrivals and departures are evaluated immediately rather than waiting for the next poll.
+- **Only Cool When Home** requires the optional **Comfort occupancy** entity to be home before an automatic cooling or drying start.
+  It defaults to Home Assistant's `zone.home` aggregate, or it can be a person or device tracker so only a specific occupant authorises normal cooling.
+  Home Rules subscribes to the selected entity, so arrivals and departures are evaluated immediately rather than waiting for the next poll.
   A departure stops an automatic run unless it is covered by the full-battery exception.
   Manual cooling is not blocked.
 - **Allow Away Cooling at Full Battery** permits an automatic cooling start while the house is empty once the configured battery state of charge reaches **Battery Full Threshold** (default 100%).

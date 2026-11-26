@@ -79,6 +79,8 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def last_evaluation(self) -> dict[str, Any]: return deepcopy(self._last_record)
     @property
     def recent_evaluations(self) -> list[dict[str, Any]]: return deepcopy(list(self._recent))
+    @property
+    def occupancy_entity_id(self) -> str: return str(self.config_entry.options.get(c.CONF_OCCUPANCY_ENTITY_ID, c.HOME_ZONE_ENTITY_ID)).strip() or c.HOME_ZONE_ENTITY_ID
 
     async def async_set_parameter(self, key: str, value: float) -> None:
         if key in (c.CONF_TEMPERATURE_THRESHOLD, c.CONF_TEMPERATURE_COOL):
@@ -130,7 +132,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._climate_unsub = async_track_state_change_event(self.hass, [self._entity_id(c.CONF_CLIMATE_ENTITY_ID)], self._async_handle_climate_change)
             self.config_entry.async_on_unload(self._unsubscribe_climate)
         if self._occupancy_unsub is None:
-            self._occupancy_unsub = async_track_state_change_event(self.hass, [c.HOME_ZONE_ENTITY_ID], self._async_handle_occupancy_change)
+            self._occupancy_unsub = async_track_state_change_event(self.hass, [self.occupancy_entity_id], self._async_handle_occupancy_change)
             self.config_entry.async_on_unload(self._unsubscribe_policy_inputs)
         if self._battery_soc_unsub is None and (battery_soc := str(self.config_entry.options.get(c.CONF_BATTERY_SOC_ENTITY_ID, self.config_entry.data.get(c.CONF_BATTERY_SOC_ENTITY_ID, ""))).strip()):
             self._battery_soc_unsub = async_track_state_change_event(self.hass, [battery_soc], self._async_handle_battery_soc_change)
@@ -286,11 +288,16 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         battery_discharge = max(0.0, (discharge or 0.0) - c.BATTERY_DISCHARGE_TOLERANCE)  # a battery covering the load hides the draw from the grid meter: pass it to the rules separately from grid usage
         someone_home: bool | None = None
         if self.only_cool_when_home:
-            zone = self.hass.states.get(c.HOME_ZONE_ENTITY_ID)
-            if zone is None or str(zone.state).lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
-                self._fallback_inputs["occupancy"] = "missing" if zone is None else str(zone.state).lower()
+            occupancy = self.hass.states.get(self.occupancy_entity_id)
+            if occupancy is None or str(occupancy.state).lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
+                self._fallback_inputs["occupancy"] = "missing" if occupancy is None else str(occupancy.state).lower()
             else:
-                with suppress(TypeError, ValueError): someone_home = float(zone.state) > 0
+                raw = str(occupancy.state).lower()
+                if self.occupancy_entity_id.startswith("zone."):
+                    with suppress(TypeError, ValueError): someone_home = float(raw) > 0
+                    if someone_home is None: self._fallback_inputs["occupancy"] = "invalid"
+                else:
+                    someone_home = raw == "home"
         battery_soc: float | None = None
         if (self.only_cool_when_home and self.allow_away_battery_cooling) or self._session.battery_run_authorized:
             soc = self._optional_state(c.CONF_BATTERY_SOC_ENTITY_ID, "battery_state_of_charge")

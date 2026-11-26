@@ -31,6 +31,7 @@
       "invalid_power_unit": "Power sensors must report W, kW, or MW.",
       "invalid_percentage_unit": "Battery state of charge must report %.",
       "invalid_climate_entity": "Climate must be a climate entity.",
+      "invalid_occupancy_entity": "Occupancy must be a person, device tracker, or zone.",
       "invalid_sensor_entity": "Selected entity must be a sensor."
     },
     "abort": {
@@ -49,6 +50,7 @@
           "humidity_entity_id": "Humidity sensor",
           "battery_power_entity_id": "Battery power sensor (optional)",
           "battery_soc_entity_id": "Battery state-of-charge sensor (optional)",
+          "occupancy_entity_id": "Comfort occupancy (optional; defaults to everyone at home)",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "eval_interval": "Evaluation interval (seconds)",

@@ -78,6 +78,52 @@ async def test_departure_event_stops_normal_automatic_run(hass, coord_factory) -
     assert len(stops) == 1
 
 
+async def test_selected_person_controls_home_comfort_independently_of_zone(hass, coord_factory) -> None:
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    from custom_components.home_rules.const import (
+        CONF_BATTERY_SOC_ENTITY_ID,
+        CONF_OCCUPANCY_ENTITY_ID,
+        ControlMode,
+    )
+    from custom_components.home_rules.rules import R_NO_ONE_HOME, HomeOutput
+
+    hass.states.async_set("zone.home", "1")
+    hass.states.async_set("person.camille", "not_home")
+    hass.states.async_set("sensor.battery_soc", "66", {"unit_of_measurement": "%"})
+    starts = async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    stops = async_mock_service(hass, "climate", "turn_off")
+    coordinator = await coord_factory(
+        options={
+            CONF_OCCUPANCY_ENTITY_ID: "person.camille",
+            CONF_BATTERY_SOC_ENTITY_ID: "sensor.battery_soc",
+        },
+    )
+    coordinator.only_cool_when_home = True
+    coordinator.allow_away_battery_cooling = True
+    coordinator.control_mode = ControlMode.AUTOMATIC
+
+    await coordinator.async_run_evaluation("initial")
+    assert coordinator.data.adjustment is HomeOutput.NO_CHANGE
+    assert coordinator._last_record["reason"] == R_NO_ONE_HOME
+    assert not starts
+
+    hass.states.async_set("person.camille", "home")
+    await hass.async_block_till_done()
+    assert coordinator._last_record["trigger"] == "occupancy"
+    assert coordinator.data.adjustment.value == HomeOutput.COOL.value
+    assert len(starts) == 1
+
+    hass.states.async_set("climate.test", "cool", {"temperature": 22})
+    await hass.async_block_till_done()
+    hass.states.async_set("person.camille", "not_home")
+    await hass.async_block_till_done()
+    assert coordinator.data.adjustment.value == HomeOutput.OFF.value
+    assert coordinator._last_record["reason"] == R_NO_ONE_HOME
+    assert len(stops) == 1
+
+
 async def test_policy_controls_persist_and_unavailable_occupancy_fails_closed(coord_factory) -> None:
     from custom_components.home_rules.const import CONF_ONLY_COOL_WHEN_HOME
     from custom_components.home_rules.rules import R_OCCUPANCY_UNAVAILABLE

@@ -19,6 +19,7 @@ else:
 _PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)
 _POWER_KEYS = {c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_BATTERY_POWER_ENTITY_ID}
+_OCCUPANCY_DOMAINS = ("person", "device_tracker", "zone")
 
 
 def _entity_selector(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector: return selector.EntitySelector(selector.EntitySelectorConfig(domain=domain) if device_class is None else selector.EntitySelectorConfig(domain=domain, device_class=device_class))
@@ -26,7 +27,7 @@ def _number_selector(min_val: float, max_val: float, step: float, unit: str | No
     return selector.NumberSelector(selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=selector.NumberSelectorMode.BOX) if unit is None else selector.NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=unit))
 
 
-_ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"), c.CONF_BATTERY_POWER_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_BATTERY_SOC_ENTITY_ID: _entity_selector("sensor", "battery")}
+_ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"), c.CONF_BATTERY_POWER_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_BATTERY_SOC_ENTITY_ID: _entity_selector("sensor", "battery"), c.CONF_OCCUPANCY_ENTITY_ID: _entity_selector(list(_OCCUPANCY_DOMAINS))}
 _NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW, _number_selector(1, 10, 1)), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY_MINUTES, c.DEFAULT_REACTIVATE_DELAY_MINUTES, _number_selector(0, 300, 0.1, "min")), (c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES, _number_selector(0, 240, 1, "min")))
 _OPTIONS_ENTITY_FIELDS: tuple[str, ...] = (c.CONF_CLIMATE_ENTITY_ID, c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)
 
@@ -53,7 +54,8 @@ def _validate_entities(
             except ValueError: return {"base": "invalid_power_unit"}
         if key == c.CONF_BATTERY_SOC_ENTITY_ID and str(state.attributes.get("unit_of_measurement", "")).strip() != "%": return {"base": "invalid_percentage_unit"}
         if check_domains and key == c.CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("climate."): return {"base": "invalid_climate_entity"}
-        if check_domains and key != c.CONF_CLIMATE_ENTITY_ID and not entity_id.startswith("sensor."): return {"base": "invalid_sensor_entity"}
+        if check_domains and key == c.CONF_OCCUPANCY_ENTITY_ID and not entity_id.startswith(tuple(f"{domain}." for domain in _OCCUPANCY_DOMAINS)): return {"base": "invalid_occupancy_entity"}
+        if check_domains and key not in (c.CONF_CLIMATE_ENTITY_ID, c.CONF_OCCUPANCY_ENTITY_ID) and not entity_id.startswith("sensor."): return {"base": "invalid_sensor_entity"}
     return {}
 
 
