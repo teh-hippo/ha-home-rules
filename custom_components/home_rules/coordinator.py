@@ -443,12 +443,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             elif adjustment is HomeOutput.OFF: await self._call_service("climate", "turn_off", {"entity_id": climate})
         if adjustment is HomeOutput.TIMER:
             self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION))))
-        elif adjustment in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.OFF):
+        elif adjustment in (HomeOutput.COOL, HomeOutput.DRY) or (adjustment is HomeOutput.OFF and self.control_mode is not c.ControlMode.MONITOR):
             self._clear_aircon_timer()
         if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
             if not self._auto_mode: self._target_notified, self._target_prompt_id = False, None
             self._auto_mode = True
-        elif adjustment is HomeOutput.OFF: self._auto_mode = False
+        elif adjustment is HomeOutput.OFF and self.control_mode is not c.ControlMode.MONITOR: self._auto_mode = False
 
     def _get_state(self, entity_id: str, label: str, *, allow_unavailable: bool = False) -> State:
         state = self.hass.states.get(entity_id)

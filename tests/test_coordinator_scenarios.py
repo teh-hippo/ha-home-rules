@@ -292,6 +292,22 @@ async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass
     assert coordinator.data.auto_mode
 
 
+async def test_monitor_off_recommendation_does_not_create_manual_timer(coord_factory) -> None:
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(climate="dry", generation="0", temperature="22")
+    coordinator.stop_at_comfort_temperature = True
+    coordinator._auto_mode = True
+    coordinator._session.last = HomeOutput.DRY
+
+    await coordinator.async_run_evaluation("poll")
+    await coordinator.async_run_evaluation("poll")
+
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    assert coordinator.data.auto_mode
+    assert coordinator.data.timer_finishes_at is None
+
+
 @pytest.mark.parametrize("climate", ["heat", "cool", "dry"])
 async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory, freezer, climate) -> None:
     from datetime import timedelta
