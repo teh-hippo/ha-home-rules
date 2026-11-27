@@ -71,14 +71,14 @@ async def test_async_set_mode_solar_cooling(coord_factory) -> None:
     assert coordinator._last_record["trigger"] == "manual"
 
 
-async def test_climate_mode_change_waits_for_evaluation(hass, coord_factory) -> None:
+async def test_climate_mode_change_evaluates_immediately(hass, coord_factory) -> None:
     coordinator = await coord_factory()
     await coordinator.async_run_evaluation("initial")
 
     hass.states.async_set("climate.test", "cool", {"temperature": 22})
     await hass.async_block_till_done()
 
-    assert coordinator._last_record["trigger"] == "initial"
+    assert coordinator._last_record["trigger"] == "climate"
 
 
 async def test_adjustment_failure_budget_prevents_extra_service_calls(hass, coord_factory) -> None:

@@ -6,6 +6,69 @@ import pytest
 
 
 @pytest.fixture
+async def virtual_climates(hass):
+    """Create stateful virtual climate entities through Home Assistant's climate platform."""
+    from homeassistant.components.climate import (
+        ATTR_HVAC_MODE,
+        ATTR_TEMPERATURE,
+        ClimateEntity,
+        ClimateEntityFeature,
+        HVACMode,
+    )
+    from homeassistant.components.climate import DOMAIN as CLIMATE_DOMAIN
+    from homeassistant.const import UnitOfTemperature
+    from homeassistant.setup import async_setup_component
+    from homeassistant.util import slugify
+    from pytest_homeassistant.common import setup_test_component_platform
+
+    class VirtualClimate(ClimateEntity):
+        """Stateful climate entity for integration tests."""
+
+        _attr_should_poll = False
+        _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+        _attr_supported_features = (
+            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_OFF | ClimateEntityFeature.TURN_ON
+        )
+        _attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL, HVACMode.DRY]
+
+        def __init__(self, name: str, hvac_mode: HVACMode, target_temperature: float) -> None:
+            self._attr_name = name
+            self._attr_unique_id = f"virtual_{slugify(name)}"
+            self.entity_id = f"{CLIMATE_DOMAIN}.{slugify(name)}"
+            self._attr_hvac_mode = hvac_mode
+            self._attr_native_current_temperature = 25.0
+            self._attr_native_target_temperature = target_temperature
+
+        async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+            self._attr_hvac_mode = hvac_mode
+            self.async_write_ha_state()
+
+        async def async_set_temperature(self, **kwargs: Any) -> None:
+            if (temperature := kwargs.get(ATTR_TEMPERATURE)) is not None:
+                self._attr_native_target_temperature = float(temperature)
+            if (hvac_mode := kwargs.get(ATTR_HVAC_MODE)) is not None:
+                self._attr_hvac_mode = HVACMode(hvac_mode)
+            self.async_write_ha_state()
+
+    async def _create(
+        *names: str,
+        hvac_mode: HVACMode = HVACMode.OFF,
+        target_temperature: float = 22.0,
+    ) -> list[VirtualClimate]:
+        entities = [VirtualClimate(name, hvac_mode, target_temperature) for name in (names or ("Virtual AC",))]
+        setup_test_component_platform(hass, CLIMATE_DOMAIN, entities)
+        assert await async_setup_component(
+            hass,
+            CLIMATE_DOMAIN,
+            {CLIMATE_DOMAIN: {"platform": "test"}},
+        )
+        await hass.async_block_till_done()
+        return entities
+
+    return _create
+
+
+@pytest.fixture
 async def coord_factory(hass):
     """Factory fixture: creates an initialized HomeRulesCoordinator with configurable HA states.
 
@@ -39,17 +102,19 @@ async def coord_factory(hass):
         temperature: str = "25",
         humidity: str = "40",
         climate: str = "off",
+        climate_entity: str = "climate.test",
         options: dict | None = None,
         extra_data: dict | None = None,
     ) -> HomeRulesCoordinator:
-        hass.states.async_set("climate.test", climate)
+        if hass.states.get(climate_entity) is None:
+            hass.states.async_set(climate_entity, climate)
         hass.states.async_set("sensor.generation", generation, {"unit_of_measurement": "W"})
         hass.states.async_set("sensor.grid", grid, {"unit_of_measurement": "W"})
         hass.states.async_set("sensor.temperature", temperature, {"unit_of_measurement": "°C"})
         hass.states.async_set("sensor.humidity", humidity, {"unit_of_measurement": "%"})
 
         data: dict[str, Any] = {
-            CONF_CLIMATE_ENTITY_ID: "climate.test",
+            CONF_CLIMATE_ENTITY_ID: climate_entity,
             CONF_GENERATION_ENTITY_ID: "sensor.generation",
             CONF_GRID_ENTITY_ID: "sensor.grid",
             CONF_TEMPERATURE_ENTITY_ID: "sensor.temperature",

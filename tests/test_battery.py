@@ -6,6 +6,7 @@ import pytest
 
 from custom_components.home_rules.rules import (
     R_BATTERY_ENGAGED,
+    R_BATTERY_RESERVE,
     R_BATTERY_TOLERATED,
     AirconMode,
     CachedState,
@@ -82,9 +83,53 @@ async def test_manual_battery_run_preserves_active_timer(coord_factory, hass) ->
     assert coordinator.data.timer_finishes_at == deadline
 
 
+async def test_manual_solar_only_cooling_reads_battery_reserve(coord_factory, hass) -> None:
+    pytest.importorskip("pytest_homeassistant")
+    from custom_components.home_rules.const import (
+        CONF_BATTERY_POWER_ENTITY_ID,
+        CONF_BATTERY_SOC_ENTITY_ID,
+        ControlMode,
+    )
+
+    turned_off: list[str] = []
+
+    async def record(call) -> None:
+        turned_off.append(call.data["entity_id"])
+
+    hass.services.async_register("climate", "turn_off", record)
+    hass.states.async_set("sensor.battery_soc", "13", {"unit_of_measurement": "%"})
+    hass.states.async_set("sensor.battery_power", "5000", {"unit_of_measurement": "W"})
+    coordinator = await coord_factory(
+        climate="cool",
+        options={
+            CONF_BATTERY_POWER_ENTITY_ID: "sensor.battery_power",
+            CONF_BATTERY_SOC_ENTITY_ID: "sensor.battery_soc",
+        },
+    )
+    assert not coordinator.allow_away_battery_cooling
+    assert not coordinator.afternoon_cooling_enabled
+
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("manual")
+
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    assert coordinator._last_record["reason"] == R_BATTERY_RESERVE
+    assert turned_off == ["climate.test"]
+
+
 def test_solar_cooling_does_not_start_while_battery_engaged() -> None:
     result = adjust(PARAMS, _home(AirconMode.OFF, battery_discharge=300, auto=False), CachedState())
     assert result.output is HomeOutput.NO_CHANGE and result.reason == R_BATTERY_ENGAGED
+
+
+@pytest.mark.parametrize("timer", [False, True])
+def test_solar_only_manual_cooling_stops_below_battery_reserve(timer: bool) -> None:
+    result = adjust(
+        PARAMS,
+        _home(AirconMode.COOL, auto=False, battery_discharge=5000, battery_soc=13, timer=timer),
+        CachedState(last=HomeOutput.TIMER if timer else HomeOutput.OFF),
+    )
+    assert result.output is HomeOutput.OFF and result.reason == R_BATTERY_RESERVE
 
 
 @pytest.mark.parametrize("auto", [False, True])

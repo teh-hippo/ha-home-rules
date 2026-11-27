@@ -81,6 +81,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record, self._fallback_inputs = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}, {}; self._aircon_timer_finishes_at: datetime | None = None
         self._target_notified = False; self._target_prompt_id: str | None = None; self._notification_unsub: CALLBACK_TYPE | None = None
         self._climate_unsub: CALLBACK_TYPE | None = None; self._climate_write_in_progress = False
+        self._climate_tasks: set[asyncio.Task[Any]] = set()
         self._automatic_setpoint: float | None = None; self._adjusted_setpoint: float | None = None; self._observed_setpoint: float | None = None
         self._store = Store[dict[str, Any]](hass, c.STORAGE_VERSION, f"{c.DOMAIN}_{config_entry.entry_id}")
         interval = timedelta(seconds=int(config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))); name = f"{c.DOMAIN} ({config_entry.entry_id})"
@@ -148,7 +149,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self.config_entry.async_on_unload(self._unsubscribe_climate)
 
     async def async_set_control(self, key: str, value: bool) -> None: setattr(self, key, value); await self._save_state()
-    async def async_shutdown(self) -> None: self._unsubscribe_notifications(); self._unsubscribe_climate()
+    async def async_shutdown(self) -> None:
+        self._unsubscribe_notifications(); self._unsubscribe_climate()
+        tasks = tuple(self._climate_tasks)
+        for task in tasks: task.cancel()
+        if tasks: await asyncio.gather(*tasks, return_exceptions=True)
+        self._climate_tasks.clear()
     def _unsubscribe_climate(self) -> None:
         if self._climate_unsub is not None: self._climate_unsub(); self._climate_unsub = None
     @staticmethod
@@ -163,6 +169,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _async_handle_climate_change(self, event: Event[EventStateChangedData]) -> None:
         old, new = event.data["old_state"], event.data["new_state"]
         if new is None: return
+        state_changed = old is not None and old.state != new.state
         if new.state == AirconMode.OFF:
             was_running = self._auto_mode or self._session.last in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.ON, HomeOutput.TIMER) or (old is not None and old.state not in (AirconMode.OFF, STATE_UNKNOWN, STATE_UNAVAILABLE))
             self._auto_mode = False; self._reset_target_tracking(); self._clear_aircon_timer(); self._session.last = HomeOutput.OFF
@@ -175,7 +182,14 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if not self._climate_write_in_progress or target == self._automatic_setpoint: self._observed_setpoint = target
         elif new.state in (AirconMode.AUTO, AirconMode.HEAT, AirconMode.HEAT_COOL, AirconMode.FAN_ONLY):
             self._auto_mode = False; self._reset_target_tracking()
+        if state_changed and self._initialized and not self._climate_write_in_progress:
+            task = self.hass.async_create_task(self._async_run_climate_evaluation(), "home_rules climate change")
+            self._climate_tasks.add(task); task.add_done_callback(self._climate_tasks.discard)
     async def async_run_evaluation(self, trigger: str = "manual") -> None: self.async_set_updated_data(await self._evaluate_with_error_handling(trigger))
+
+    async def _async_run_climate_evaluation(self) -> None:
+        try: await self.async_run_evaluation("climate")
+        except UpdateFailed as err: self.async_set_update_error(err)
 
     async def _async_update_data(self) -> CoordinatorData:
         return await self._evaluate_with_error_handling("poll")
@@ -192,6 +206,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if notification_action is not None and notification_action not in self._target_notification_actions(): return self.data
             now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, _ = self._build_home_input(); params = self.parameters; afternoon = await self._afternoon_context(params); home = replace(home, afternoon_planning=afternoon.planning, afternoon_window_open=afternoon.window_open, afternoon_start_allowed=afternoon.start_allowed, afternoon_forecast_available=afternoon.forecast_available, afternoon_forecast_recovery=afternoon.forecast_recovery, afternoon_window_start=afternoon.window_start, afternoon_window_end=afternoon.window_end, afternoon_window_energy=afternoon.window_energy)
             if notification_action is not None and (home.auto or home.aircon_mode not in (AirconMode.COOL, AirconMode.DRY) or self.control_mode in (c.ControlMode.DISABLED, c.ControlMode.MONITOR) or params.stop_at_comfort_temperature or (self._session.last is HomeOutput.TIMER and not home.timer)): notification_action = None
+            if trigger == "climate": home = replace(home, count_power_tolerance=False)
             if home.timer and home.aircon_mode is AirconMode.OFF: self._clear_aircon_timer(); home = replace(home, timer=False)
             if notification_action is not None and notification_action.endswith("_five"):
                 finishes = dt_util.utcnow() + timedelta(minutes=5)
@@ -365,6 +380,9 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _entity_id(self, key: str) -> str:
         return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip() or str(self.config_entry.data[key])
 
+    def _optional_state_id(self, key: str) -> str:
+        return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip()
+
     def _state(self, conf_key: str, label: str, *, allow_unavailable: bool = False) -> State: return self._get_state(self._entity_id(conf_key), label, allow_unavailable=allow_unavailable)
 
     def _build_home_input(self) -> tuple[HomeInput, datetime | None]:
@@ -389,7 +407,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 else:
                     someone_home = raw == "home"
         battery_soc: float | None = None
-        if (self.only_cool_when_home and self.allow_away_battery_cooling) or self._session.battery_run_authorized or self.afternoon_cooling_enabled:
+        if self._optional_state_id(c.CONF_BATTERY_SOC_ENTITY_ID):
             soc = self._optional_state(c.CONF_BATTERY_SOC_ENTITY_ID, "battery_state_of_charge")
             if soc is not None:
                 with suppress(TypeError, ValueError):
@@ -440,7 +458,10 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             climate = str(self._entity_id(c.CONF_CLIMATE_ENTITY_ID))
             if adjustment in (HomeOutput.COOL, HomeOutput.DRY):
                 await self._set_climate_target(target_temperature, adjustment.value.lower())
-            elif adjustment is HomeOutput.OFF: await self._call_service("climate", "turn_off", {"entity_id": climate})
+            elif adjustment is HomeOutput.OFF:
+                self._climate_write_in_progress = True
+                try: await self._call_service("climate", "turn_off", {"entity_id": climate})
+                finally: self._climate_write_in_progress = False
         if adjustment is HomeOutput.TIMER:
             self._aircon_timer_finishes_at = dt_util.utcnow() + timedelta(minutes=max(1, int(self.config_entry.options.get(c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION))))
         elif adjustment in (HomeOutput.COOL, HomeOutput.DRY) or (adjustment is HomeOutput.OFF and self.control_mode is not c.ControlMode.MONITOR):
@@ -483,7 +504,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._create_issue(c.ISSUE_INVALID_UNIT, {"entity_id": state.entity_id, "unit": unit or "(none)"}); raise ValueError(f"unsupported power unit for {state.entity_id}: {unit}") from None
 
     def _optional_state(self, conf_key: str, label: str) -> State | None:
-        entity_id = str(self.config_entry.options.get(conf_key, self.config_entry.data.get(conf_key, ""))).strip()
+        entity_id = self._optional_state_id(conf_key)
         if not entity_id: return None
         state = self.hass.states.get(entity_id)
         if state is None or str(state.state).lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}: self._fallback_inputs[label] = "missing" if state is None else str(state.state).lower(); return None  # optional input: fail open, but record it

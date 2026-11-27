@@ -155,6 +155,36 @@ async def test_timer_expiry_waits_for_next_evaluation(coord_factory) -> None:
     await coordinator.async_shutdown()
 
 
+async def test_external_climate_start_evaluates_immediately(hass, coord_factory) -> None:
+    from pytest_homeassistant.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_BATTERY_POWER_ENTITY_ID, CONF_BATTERY_SOC_ENTITY_ID, ControlMode
+    from custom_components.home_rules.rules import HomeOutput
+
+    turned_off = async_mock_service(hass, "climate", "turn_off")
+    hass.states.async_set("sensor.battery_power", "5000", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.battery_soc", "13", {"unit_of_measurement": "%"})
+    coordinator = await coord_factory(
+        generation="0",
+        grid="0",
+        options={
+            CONF_BATTERY_POWER_ENTITY_ID: "sensor.battery_power",
+            CONF_BATTERY_SOC_ENTITY_ID: "sensor.battery_soc",
+        },
+    )
+    coordinator.only_cool_when_home = coordinator.allow_away_battery_cooling = True
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("initial")
+
+    hass.states.async_set("climate.test", "cool")
+    await hass.async_block_till_done()
+
+    assert coordinator._last_record["trigger"] == "climate"
+    assert coordinator.data.adjustment is HomeOutput.OFF
+    assert len(turned_off) == 1
+    await coordinator.async_shutdown()
+
+
 async def test_restart_first_eval_uses_live_state_when_no_stored_session(coord_factory) -> None:
     """First eval with no stored session initialises session.last from live entity state."""
     # High solar, hot, aircon is already cooling.

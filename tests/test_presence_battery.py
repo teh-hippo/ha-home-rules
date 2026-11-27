@@ -71,7 +71,7 @@ async def test_departure_is_applied_on_next_evaluation(hass, coord_factory) -> N
     await hass.async_block_till_done()
     hass.states.async_set("zone.home", "0")
     await hass.async_block_till_done()
-    assert coordinator._last_record["trigger"] == "initial"
+    assert coordinator._last_record["trigger"] == "climate"
     assert not stops
 
     await coordinator.async_run_evaluation("poll")

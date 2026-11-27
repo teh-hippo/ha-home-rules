@@ -6,33 +6,24 @@ when running only the pure rules-engine unit tests.
 
 from __future__ import annotations
 
-from typing import Any
 
-
-async def test_execute_adjustment_sets_explicit_hvac_mode(hass, coord_factory) -> None:
-    """Verify set_hvac_mode is called explicitly before set_temperature in solar cooling mode."""
+async def test_execute_adjustment_updates_virtual_climate(hass, coord_factory, virtual_climates) -> None:
+    """Verify solar cooling updates an actual Home Assistant climate entity."""
     from custom_components.home_rules.const import ControlMode
 
-    calls: list[tuple[str, str, dict[str, Any]]] = []
-
-    async def record_service_call(call) -> None:
-        calls.append((call.domain, call.service, dict(call.data)))
-
-    hass.services.async_register("climate", "set_hvac_mode", record_service_call)
-    hass.services.async_register("climate", "set_temperature", record_service_call)
-
-    coordinator = await coord_factory()
+    climate, other_climate = await virtual_climates("Integration Test AC", "Other Test AC", target_temperature=26)
+    coordinator = await coord_factory(climate_entity=climate.entity_id)
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     await coordinator.async_run_evaluation("manual")
 
-    assert calls == [
-        ("climate", "set_hvac_mode", {"entity_id": "climate.test", "hvac_mode": "cool"}),
-        (
-            "climate",
-            "set_temperature",
-            {"entity_id": "climate.test", "temperature": coordinator.parameters.temperature_cool},
-        ),
-    ]
+    state = hass.states.get(climate.entity_id)
+    assert state is not None
+    assert state.state == "cool"
+    assert state.attributes["temperature"] == coordinator.parameters.temperature_cool
+    other_state = hass.states.get(other_climate.entity_id)
+    assert other_state is not None
+    assert other_state.state == "off"
+    assert other_state.attributes["temperature"] == 26
 
 
 async def test_stale_auto_mode_self_heals_for_heat(hass, coord_factory) -> None:

@@ -125,6 +125,7 @@ class HomeInput:
     generation_available: bool = True
     grid_available: bool = True
     battery_power_available: bool = True
+    count_power_tolerance: bool = True
 
 
 @dataclass
@@ -479,6 +480,15 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             state.afternoon_run_authorized = True
         return AdjustResult(target.output, target.reason)
 
+    if (
+        manual_cooling
+        and not h.allow_paid_power
+        and h.battery_discharge > 0
+        and h.battery_soc is not None
+        and h.battery_soc < config.battery_reserve_threshold
+    ):
+        return _stop(config, h, state, R_BATTERY_RESERVE)
+
     if manual_cooling:
         if h.timer or not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0:
             state.tolerated = 0
@@ -538,6 +548,8 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             else:
                 return _stop(config, h, state, R_AFTERNOON_OCCUPANCY)
             state.afternoon_run_authorized = True
+            if not h.count_power_tolerance:
+                return AdjustResult(HomeOutput.NO_CHANGE, R_BATTERY_TOLERATED)
             state.tolerated += 1
             if state.tolerated >= config.grid_usage_delay:
                 return _stop(config, h, state, R_BATTERY_ENGAGED)
@@ -582,6 +594,8 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         if h.temperature <= config.temperature_cool:
             return _stop(config, h, state, R_TARGET_REACHED)
         if h.grid_usage > 0:
+            if not h.count_power_tolerance:
+                return AdjustResult(HomeOutput.NO_CHANGE, R_BATTERY_COOLING)
             state.tolerated += 1
             if state.tolerated >= config.grid_usage_delay:
                 return _stop(config, h, state, R_GRID_TOO_HIGH)
@@ -594,6 +608,9 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
 
     # --- Cooling run + grid draw (or no solar) ---
     if h.auto and (not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0):
+        if not h.count_power_tolerance:
+            reason = R_BATTERY_TOLERATED if h.battery_discharge > 0 else R_GRID_TOLERATED
+            return AdjustResult(HomeOutput.NO_CHANGE, reason)
         state.tolerated += 1
         if state.tolerated < config.grid_usage_delay:
             if target.output is not None and h.temperature_available and h.battery_discharge <= 0:
