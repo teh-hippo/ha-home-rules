@@ -91,7 +91,8 @@ class HomeRulesModeSelect(HomeRulesEntity, SelectEntity):
     def __init__(self, entry: Entry, coordinator: Coord) -> None: super().__init__(entry, coordinator, "control_mode")
     @property
     def current_option(self) -> str: return self.coordinator.control_mode.value
-    async def async_select_option(self, option: str) -> None: await self.coordinator.async_set_mode(c.ControlMode(option))
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_mode(c.ControlMode(option)); self.async_write_ha_state()
 
 
 class HomeRulesSwitch(HomeRulesEntity, SwitchEntity):
@@ -100,8 +101,10 @@ class HomeRulesSwitch(HomeRulesEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool: return bool(getattr(self.coordinator, self.entity_description.key))
-    async def async_turn_on(self, **kwargs: object) -> None: await self.coordinator.async_set_control(self.entity_description.key, True)
-    async def async_turn_off(self, **kwargs: object) -> None: await self.coordinator.async_set_control(self.entity_description.key, False)
+    async def async_turn_on(self, **kwargs: object) -> None:
+        await self.coordinator.async_set_control(self.entity_description.key, True); self.async_write_ha_state()
+    async def async_turn_off(self, **kwargs: object) -> None:
+        await self.coordinator.async_set_control(self.entity_description.key, False); self.async_write_ha_state()
 
 
 class HomeRulesPowerPolicySelect(HomeRulesEntity, SelectEntity):
@@ -112,7 +115,8 @@ class HomeRulesPowerPolicySelect(HomeRulesEntity, SelectEntity):
     def __init__(self, entry: Entry, coordinator: Coord) -> None: super().__init__(entry, coordinator, c.CONF_POWER_POLICY)
     @property
     def current_option(self) -> str: return self.coordinator.power_policy.value
-    async def async_select_option(self, option: str) -> None: await self.coordinator.async_set_power_policy(c.PowerPolicy(option))
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_power_policy(c.PowerPolicy(option)); self.async_write_ha_state()
 
 
 class HomeRulesEvaluateButton(HomeRulesEntity, ButtonEntity):

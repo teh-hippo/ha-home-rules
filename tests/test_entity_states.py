@@ -51,6 +51,17 @@ async def test_all_entities_use_translation_key_not_name(hass, loaded_entry) -> 
         assert desc.icon is None, f"{desc.key} should not set icon (use icons.json)"
 
 
+async def test_control_mode_selection_updates_state(hass, loaded_entry) -> None:
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": "select.home_rules_control_mode", "option": "automatic"},
+        blocking=True,
+    )
+
+    assert hass.states.get("select.home_rules_control_mode").state == "automatic"
+
+
 async def test_renamed_labels_preserve_registered_entity_ids(hass, mock_entry) -> None:
     from homeassistant.helpers import entity_registry as er
 
