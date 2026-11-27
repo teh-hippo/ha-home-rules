@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.5.1 (2026-11-27)
+
+### Bug Fixes
+
+- Preserve automatic ownership for monitor recommendations
+  ([`a287493`](https://github.com/teh-hippo/ha-home-rules/commit/a287493d258aec51c700f2d12138187510c02263))
+
+
 ## v4.5.0 (2026-11-27)
 
 ### Features
