@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.5.0 (2026-11-27)
+
+### Features
+
+- Add forecast-aware afternoon cooling
+  ([`4b98ea0`](https://github.com/teh-hippo/ha-home-rules/commit/4b98ea0d82763bce2614bd33f79394bc47b0543d))
+
+
 ## v4.4.0 (2026-11-26)
 
 ### Features
