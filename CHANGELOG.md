@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.5.2 (2026-11-27)
+
+### Bug Fixes
+
+- Refresh control entity state
+  ([`eaa4873`](https://github.com/teh-hippo/ha-home-rules/commit/eaa4873e36589e092562994a03f83c9a0908dcb5))
+
+
 ## v4.5.1 (2026-11-27)
 
 ### Bug Fixes
