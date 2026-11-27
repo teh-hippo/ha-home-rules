@@ -24,7 +24,7 @@ from .coordinator import HomeRulesConfigEntry, HomeRulesCoordinator
 _DIAG, _CONF, _TS, _DUR = EntityCategory.DIAGNOSTIC, EntityCategory.CONFIG, SensorDeviceClass.TIMESTAMP, SensorDeviceClass.DURATION
 type Entry = HomeRulesConfigEntry
 type Coord = HomeRulesCoordinator
-_ENTITY_IDS = {"mode": f"sensor.{c.DOMAIN}_mode", "adjustment": f"sensor.{c.DOMAIN}_action", "timer_finishes_at": f"sensor.{c.DOMAIN}_timer_countdown", "temperature_cool": f"number.{c.DOMAIN}_cool_setpoint", "temperature_threshold": f"number.{c.DOMAIN}_temperature_threshold", c.CONF_STOP_AT_COMFORT_TEMPERATURE: f"switch.{c.DOMAIN}_{c.CONF_STOP_AT_COMFORT_TEMPERATURE}", "power_policy": f"select.{c.DOMAIN}_power_policy", c.CONF_ALLOW_AWAY_BATTERY_COOLING: f"switch.{c.DOMAIN}_{c.CONF_ALLOW_AWAY_BATTERY_COOLING}", c.CONF_BATTERY_RESERVE_THRESHOLD: f"number.{c.DOMAIN}_{c.CONF_BATTERY_RESERVE_THRESHOLD}"}
+_ENTITY_IDS = {"mode": f"sensor.{c.DOMAIN}_mode", "adjustment": f"sensor.{c.DOMAIN}_action", "timer_finishes_at": f"sensor.{c.DOMAIN}_timer_countdown", "temperature_cool": f"number.{c.DOMAIN}_cool_setpoint", "temperature_threshold": f"number.{c.DOMAIN}_temperature_threshold", c.CONF_STOP_AT_COMFORT_TEMPERATURE: f"switch.{c.DOMAIN}_{c.CONF_STOP_AT_COMFORT_TEMPERATURE}", "power_policy": f"select.{c.DOMAIN}_power_policy", c.CONF_ALLOW_AWAY_BATTERY_COOLING: f"switch.{c.DOMAIN}_{c.CONF_ALLOW_AWAY_BATTERY_COOLING}", c.CONF_BATTERY_RESERVE_THRESHOLD: f"number.{c.DOMAIN}_{c.CONF_BATTERY_RESERVE_THRESHOLD}", c.CONF_AFTERNOON_COOLING_ENABLED: f"switch.{c.DOMAIN}_{c.CONF_AFTERNOON_COOLING_ENABLED}", c.CONF_AFTERNOON_ENERGY_BUDGET: f"number.{c.DOMAIN}_{c.CONF_AFTERNOON_ENERGY_BUDGET}", c.CONF_AFTERNOON_BATTERY_RESERVE: f"number.{c.DOMAIN}_{c.CONF_AFTERNOON_BATTERY_RESERVE}"}
 
 
 def _sensor(key: str, **kwargs: Any) -> SensorEntityDescription: return SensorEntityDescription(key=key, translation_key=key, **kwargs)
@@ -42,7 +42,7 @@ BINARY_SENSORS = (
     BinarySensorEntityDescription(key="solar_available", translation_key="solar_available", entity_category=_DIAG),
     BinarySensorEntityDescription(key="auto_mode", translation_key="auto_mode", entity_category=_DIAG),
 )
-SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", c.CONF_ONLY_COOL_WHEN_HOME, c.CONF_ALLOW_AWAY_BATTERY_COOLING, c.CONF_STOP_AT_COMFORT_TEMPERATURE, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS))
+SWITCHES = tuple(SwitchEntityDescription(key=k, translation_key=k, entity_category=_CONF) for k in ("cooling_enabled", "dry_mode_enabled", c.CONF_ONLY_COOL_WHEN_HOME, c.CONF_ALLOW_AWAY_BATTERY_COOLING, c.CONF_AFTERNOON_COOLING_ENABLED, c.CONF_STOP_AT_COMFORT_TEMPERATURE, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS))
 
 
 class HomeRulesEntity(CoordinatorEntity[HomeRulesCoordinator]):
@@ -139,6 +139,8 @@ NUMBERS = tuple(
         ("temperature_cool", 0, 40, 0.5, "°C", c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL),
         ("battery_full_threshold", 0, 100, 1, "%", c.CONF_BATTERY_FULL_THRESHOLD, c.DEFAULT_BATTERY_FULL_THRESHOLD),
         ("battery_reserve_threshold", 0, 100, 1, "%", c.CONF_BATTERY_RESERVE_THRESHOLD, c.DEFAULT_BATTERY_RESERVE_THRESHOLD),
+        ("afternoon_energy_budget", 0.1, 20, 0.1, "kWh", c.CONF_AFTERNOON_ENERGY_BUDGET, c.DEFAULT_AFTERNOON_ENERGY_BUDGET),
+        ("afternoon_battery_reserve", 0, 100, 1, "%", c.CONF_AFTERNOON_BATTERY_RESERVE, c.DEFAULT_AFTERNOON_BATTERY_RESERVE),
     )
 )
 

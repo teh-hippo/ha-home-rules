@@ -20,6 +20,7 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
         "switch.home_rules_dry_mode_enabled",
         "switch.home_rules_only_cool_when_home",
         "switch.home_rules_allow_away_battery_cooling",
+        "switch.home_rules_afternoon_cooling_enabled",
         "switch.home_rules_stop_at_comfort_temperature",
         "switch.home_rules_automatic_target_notifications",
         "button.home_rules_evaluate_now",
@@ -35,6 +36,7 @@ async def test_entities_register_on_setup(hass, loaded_entry) -> None:
     assert hass.states.get("switch.home_rules_dry_mode_enabled").state == "on"
     assert hass.states.get("switch.home_rules_only_cool_when_home").state == "off"
     assert hass.states.get("switch.home_rules_allow_away_battery_cooling").state == "off"
+    assert hass.states.get("switch.home_rules_afternoon_cooling_enabled").state == "off"
     assert hass.states.get("switch.home_rules_stop_at_comfort_temperature").state == "off"
     assert hass.states.get("switch.home_rules_automatic_target_notifications").state == "on"
 

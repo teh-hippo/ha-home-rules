@@ -126,6 +126,33 @@ async def test_options_flow_accepts_person_for_comfort_occupancy(hass, mock_entr
     assert result["data"][CONF_OCCUPANCY_ENTITY_ID] == "person.camille"
 
 
+async def test_options_flow_accepts_afternoon_forecast_and_deadline(hass, mock_entry) -> None:
+    from custom_components.home_rules.const import (
+        CONF_AFTERNOON_BATTERY_RESERVE,
+        CONF_AFTERNOON_ENERGY_BUDGET,
+        CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID,
+        CONF_AFTERNOON_READY_BY,
+    )
+
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    user_input = _valid_options_input()
+    user_input.update(
+        {
+            CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID: "forecast-entry",
+            CONF_AFTERNOON_READY_BY: "17:30:00",
+            CONF_AFTERNOON_ENERGY_BUDGET: 6.5,
+            CONF_AFTERNOON_BATTERY_RESERVE: 45,
+        }
+    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user_input)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID] == "forecast-entry"
+    assert result["data"][CONF_AFTERNOON_READY_BY] == "17:30:00"
+    assert result["data"][CONF_AFTERNOON_ENERGY_BUDGET] == 6.5
+    assert result["data"][CONF_AFTERNOON_BATTERY_RESERVE] == 45
+
+
 async def test_options_flow_validates_entities(hass, mock_entry) -> None:
     """Options flow should return entity_not_found for missing entities."""
     from custom_components.home_rules.const import CONF_CLIMATE_ENTITY_ID

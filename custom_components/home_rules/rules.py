@@ -56,6 +56,15 @@ R_BATTERY_SOC_UNAVAILABLE = "Battery state of charge unavailable"
 R_BATTERY_FULL = "Battery full"
 R_BATTERY_COOLING = "Battery-authorised cooling"
 R_BATTERY_RESERVE = "Battery reserve reached"
+R_AFTERNOON_WAITING = "Waiting for afternoon forecast window"
+R_AFTERNOON_FORECAST_UNAVAILABLE = "Afternoon forecast unavailable"
+R_AFTERNOON_NO_RECOVERY = "Afternoon forecast does not recover within tolerance"
+R_AFTERNOON_RESERVE = "Afternoon battery reserve reached"
+R_AFTERNOON_COOLING = "Afternoon battery comfort cooling"
+R_AFTERNOON_OCCUPANCY = "Camille not home for afternoon battery cooling"
+R_AFTERNOON_TARGET = "Afternoon comfort target reached"
+R_AFTERNOON_WINDOW_CLOSED = "Afternoon forecast window closed"
+R_AFTERNOON_POWER_UNAVAILABLE = "Afternoon live power data unavailable"
 
 
 class AirconMode(StrEnum):
@@ -104,6 +113,18 @@ class HomeInput:
     only_cool_when_home: bool = False
     battery_soc: float | None = None
     allow_away_battery_cooling: bool = False
+    afternoon_enabled: bool = False
+    afternoon_planning: bool = False
+    afternoon_window_open: bool = False
+    afternoon_forecast_available: bool = True
+    afternoon_forecast_recovery: bool = False
+    afternoon_window_start: str | None = None
+    afternoon_window_end: str | None = None
+    afternoon_window_energy: float = 0.0
+    afternoon_start_allowed: bool = False
+    generation_available: bool = True
+    grid_available: bool = True
+    battery_power_available: bool = True
 
 
 @dataclass
@@ -121,6 +142,8 @@ class RuleParameters:
     evaluation_interval: float = 180.0
     battery_full_threshold: float = 100.0
     battery_reserve_threshold: float = 80.0
+    afternoon_energy_budget: float = 6.1
+    afternoon_battery_reserve: float = 40.0
 
     @property
     def temperature_range_valid(self) -> bool:
@@ -138,6 +161,15 @@ class RuleParameters:
             and 0 <= self.battery_reserve_threshold < self.battery_full_threshold <= 100
         )
 
+    @property
+    def afternoon_range_valid(self) -> bool:
+        return (
+            isfinite(self.afternoon_energy_budget)
+            and self.afternoon_energy_budget > 0
+            and isfinite(self.afternoon_battery_reserve)
+            and 0 <= self.afternoon_battery_reserve <= 100
+        )
+
 
 @dataclass
 class CachedState:
@@ -149,6 +181,11 @@ class CachedState:
     solar_lost_at: float | None = None
     solar_recovered_at: float | None = None
     battery_run_authorized: bool = False
+    afternoon_run_authorized: bool = False
+    afternoon_battery_run: bool = False
+    afternoon_window_start: str | None = None
+    afternoon_window_end: str | None = None
+    afternoon_window_energy: float = 0.0
 
     def clear_solar_run(self) -> None:
         self.solar_run_eligible = False
@@ -156,7 +193,7 @@ class CachedState:
 
     def clear_power_run(self) -> None:
         self.clear_solar_run()
-        self.battery_run_authorized = False
+        self.battery_run_authorized = self.afternoon_run_authorized = self.afternoon_battery_run = False
 
     def record_stop(self, now: float, delay_minutes: float) -> None:
         self.reactivate_at = max(self.reactivate_at, now + delay_minutes * 60)
@@ -248,6 +285,20 @@ def _idle_reason(config: RuleParameters, home: HomeInput, activation: str | None
         return R_TEMPERATURE_UNAVAILABLE
     if home.only_cool_when_home and home.someone_home is None:
         return R_OCCUPANCY_UNAVAILABLE
+    if home.afternoon_enabled and home.afternoon_planning:
+        if not home.afternoon_forecast_available:
+            return R_AFTERNOON_FORECAST_UNAVAILABLE
+        if not home.afternoon_window_open:
+            return R_AFTERNOON_WAITING
+        if not (home.generation_available and home.grid_available and home.battery_power_available):
+            return R_AFTERNOON_POWER_UNAVAILABLE
+        if home.someone_home is None:
+            return R_OCCUPANCY_UNAVAILABLE
+        if home.someone_home is True:
+            if home.battery_soc is None:
+                return R_BATTERY_SOC_UNAVAILABLE
+            if home.battery_soc < config.afternoon_battery_reserve:
+                return R_AFTERNOON_RESERVE
     if home.only_cool_when_home and home.someone_home is False and not _battery_start_allowed(config, home):
         if home.allow_away_battery_cooling and home.battery_soc is None:
             return R_BATTERY_SOC_UNAVAILABLE
@@ -318,8 +369,42 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         return AdjustResult(out, R_DISABLED)
     if h.aircon_mode == AirconMode.UNKNOWN:
         return AdjustResult(HomeOutput.NO_CHANGE, R_UNKNOWN_MODE)
+    afternoon_planning = h.afternoon_enabled and h.afternoon_planning
+    afternoon_running = h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY) and state.afternoon_run_authorized
+    if h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY) and afternoon_planning and h.afternoon_window_open:
+        state.afternoon_run_authorized = True
+    if (
+        h.auto
+        and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
+        and (afternoon_planning or state.afternoon_run_authorized)
+        and not (h.generation_available and h.grid_available and h.battery_power_available)
+    ):
+        return _stop(config, h, state, R_AFTERNOON_POWER_UNAVAILABLE)
     if h.auto and not h.cooling_enabled and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY):
         return _stop(config, h, state, R_COOLING_DISABLED)
+    if afternoon_running and state.afternoon_battery_run:
+        if not afternoon_planning:
+            return _stop(config, h, state, R_AFTERNOON_WINDOW_CLOSED)
+        if not h.afternoon_forecast_available:
+            return _stop(config, h, state, R_AFTERNOON_FORECAST_UNAVAILABLE)
+        if not h.afternoon_window_open:
+            return _stop(config, h, state, R_AFTERNOON_WINDOW_CLOSED)
+        if h.grid_usage > 0:
+            return _stop(config, h, state, R_GRID_TOO_HIGH)
+        if not (h.generation_available and h.grid_available and h.battery_power_available):
+            return _stop(config, h, state, R_AFTERNOON_POWER_UNAVAILABLE)
+        if h.battery_soc is None:
+            return _stop(config, h, state, R_BATTERY_SOC_UNAVAILABLE)
+        if h.battery_soc < config.afternoon_battery_reserve:
+            return _stop(config, h, state, R_AFTERNOON_RESERVE)
+        if h.someone_home is not True:
+            return _stop(config, h, state, R_AFTERNOON_OCCUPANCY)
+        if not h.temperature_available or h.temperature is None:
+            return _stop(config, h, state, R_TEMPERATURE_UNAVAILABLE)
+        if h.temperature_available and h.temperature is not None and h.temperature <= config.temperature_threshold:
+            return _stop(config, h, state, R_AFTERNOON_TARGET)
+        state.tolerated = 0
+        return AdjustResult(HomeOutput.NO_CHANGE, R_AFTERNOON_COOLING)
     if (
         h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
         and config.stop_at_comfort_temperature
@@ -352,6 +437,28 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         state.battery_run_authorized = True
         return AdjustResult(HomeOutput.COOL, R_BATTERY_FULL)
     if (
+        h.aircon_mode is AirconMode.OFF
+        and afternoon_planning
+        and h.afternoon_window_open
+        and h.afternoon_start_allowed
+        and h.cooling_enabled
+        and h.grid_usage <= 0
+        and h.generation_available
+        and h.grid_available
+        and h.battery_power_available
+        and config.temperature_range_valid
+        and h.temperature_available
+        and h.temperature is not None
+        and h.temperature > config.temperature_threshold
+        and h.someone_home is True
+        and h.battery_soc is not None
+        and h.battery_soc >= config.afternoon_battery_reserve
+    ):
+        state.tolerated = 0
+        state.clear_solar_run()
+        state.afternoon_run_authorized = state.afternoon_battery_run = True
+        return AdjustResult(HomeOutput.COOL, R_AFTERNOON_COOLING)
+    if (
         (h.aircon_mode is AirconMode.OFF or manual_cooling)
         and h.cooling_enabled
         and h.battery_discharge <= 0
@@ -362,9 +469,14 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         and h.temperature >= config.temperature_threshold
         and target.output is not None
         and occupancy_allows_start
+        and (not afternoon_planning or h.afternoon_window_open)
+        and (not afternoon_planning or h.afternoon_start_allowed)
+        and (not afternoon_planning or (h.generation_available and h.grid_available and h.battery_power_available))
     ):
         state.tolerated = 0
         state.solar_run_eligible = True
+        if afternoon_planning:
+            state.afternoon_run_authorized = True
         return AdjustResult(target.output, target.reason)
 
     if manual_cooling:
@@ -392,11 +504,52 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         if h.someone_home is False:
             if battery_start_allowed:
                 state.battery_run_authorized = True
+            elif (
+                afternoon_planning and state.afternoon_run_authorized and h.battery_discharge <= 0 and h.grid_usage <= 0
+            ):
+                pass
             elif not state.battery_run_authorized:
                 return _stop(config, h, state, R_NO_ONE_HOME)
     if h.auto and state.battery_run_authorized and (not h.only_cool_when_home or h.someone_home is True):
         state.battery_run_authorized = False
         state.clear_solar_run()
+
+    if (
+        afternoon_planning
+        and h.auto
+        and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
+        and not state.battery_run_authorized
+    ):
+        if not (h.generation_available and h.grid_available and h.battery_power_available):
+            return _stop(config, h, state, R_AFTERNOON_POWER_UNAVAILABLE)
+        if h.grid_usage > 0:
+            return _stop(config, h, state, R_GRID_TOO_HIGH)
+        if h.battery_discharge > 0:
+            if not h.afternoon_forecast_recovery:
+                return _stop(config, h, state, R_AFTERNOON_NO_RECOVERY)
+            if h.battery_soc is None:
+                return _stop(config, h, state, R_BATTERY_SOC_UNAVAILABLE)
+            if h.someone_home is True:
+                if h.battery_soc < config.afternoon_battery_reserve:
+                    return _stop(config, h, state, R_AFTERNOON_RESERVE)
+            elif h.someone_home is False:
+                if h.battery_soc < config.battery_reserve_threshold:
+                    return _stop(config, h, state, R_BATTERY_RESERVE)
+            else:
+                return _stop(config, h, state, R_AFTERNOON_OCCUPANCY)
+            state.afternoon_run_authorized = True
+            state.tolerated += 1
+            if state.tolerated >= config.grid_usage_delay:
+                return _stop(config, h, state, R_BATTERY_ENGAGED)
+            return AdjustResult(HomeOutput.NO_CHANGE, R_BATTERY_TOLERATED)
+        elif (
+            h.someone_home is False
+            and not state.afternoon_run_authorized
+            and not state.battery_run_authorized
+            and h.battery_soc is not None
+            and h.battery_soc < config.battery_full_threshold
+        ):
+            return _stop(config, h, state, R_NO_ONE_HOME)
 
     # --- Aircon is OFF ---
     if h.aircon_mode == AirconMode.OFF:
