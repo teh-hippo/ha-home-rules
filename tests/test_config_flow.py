@@ -60,6 +60,8 @@ async def _move_to_comfort_step(hass: HomeAssistant) -> ConfigFlowResult:
 async def test_config_flow_happy_path_creates_entry(hass) -> None:
     """The full user -> solar -> comfort flow should create an entry with defaults."""
     from custom_components.home_rules.const import (
+        CONF_AFTERNOON_BATTERY_RESERVE,
+        CONF_AFTERNOON_ENERGY_BUDGET,
         CONF_AIRCON_TIMER_DURATION,
         CONF_CLIMATE_ENTITY_ID,
         CONF_EVAL_INTERVAL,
@@ -73,6 +75,8 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_SMOOTHING_WINDOW,
         CONF_SOLAR_RUN_ON_MINUTES,
         CONF_TEMPERATURE_ENTITY_ID,
+        DEFAULT_AFTERNOON_BATTERY_RESERVE,
+        DEFAULT_AFTERNOON_ENERGY_BUDGET,
         DEFAULT_AIRCON_TIMER_DURATION,
         DEFAULT_EVAL_INTERVAL,
         DEFAULT_GENERATION_COOL_THRESHOLD,
@@ -110,6 +114,8 @@ async def test_config_flow_happy_path_creates_entry(hass) -> None:
         CONF_REACTIVATE_DELAY_MINUTES: DEFAULT_REACTIVATE_DELAY_MINUTES,
         CONF_SOLAR_RUN_ON_MINUTES: DEFAULT_SOLAR_RUN_ON_MINUTES,
         CONF_SMOOTHING_WINDOW: DEFAULT_SMOOTHING_WINDOW,
+        CONF_AFTERNOON_ENERGY_BUDGET: DEFAULT_AFTERNOON_ENERGY_BUDGET,
+        CONF_AFTERNOON_BATTERY_RESERVE: DEFAULT_AFTERNOON_BATTERY_RESERVE,
     }
 
 

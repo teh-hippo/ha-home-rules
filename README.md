@@ -96,6 +96,22 @@ Presence alone does not authorise a fresh battery or grid start; ordinary home-p
 Existing comfort and ideal temperatures are preserved.
 Supported earlier releases migrate saved settings automatically during an upgrade.
 
+**Afternoon comfort planning (optional).** Turn on **Afternoon Comfort Cooling** to select a cooling window before the configured deadline (default 17:00) using a Forecast.Solar config entry.
+Home Rules reads Forecast.Solar's cached time series; it does not force an upstream refresh.
+It chooses the latest remaining one-hour window that can cover the configured **Afternoon Cooling Energy Budget**, default 6.1 kWh.
+The budget is a conservative starting value for about 5.5 kW of aircon plus ordinary house load.
+
+The forecast only selects a window.
+Live generation, grid and battery sensors still authorise each evaluation.
+While the selected comfort occupant is away, the policy prioritises battery charging and blocks a new battery-backed start until the existing full-battery away exception's conditions are met.
+While the selected comfort occupant is home, a late comfort top-up can use the battery down to the separate **Central Cooling Battery Reserve**, default 40%, and stops at Comfort Temperature (24°C by default) rather than chasing the 22°C ideal target.
+This reserve applies only to Home Rules central cooling; it does not change GoodWe export or inverter reserve settings.
+
+An existing run may bridge a solar interruption for no longer than the existing paid-power tolerance when Forecast.Solar predicts recovery during that interval.
+Sustained grid import, missing live battery/occupancy data, no forecast recovery or a breached reserve stops the afternoon policy.
+Missing or malformed forecast data prevents an afternoon start and is reported in the decision sensor.
+The policy is off by default and should be observed in Monitor mode before enabling Automatic control.
+
 **Battery power (optional).** Select a battery power sensor in options to detect discharge.
 Battery discharge readings up to 100 W are treated as noise.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.

@@ -49,6 +49,9 @@
       "allow_away_battery_cooling": {
         "default": "mdi:battery-high"
       },
+      "afternoon_cooling_enabled": {
+        "default": "mdi:weather-sunset"
+      },
       "stop_at_comfort_temperature": {
         "default": "mdi:thermometer-check"
       },
@@ -73,6 +76,12 @@
       },
       "battery_reserve_threshold": {
         "default": "mdi:battery-lock"
+      },
+      "afternoon_energy_budget": {
+        "default": "mdi:solar-power"
+      },
+      "afternoon_battery_reserve": {
+        "default": "mdi:battery-lock-open"
       }
     }
   }

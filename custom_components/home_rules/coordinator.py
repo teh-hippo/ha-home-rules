@@ -3,10 +3,11 @@
 
 import asyncio
 from collections import deque
+from collections.abc import Mapping
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from math import isfinite
 from typing import Any
 from uuid import uuid4
@@ -41,14 +42,26 @@ from .rules import (
     current_state,
 )
 
-_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "humidity_available", "have_solar", "auto", "aircon_mode", "battery_discharge", "battery_soc", "someone_home")
-_SESSION_RECORD_FIELDS = ("tolerated", "reactivate_at", "solar_run_eligible", "solar_lost_at", "solar_recovered_at", "battery_run_authorized")
+_HOME_RECORD_FIELDS = ("generation", "grid_usage", "temperature", "temperature_available", "humidity", "humidity_available", "have_solar", "auto", "aircon_mode", "battery_discharge", "battery_soc", "someone_home", "afternoon_enabled", "afternoon_planning", "afternoon_window_open", "afternoon_start_allowed", "afternoon_forecast_available", "afternoon_forecast_recovery", "afternoon_window_start", "afternoon_window_end", "afternoon_window_energy", "generation_available", "grid_available", "battery_power_available")
+_SESSION_RECORD_FIELDS = ("tolerated", "reactivate_at", "solar_run_eligible", "solar_lost_at", "solar_recovered_at", "battery_run_authorized", "afternoon_run_authorized", "afternoon_battery_run", "afternoon_window_start", "afternoon_window_end", "afternoon_window_energy")
 _CLEAR_ISSUES = (c.ISSUE_RUNTIME, c.ISSUE_ENTITY_MISSING, c.ISSUE_INVALID_UNIT, c.ISSUE_ENTITY_UNAVAILABLE)
 
 
 @dataclass
 class CoordinatorData:
     mode: HomeOutput = HomeOutput.OFF; adjustment: HomeOutput = HomeOutput.NO_CHANGE; decision: str = ""; solar_available: bool = False; auto_mode: bool = False; timer_finishes_at: datetime | None = None; last_evaluated: str | None = None; last_changed: str | None = None
+
+
+@dataclass
+class AfternoonContext:
+    planning: bool = False
+    window_open: bool = False
+    forecast_available: bool = True
+    forecast_recovery: bool = False
+    window_start: str | None = None
+    window_end: str | None = None
+    window_energy: float = 0.0
+    start_allowed: bool = False
 
 
 class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
@@ -62,6 +75,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self.hass, self.config_entry = hass, config_entry; self._lock, self._session = asyncio.Lock(), CachedState(); self.control_mode, self.cooling_enabled, self.dry_mode_enabled = c.ControlMode.MONITOR, True, True
         self.only_cool_when_home, self.allow_away_battery_cooling = False, False
+        self.afternoon_cooling_enabled = False
         self.power_policy = c.PowerPolicy.SOLAR_ONLY
         self.stop_at_comfort_temperature, self.automatic_target_notifications = False, True
         self._parameters: dict[str, float] = {}; self._auto_mode = self._initialized = self._first_refresh_done = False; self._recent, self._last_changed, self._last_record, self._fallback_inputs = deque(maxlen=c.MAX_RECENT_EVALUATIONS), None, {}, {}; self._aircon_timer_finishes_at: datetime | None = None
@@ -87,12 +101,15 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if key in (c.CONF_BATTERY_FULL_THRESHOLD, c.CONF_BATTERY_RESERVE_THRESHOLD):
             candidate = replace(self.parameters, battery_full_threshold=value) if key == c.CONF_BATTERY_FULL_THRESHOLD else replace(self.parameters, battery_reserve_threshold=value)
             if not candidate.battery_range_valid: raise ServiceValidationError(translation_domain=c.DOMAIN, translation_key="invalid_battery_range")
+        if key in (c.CONF_AFTERNOON_ENERGY_BUDGET, c.CONF_AFTERNOON_BATTERY_RESERVE):
+            candidate = replace(self.parameters, afternoon_energy_budget=value) if key == c.CONF_AFTERNOON_ENERGY_BUDGET else replace(self.parameters, afternoon_battery_reserve=value)
+            if not candidate.afternoon_range_valid: raise ServiceValidationError(translation_domain=c.DOMAIN, translation_key="invalid_afternoon_range")
         self._parameters[key] = value; await self._save_state()
 
     @property
     def parameters(self) -> RuleParameters:
         g, o = self.get_parameter, self.config_entry.options
-        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), float(o.get(c.CONF_REACTIVATE_DELAY_MINUTES, c.DEFAULT_REACTIVATE_DELAY_MINUTES)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL), self.stop_at_comfort_temperature, solar_run_on_minutes=float(o.get(c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES)), evaluation_interval=float(o.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL)), battery_full_threshold=g(c.CONF_BATTERY_FULL_THRESHOLD, c.DEFAULT_BATTERY_FULL_THRESHOLD), battery_reserve_threshold=g(c.CONF_BATTERY_RESERVE_THRESHOLD, c.DEFAULT_BATTERY_RESERVE_THRESHOLD))
+        return RuleParameters(g(c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD), g(c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD), g(c.CONF_TEMPERATURE_THRESHOLD, c.DEFAULT_TEMPERATURE_THRESHOLD), c.DRY_MODE_HUMIDITY_CUTOFF, self.dry_mode_enabled, int(o.get(c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY)), float(o.get(c.CONF_REACTIVATE_DELAY_MINUTES, c.DEFAULT_REACTIVATE_DELAY_MINUTES)), g(c.CONF_TEMPERATURE_COOL, c.DEFAULT_TEMPERATURE_COOL), self.stop_at_comfort_temperature, solar_run_on_minutes=float(o.get(c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES)), evaluation_interval=float(o.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL)), battery_full_threshold=g(c.CONF_BATTERY_FULL_THRESHOLD, c.DEFAULT_BATTERY_FULL_THRESHOLD), battery_reserve_threshold=g(c.CONF_BATTERY_RESERVE_THRESHOLD, c.DEFAULT_BATTERY_RESERVE_THRESHOLD), afternoon_energy_budget=g(c.CONF_AFTERNOON_ENERGY_BUDGET, c.DEFAULT_AFTERNOON_ENERGY_BUDGET), afternoon_battery_reserve=g(c.CONF_AFTERNOON_BATTERY_RESERVE, c.DEFAULT_AFTERNOON_BATTERY_RESERVE))
 
     async def async_set_mode(self, mode: c.ControlMode) -> None: self.control_mode = mode; await self._save_state()
     async def async_set_power_policy(self, policy: c.PowerPolicy) -> None: self.power_policy = policy; self._session.tolerated = 0; await self._save_state()
@@ -106,11 +123,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.cooling_enabled, self.dry_mode_enabled = bool(controls.get("cooling_enabled", True)), bool(controls.get(c.CONF_DRY_MODE_ENABLED, True))
         self.only_cool_when_home = bool(controls.get(c.CONF_ONLY_COOL_WHEN_HOME, False))
         self.allow_away_battery_cooling = bool(controls.get(c.CONF_ALLOW_AWAY_BATTERY_COOLING, False))
+        self.afternoon_cooling_enabled = bool(controls.get(c.CONF_AFTERNOON_COOLING_ENABLED, False))
         self.stop_at_comfort_temperature = bool(controls.get(c.CONF_STOP_AT_COMFORT_TEMPERATURE, self.config_entry.options.get(c.CONF_MANUAL_COOLING_BEHAVIOUR) == "stop"))
         self.automatic_target_notifications = bool(controls.get(c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS, True))
         last = session.get("last")
         legacy_delay = float(session.get("reactivate_delay", 0)) * float(self.config_entry.options.get(c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL))
-        self._session = CachedState(reactivate_at=float(session.get("reactivate_at", dt_util.utcnow().timestamp() + legacy_delay if legacy_delay else 0)), tolerated=int(session.get("tolerated", 0)), last=HomeOutput(last) if last else None, failed_to_change=int(session.get("failed_to_change", 0)), solar_run_eligible=bool(session.get("solar_run_eligible", False)), solar_lost_at=session.get("solar_lost_at"), solar_recovered_at=session.get("solar_recovered_at"), battery_run_authorized=bool(session.get("battery_run_authorized", False)))
+        self._session = CachedState(reactivate_at=float(session.get("reactivate_at", dt_util.utcnow().timestamp() + legacy_delay if legacy_delay else 0)), tolerated=int(session.get("tolerated", 0)), last=HomeOutput(last) if last else None, failed_to_change=int(session.get("failed_to_change", 0)), solar_run_eligible=bool(session.get("solar_run_eligible", False)), solar_lost_at=session.get("solar_lost_at"), solar_recovered_at=session.get("solar_recovered_at"), battery_run_authorized=bool(session.get("battery_run_authorized", False)), afternoon_run_authorized=bool(session.get("afternoon_run_authorized", False)), afternoon_battery_run=bool(session.get("afternoon_battery_run", False)), afternoon_window_start=session.get("afternoon_window_start"), afternoon_window_end=session.get("afternoon_window_end"), afternoon_window_energy=float(session.get("afternoon_window_energy", 0.0)))
         self._auto_mode, self._last_changed = bool(stored.get("auto_mode", False)), stored.get("last_changed")
         self._recent = deque(stored.get("recent_evaluations", []), maxlen=c.MAX_RECENT_EVALUATIONS)
         self._aircon_timer_finishes_at = dt_util.parse_datetime(str(v)) if (v := stored.get("aircon_timer_finishes_at")) else None
@@ -172,7 +190,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _evaluate(self, trigger: str, *, notification_action: str | None = None) -> CoordinatorData:
         async with self._lock:
             if notification_action is not None and notification_action not in self._target_notification_actions(): return self.data
-            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, _ = self._build_home_input(); params = self.parameters
+            now = dt_util.utcnow().isoformat(); self._fallback_inputs = {}; self._clear_issue(c.ISSUE_ENTITY_UNAVAILABLE); home, _ = self._build_home_input(); params = self.parameters; afternoon = await self._afternoon_context(params); home = replace(home, afternoon_planning=afternoon.planning, afternoon_window_open=afternoon.window_open, afternoon_start_allowed=afternoon.start_allowed, afternoon_forecast_available=afternoon.forecast_available, afternoon_forecast_recovery=afternoon.forecast_recovery, afternoon_window_start=afternoon.window_start, afternoon_window_end=afternoon.window_end, afternoon_window_energy=afternoon.window_energy)
             if notification_action is not None and (home.auto or home.aircon_mode not in (AirconMode.COOL, AirconMode.DRY) or self.control_mode in (c.ControlMode.DISABLED, c.ControlMode.MONITOR) or params.stop_at_comfort_temperature or (self._session.last is HomeOutput.TIMER and not home.timer)): notification_action = None
             if home.timer and home.aircon_mode is AirconMode.OFF: self._clear_aircon_timer(); home = replace(home, timer=False)
             if notification_action is not None and notification_action.endswith("_five"):
@@ -186,7 +204,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 self._session.record_stop(home.now, params.reactivate_delay)
                 result = AdjustResult(HomeOutput.OFF, "Turned off from notification")
             else: result = adjust(params, decision_home, self._session)
-            adjustment, reason = result.output, result.reason; target_temperature = self._adjusted_setpoint if home.auto and self._adjusted_setpoint is not None else params.temperature_cool
+            adjustment, reason = result.output, result.reason; target_temperature = self._adjusted_setpoint if home.auto and self._adjusted_setpoint is not None else params.temperature_threshold if self._session.afternoon_battery_run else params.temperature_cool
             previous = self._session.last; applied = apply_adjustment(self._session, current, adjustment); is_monitor = self.control_mode is c.ControlMode.MONITOR
             if is_monitor: self._session.failed_to_change, applied = 0, True
             if not applied: raise HomeAssistantError("failed to apply adjustment")
@@ -253,6 +271,97 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         vals: list[float] = [r.get("raw_generation", r.get("generation", 0.0)) for r in list(self._recent)[:window - 1]] + [raw_gen]
         return sum(vals) / len(vals)
 
+    async def _afternoon_context(self, params: RuleParameters) -> AfternoonContext:
+        context = AfternoonContext()
+        if not self.afternoon_cooling_enabled: return context
+        local_now = dt_util.now()
+        try: ready_by = time.fromisoformat(str(self.config_entry.options.get(c.CONF_AFTERNOON_READY_BY, c.DEFAULT_AFTERNOON_READY_BY)))
+        except ValueError: ready_by = time.fromisoformat(c.DEFAULT_AFTERNOON_READY_BY)
+        start = local_now.replace(hour=c.AFTERNOON_PLANNING_START_HOUR, minute=0, second=0, microsecond=0)
+        deadline = datetime.combine(local_now.date(), ready_by, local_now.tzinfo)
+        if local_now < start or local_now >= deadline: return context
+        context.planning = True
+        config_entry_id = str(self.config_entry.options.get(c.CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID, "")).strip()
+        if not config_entry_id:
+            self._fallback_inputs["afternoon_forecast"] = "missing_configuration"
+            context.forecast_available = False
+            return context
+        try:
+            response = await self.hass.services.async_call("forecast_solar", "get_forecast", {"config_entry": config_entry_id, "start": start.isoformat(), "end": deadline.isoformat(), "resolution": "raw"}, blocking=True, return_response=True)
+        except (HomeAssistantError, TimeoutError) as err:
+            c.LOGGER.warning("Afternoon forecast unavailable: %s", err)
+            self._fallback_inputs["afternoon_forecast"] = "service_error"
+            context.forecast_available = False
+            return context
+        periods = self._forecast_periods(response)
+        if not periods:
+            self._fallback_inputs["afternoon_forecast"] = "no_periods"
+            context.forecast_available = False
+            return context
+        tolerance_end = local_now + timedelta(seconds=max(1, params.grid_usage_delay) * params.evaluation_interval)
+        context.forecast_recovery = any(period_start < tolerance_end and period_end > local_now and wh * 1000 / max(1 / 3600, (period_end - period_start).total_seconds() / 3600) >= params.generation_cool_threshold for period_start, period_end, wh in periods)
+        window = self._latest_afternoon_window(local_now, deadline, periods, params.afternoon_energy_budget)
+        if window is None and self._session.afternoon_window_start:
+            selected_start = dt_util.parse_datetime(self._session.afternoon_window_start)
+            if selected_start is not None and selected_start < local_now:
+                retained = self._window_energy(selected_start, selected_start + timedelta(hours=1), periods)
+                if retained is not None and retained >= params.afternoon_energy_budget and local_now < selected_start + timedelta(hours=1):
+                    window = selected_start, selected_start + timedelta(hours=1), retained
+        if window is None: return context
+        window_start, window_end, energy = window
+        context.window_open = window_start <= local_now < window_end
+        context.start_allowed = context.window_open and local_now <= window_start + timedelta(seconds=params.evaluation_interval)
+        context.window_start, context.window_end, context.window_energy = window_start.isoformat(), window_end.isoformat(), round(energy, 3)
+        self._session.afternoon_window_start = context.window_start; self._session.afternoon_window_end = context.window_end; self._session.afternoon_window_energy = context.window_energy
+        return context
+
+    @staticmethod
+    def _forecast_periods(response: object) -> list[tuple[datetime, datetime, float]]:
+        if not isinstance(response, Mapping) or not isinstance(series := response.get("wh_period"), Mapping): return []
+        raw: list[tuple[datetime, float]] = []
+        for timestamp, value in series.items():
+            parsed = dt_util.parse_datetime(str(timestamp))
+            if parsed is None or not isinstance(value, (int, float)): continue
+            energy = float(value) / 1000
+            if isfinite(energy) and energy >= 0: raw.append((parsed, energy))
+        raw.sort(key=lambda item: item[0])
+        if not raw: return []
+        periods: list[tuple[datetime, datetime, float]] = []
+        default_duration = raw[1][0] - raw[0][0] if len(raw) > 1 else timedelta(hours=1)
+        for index, (period_start, energy) in enumerate(raw):
+            period_end = raw[index + 1][0] if index + 1 < len(raw) else period_start + (raw[index][0] - raw[index - 1][0] if index else default_duration)
+            if period_end > period_start: periods.append((period_start, period_end, energy))
+        return periods
+
+    @staticmethod
+    def _latest_afternoon_window(now: datetime, deadline: datetime, periods: list[tuple[datetime, datetime, float]], budget: float) -> tuple[datetime, datetime, float] | None:
+        candidates = sorted({period_start for period_start, _, _ in periods if period_start >= now and period_start + timedelta(hours=1) <= deadline}, reverse=True)
+        for window_start in candidates:
+            window_end = window_start + timedelta(hours=1)
+            cursor, coverage, energy = window_start, timedelta(), 0.0
+            for period_start, period_end, period_energy in periods:
+                if period_end <= cursor or period_start >= window_end: continue
+                if period_start > cursor: break
+                overlap_start, overlap_end = max(cursor, period_start), min(window_end, period_end)
+                if overlap_end <= overlap_start: continue
+                fraction = (overlap_end - overlap_start) / (period_end - period_start)
+                coverage += overlap_end - overlap_start; energy += period_energy * fraction; cursor = overlap_end
+            if coverage >= timedelta(hours=1) and energy >= budget:
+                return window_start, window_end, energy
+        return None
+
+    @staticmethod
+    def _window_energy(window_start: datetime, window_end: datetime, periods: list[tuple[datetime, datetime, float]]) -> float | None:
+        cursor, energy = window_start, 0.0
+        for period_start, period_end, period_energy in periods:
+            if period_end <= cursor or period_start >= window_end: continue
+            if period_start > cursor: return None
+            overlap_start, overlap_end = max(cursor, period_start), min(window_end, period_end)
+            fraction = (overlap_end - overlap_start) / (period_end - period_start)
+            energy += period_energy * fraction
+            cursor = overlap_end
+        return energy if cursor >= window_end else None
+
     def _entity_id(self, key: str) -> str:
         return str(self.config_entry.options.get(key, self.config_entry.data.get(key, ""))).strip() or str(self.config_entry.data[key])
 
@@ -263,11 +372,12 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         gen = self._state(c.CONF_GENERATION_ENTITY_ID, "generation", allow_unavailable=True); grid = self._state(c.CONF_GRID_ENTITY_ID, "grid", allow_unavailable=True); temp = self._state(c.CONF_TEMPERATURE_ENTITY_ID, "temperature", allow_unavailable=True); hum = self._state(c.CONF_HUMIDITY_ENTITY_ID, "humidity", allow_unavailable=True)
         discharge = self._optional_power(c.CONF_BATTERY_POWER_ENTITY_ID, "battery_power", invert=bool(self.config_entry.options.get(c.CONF_BATTERY_INVERT, False)))
         gen_live = "generation" not in self._fallback_inputs; grid_live = "grid" not in self._fallback_inputs  # a fallback means the sensor is unknown/unavailable (e.g. inverter asleep)
+        battery_power_live = bool(self.config_entry.options.get(c.CONF_BATTERY_POWER_ENTITY_ID, self.config_entry.data.get(c.CONF_BATTERY_POWER_ENTITY_ID, ""))) and "battery_power" not in self._fallback_inputs
         generation = self._normalized_power(gen, "generation") if gen_live else 0.0; grid_usage = self._normalized_power(grid, "grid", invert=bool(self.config_entry.options.get(c.CONF_GRID_INVERT, False))) if grid_live else 0.0  # normalise only live readings; a stale fallback stays 0
         have_solar = gen_live and generation > 0.0
         battery_discharge = max(0.0, (discharge or 0.0) - c.BATTERY_DISCHARGE_TOLERANCE)  # a battery covering the load hides the draw from the grid meter: pass it to the rules separately from grid usage
         someone_home: bool | None = None
-        if self.only_cool_when_home:
+        if self.only_cool_when_home or self.afternoon_cooling_enabled:
             occupancy = self.hass.states.get(self.occupancy_entity_id)
             if occupancy is None or str(occupancy.state).lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
                 self._fallback_inputs["occupancy"] = "missing" if occupancy is None else str(occupancy.state).lower()
@@ -279,7 +389,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 else:
                     someone_home = raw == "home"
         battery_soc: float | None = None
-        if (self.only_cool_when_home and self.allow_away_battery_cooling) or self._session.battery_run_authorized:
+        if (self.only_cool_when_home and self.allow_away_battery_cooling) or self._session.battery_run_authorized or self.afternoon_cooling_enabled:
             soc = self._optional_state(c.CONF_BATTERY_SOC_ENTITY_ID, "battery_state_of_charge")
             if soc is not None:
                 with suppress(TypeError, ValueError):
@@ -296,13 +406,13 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         aggressive = self.power_policy is c.PowerPolicy.ALLOW_BATTERY_GRID; enabled = self.control_mode is not c.ControlMode.DISABLED
         raw_temperature = self._normalized_temperature(temp) if "temperature" not in self._fallback_inputs else None; temperature_available = raw_temperature is not None and isfinite(raw_temperature)
         raw_humidity = self._state_to_float(hum, "humidity") if "humidity" not in self._fallback_inputs else None; humidity_available = raw_humidity is not None and isfinite(raw_humidity)
-        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, raw_temperature if temperature_available else None, raw_humidity if humidity_available else None, self._auto_mode, aggressive, enabled, self.cooling_enabled, battery_discharge, temperature_available, humidity_available, now=dt_util.utcnow().timestamp(), someone_home=someone_home, only_cool_when_home=self.only_cool_when_home, battery_soc=battery_soc, allow_away_battery_cooling=self.allow_away_battery_cooling), timer
+        return HomeInput(mode, have_solar, generation, grid_usage, timer is not None, raw_temperature if temperature_available else None, raw_humidity if humidity_available else None, self._auto_mode, aggressive, enabled, self.cooling_enabled, battery_discharge, temperature_available, humidity_available, now=dt_util.utcnow().timestamp(), someone_home=someone_home, only_cool_when_home=self.only_cool_when_home, battery_soc=battery_soc, allow_away_battery_cooling=self.allow_away_battery_cooling, afternoon_enabled=self.afternoon_cooling_enabled, generation_available=gen_live, grid_available=grid_live, battery_power_available=battery_power_live), timer
 
     def _sync_on_startup(self, current: HomeOutput, home: HomeInput) -> None:
         if home.aircon_mode is AirconMode.OFF and self._session.last in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.ON, HomeOutput.TIMER) and self._session.reactivate_at <= home.now:
             self._session.record_stop(home.now, self.parameters.reactivate_delay)
         if self._session.last is None: self._session.last = current
-        elif home.timer and self._session.last is HomeOutput.TIMER: return
+        elif home.timer and self._session.last is HomeOutput.TIMER:         return
         elif self._session.last is HomeOutput.TIMER and home.aircon_mode is not AirconMode.OFF: return  # cap elapsed while down but aircon still on: keep TIMER so adjust() issues OFF, don't re-arm
         elif self._session.last != current: c.LOGGER.info("Startup sync: restoring from %s to live state %s", self._session.last.value, current.value); self._session.last = current
 
@@ -391,7 +501,7 @@ class HomeRulesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _save_state(self) -> None:
         session = asdict(self._session); session["last"] = self._session.last.value if self._session.last else None
         history_size = max(1, int(self.config_entry.options.get(c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW)))
-        await self._store.async_save({"controls": {"mode": self.control_mode.value, c.CONF_POWER_POLICY: self.power_policy.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_ONLY_COOL_WHEN_HOME: self.only_cool_when_home, c.CONF_ALLOW_AWAY_BATTERY_COOLING: self.allow_away_battery_cooling, c.CONF_STOP_AT_COMFORT_TEMPERATURE: self.stop_at_comfort_temperature, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS: self.automatic_target_notifications}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent)[:history_size], "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "target_notified": self._target_notified, "target_prompt_id": self._target_prompt_id, "automatic_setpoint": self._automatic_setpoint, "adjusted_setpoint": self._adjusted_setpoint, "parameters": dict(self._parameters)})
+        await self._store.async_save({"controls": {"mode": self.control_mode.value, c.CONF_POWER_POLICY: self.power_policy.value, "cooling_enabled": self.cooling_enabled, c.CONF_DRY_MODE_ENABLED: self.dry_mode_enabled, c.CONF_ONLY_COOL_WHEN_HOME: self.only_cool_when_home, c.CONF_ALLOW_AWAY_BATTERY_COOLING: self.allow_away_battery_cooling, c.CONF_AFTERNOON_COOLING_ENABLED: self.afternoon_cooling_enabled, c.CONF_STOP_AT_COMFORT_TEMPERATURE: self.stop_at_comfort_temperature, c.CONF_AUTOMATIC_TARGET_NOTIFICATIONS: self.automatic_target_notifications}, "session": session, "auto_mode": self._auto_mode, "last_changed": self._last_changed, "recent_evaluations": list(self._recent)[:history_size], "aircon_timer_finishes_at": self._aircon_timer_finishes_at and self._aircon_timer_finishes_at.isoformat(), "target_notified": self._target_notified, "target_prompt_id": self._target_prompt_id, "automatic_setpoint": self._automatic_setpoint, "adjusted_setpoint": self._adjusted_setpoint, "parameters": dict(self._parameters)})
 
     def _create_issue(self, issue: str, placeholders: dict[str, str]) -> None:
         ir.async_create_issue(self.hass, c.DOMAIN, f"{self.config_entry.entry_id}_{issue}", is_fixable=False, is_persistent=False, severity=ir.IssueSeverity.ERROR, translation_key=issue, translation_placeholders=placeholders)

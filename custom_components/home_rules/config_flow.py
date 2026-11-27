@@ -20,6 +20,7 @@ _PLATFORMS = ("switch", "select", "sensor", "binary_sensor", "button", "number")
 _HOME_RULES_PREFIXES = tuple(f"{platform}.{c.DOMAIN}_" for platform in _PLATFORMS)
 _POWER_KEYS = {c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_BATTERY_POWER_ENTITY_ID}
 _OCCUPANCY_DOMAINS = ("person", "device_tracker", "zone")
+_FORECAST_ENTRY_SELECTOR = selector.ConfigEntrySelector(selector.ConfigEntrySelectorConfig(integration="forecast_solar"))
 
 
 def _entity_selector(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector: return selector.EntitySelector(selector.EntitySelectorConfig(domain=domain) if device_class is None else selector.EntitySelectorConfig(domain=domain, device_class=device_class))
@@ -28,8 +29,9 @@ def _number_selector(min_val: float, max_val: float, step: float, unit: str | No
 
 
 _ENTITY_SELECTORS = {c.CONF_CLIMATE_ENTITY_ID: _entity_selector("climate"), c.CONF_GENERATION_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_GRID_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_TEMPERATURE_ENTITY_ID: _entity_selector("sensor", "temperature"), c.CONF_HUMIDITY_ENTITY_ID: _entity_selector("sensor", "humidity"), c.CONF_BATTERY_POWER_ENTITY_ID: _entity_selector("sensor", "power"), c.CONF_BATTERY_SOC_ENTITY_ID: _entity_selector("sensor", "battery"), c.CONF_OCCUPANCY_ENTITY_ID: _entity_selector(list(_OCCUPANCY_DOMAINS))}
-_NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW, _number_selector(1, 10, 1)), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY_MINUTES, c.DEFAULT_REACTIVATE_DELAY_MINUTES, _number_selector(0, 300, 0.1, "min")), (c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES, _number_selector(0, 240, 1, "min")))
+_NUMBER_FIELDS = ((c.CONF_AIRCON_TIMER_DURATION, c.DEFAULT_AIRCON_TIMER_DURATION, _number_selector(1, 180, 1, "min")), (c.CONF_EVAL_INTERVAL, c.DEFAULT_EVAL_INTERVAL, _number_selector(60, 3600, 60, "s")), (c.CONF_SMOOTHING_WINDOW, c.DEFAULT_SMOOTHING_WINDOW, _number_selector(1, 10, 1)), (c.CONF_GENERATION_COOL_THRESHOLD, c.DEFAULT_GENERATION_COOL_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GENERATION_DRY_THRESHOLD, c.DEFAULT_GENERATION_DRY_THRESHOLD, _number_selector(0, 20000, 100, "W")), (c.CONF_GRID_USAGE_DELAY, c.DEFAULT_GRID_USAGE_DELAY, _number_selector(0, 5, 1)), (c.CONF_REACTIVATE_DELAY_MINUTES, c.DEFAULT_REACTIVATE_DELAY_MINUTES, _number_selector(0, 300, 0.1, "min")), (c.CONF_SOLAR_RUN_ON_MINUTES, c.DEFAULT_SOLAR_RUN_ON_MINUTES, _number_selector(0, 240, 1, "min")), (c.CONF_AFTERNOON_ENERGY_BUDGET, c.DEFAULT_AFTERNOON_ENERGY_BUDGET, _number_selector(0.1, 20, 0.1, "kWh")), (c.CONF_AFTERNOON_BATTERY_RESERVE, c.DEFAULT_AFTERNOON_BATTERY_RESERVE, _number_selector(0, 100, 1, "%")))
 _OPTIONS_ENTITY_FIELDS: tuple[str, ...] = (c.CONF_CLIMATE_ENTITY_ID, c.CONF_GENERATION_ENTITY_ID, c.CONF_GRID_ENTITY_ID, c.CONF_TEMPERATURE_ENTITY_ID, c.CONF_HUMIDITY_ENTITY_ID)
+_OPTIONAL_OPTIONS_KEYS = (*c.OPTIONAL_ENTITY_KEYS, c.CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID)
 
 
 def _initial_options() -> dict[str, int | float | str]: return {key: default for key, default, _selector in _NUMBER_FIELDS}
@@ -92,13 +94,15 @@ class HomeRulesConfigFlow(ConfigFlow, domain=c.DOMAIN):
 class HomeRulesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors = _validate_entities(self.hass, user_input, [*_OPTIONS_ENTITY_FIELDS, *(k for k in c.OPTIONAL_ENTITY_KEYS if user_input.get(k))]) if user_input else {}
-        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in c.OPTIONAL_ENTITY_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional entities are cleared by omission
+        if user_input and not errors: return self.async_create_entry(data={**{k: v for k, v in self.config_entry.options.items() if k not in _OPTIONAL_OPTIONS_KEYS and k != c.CONF_MANUAL_COOLING_BEHAVIOUR}, **user_input})  # optional inputs are cleared by omission
         cur = self.config_entry.options
         notify_services = {f"notify.{name}" for name in self.hass.services.async_services_for_domain("notify")}
         if current_notify := str(cur.get(c.CONF_NOTIFICATION_SERVICE, "")).strip(): notify_services.add(current_notify)
         notify_options = cast(list[SelectOptionDict], [{"label": "Disabled", "value": ""}] + [{"label": service, "value": service} for service in sorted(notify_services)])
         schema: dict[Any, Any] = {vol.Required(key, default=cur.get(key, self.config_entry.data.get(key, ""))): _ENTITY_SELECTORS[key] for key in _OPTIONS_ENTITY_FIELDS}
         schema.update({vol.Optional(key, description={"suggested_value": cur[key]} if cur.get(key) else None): _ENTITY_SELECTORS[key] for key in c.OPTIONAL_ENTITY_KEYS})
+        schema[vol.Optional(c.CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID, description={"suggested_value": cur[c.CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID]} if cur.get(c.CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID) else None)] = _FORECAST_ENTRY_SELECTOR
+        schema[vol.Required(c.CONF_AFTERNOON_READY_BY, default=cur.get(c.CONF_AFTERNOON_READY_BY, c.DEFAULT_AFTERNOON_READY_BY))] = selector.TimeSelector()
         schema[vol.Optional(c.CONF_BATTERY_INVERT, default=bool(cur.get(c.CONF_BATTERY_INVERT, False)))] = selector.BooleanSelector()
         schema.update({vol.Required(key, default=cur.get(key, default)): sel for key, default, sel in _NUMBER_FIELDS})
         schema[vol.Optional(c.CONF_GRID_INVERT, default=bool(cur.get(c.CONF_GRID_INVERT, False)))] = selector.BooleanSelector()

@@ -6,6 +6,8 @@ import pytest
 
 
 async def test_power_and_target_controls_persist_across_reload(hass, loaded_entry) -> None:
+    from custom_components.home_rules.const import CONF_AFTERNOON_COOLING_ENABLED
+
     await hass.services.async_call(
         "select",
         "select_option",
@@ -18,6 +20,12 @@ async def test_power_and_target_controls_persist_across_reload(hass, loaded_entr
     await hass.services.async_call(
         "switch", "turn_off", {"entity_id": "switch.home_rules_automatic_target_notifications"}, blocking=True
     )
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {"entity_id": "switch.home_rules_afternoon_cooling_enabled"},
+        blocking=True,
+    )
 
     assert await hass.config_entries.async_reload(loaded_entry.entry_id)
     await hass.async_block_till_done()
@@ -25,6 +33,9 @@ async def test_power_and_target_controls_persist_across_reload(hass, loaded_entr
     assert hass.states.get("select.home_rules_power_policy").state == "allow_battery_grid"
     assert hass.states.get("switch.home_rules_stop_at_comfort_temperature").state == "on"
     assert hass.states.get("switch.home_rules_automatic_target_notifications").state == "off"
+    assert loaded_entry.runtime_data.afternoon_cooling_enabled is True
+    stored = await loaded_entry.runtime_data._store.async_load()
+    assert stored["controls"][CONF_AFTERNOON_COOLING_ENABLED] is True
 
 
 @pytest.mark.parametrize(

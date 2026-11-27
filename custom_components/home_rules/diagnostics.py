@@ -16,6 +16,7 @@ _REDACT_KEYS = {
     c.CONF_NOTIFICATION_SERVICE,
     c.CONF_OCCUPANCY_ENTITY_ID,
     c.CONF_TEMPERATURE_ENTITY_ID,
+    c.CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID,
 }
 
 
@@ -31,6 +32,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "dry_mode_enabled": coordinator.dry_mode_enabled,
             "only_cool_when_home": coordinator.only_cool_when_home,
             "allow_away_battery_cooling": coordinator.allow_away_battery_cooling,
+            "afternoon_cooling_enabled": coordinator.afternoon_cooling_enabled,
             "stop_at_comfort_temperature": coordinator.stop_at_comfort_temperature,
             "automatic_target_notifications": coordinator.automatic_target_notifications,
             "power_policy": coordinator.power_policy.value,
@@ -41,6 +43,11 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "temperature_cool": coordinator.parameters.temperature_cool,
             "battery_full_threshold": coordinator.parameters.battery_full_threshold,
             "battery_reserve_threshold": coordinator.parameters.battery_reserve_threshold,
+            "afternoon_energy_budget": coordinator.parameters.afternoon_energy_budget,
+            "afternoon_battery_reserve": coordinator.parameters.afternoon_battery_reserve,
+            "afternoon_ready_by": coordinator.config_entry.options.get(
+                c.CONF_AFTERNOON_READY_BY, c.DEFAULT_AFTERNOON_READY_BY
+            ),
             "reactivate_delay_minutes": coordinator.parameters.reactivate_delay,
             "solar_run_on_minutes": coordinator.parameters.solar_run_on_minutes,
         },

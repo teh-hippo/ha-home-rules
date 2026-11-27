@@ -51,6 +51,8 @@
           "battery_power_entity_id": "Battery power sensor (optional)",
           "battery_soc_entity_id": "Battery state-of-charge sensor (optional)",
           "occupancy_entity_id": "Comfort occupancy (optional; defaults to everyone at home)",
+          "afternoon_forecast_config_entry_id": "Forecast.Solar entry (optional)",
+          "afternoon_ready_by": "Afternoon comfort deadline",
           "battery_invert": "Battery sensor reports charging as positive (invert sign)",
           "aircon_timer_duration": "Aircon timer duration (minutes)",
           "eval_interval": "Evaluation interval (seconds)",
@@ -151,6 +153,9 @@
       "allow_away_battery_cooling": {
         "name": "Allow Away Cooling at Full Battery"
       },
+      "afternoon_cooling_enabled": {
+        "name": "Afternoon Comfort Cooling"
+      },
       "stop_at_comfort_temperature": {
         "name": "Stop at Ideal Temperature"
       },
@@ -175,6 +180,12 @@
       },
       "battery_reserve_threshold": {
         "name": "Battery Reserve"
+      },
+      "afternoon_energy_budget": {
+        "name": "Afternoon Cooling Energy Budget"
+      },
+      "afternoon_battery_reserve": {
+        "name": "Central Cooling Battery Reserve"
       }
     }
   },
@@ -184,6 +195,9 @@
     },
     "invalid_battery_range": {
       "message": "Battery Reserve must be lower than the Battery Full Threshold, and both must be between 0% and 100%."
+    },
+    "invalid_afternoon_range": {
+      "message": "Afternoon energy budget must be positive and central cooling reserve must be between 0% and 100%."
     },
     "update_failed": {
       "message": "Failed to evaluate Home Rules: {error}"
