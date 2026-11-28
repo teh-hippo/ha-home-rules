@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.5.3 (2026-11-28)
+
+### Bug Fixes
+
+- Harden virtual climate and battery safety
+  ([`6b9d29f`](https://github.com/teh-hippo/ha-home-rules/commit/6b9d29facf980bca0c452e3b272611b7c1ee4f83))
+
+
 ## v4.5.2 (2026-11-27)
 
 ### Bug Fixes
