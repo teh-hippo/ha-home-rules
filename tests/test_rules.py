@@ -971,28 +971,6 @@ class TestAdjustOnFreeSolar:
         assert r.output is OUT.NO_CHANGE
         assert r.reason == R_NO_CHANGE
 
-    @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
-    @pytest.mark.parametrize("timer", [False, True])
-    @pytest.mark.parametrize(
-        ("generation", "output", "reason"), [(6000, OUT.COOL, R_SOLAR_COOL), (4000, OUT.DRY, R_SOLAR_DRY)]
-    )
-    def test_manual_cooling_is_adopted_when_start_conditions_qualify(self, mode, timer, generation, output, reason):
-        state = CachedState()
-        r = adjust(
-            TEST_PARAMS,
-            home(
-                aircon_mode=mode,
-                generation=generation,
-                humidity=70,
-                timer=timer,
-                grid_usage=0,
-                auto=False,
-            ),
-            state,
-        )
-        assert r == AdjustResult(output, reason)
-        assert state.solar_run_eligible
-
     def test_free_solar_resets_tolerated(self):
         """Auto free solar path resets tolerated counter."""
         state = CachedState(tolerated=5)
@@ -1498,16 +1476,6 @@ def test_automatic_target_stop_precedes_power_and_mode_changes(mode, boost, gene
     assert state.reactivate_at == TEST_PARAMS.reactivate_delay * 60
 
 
-@pytest.mark.parametrize("boost", [False, True])
-def test_manual_free_solar_run_is_not_stopped_at_temperature_target(boost):
-    result = adjust(
-        TEST_PARAMS,
-        home(aircon_mode=AirconMode.COOL, generation=6000, temperature=21, allow_paid_power=boost),
-        CachedState(),
-    )
-    assert result.output is OUT.NO_CHANGE
-
-
 @pytest.mark.parametrize("start", [21, 22, float("nan"), float("inf")])
 def test_invalid_temperature_range_blocks_automatic_starts(start):
     params = replace(TEST_PARAMS, temperature_threshold=start)
@@ -1532,15 +1500,7 @@ def test_solar_only_does_not_start_while_importing():
 
 
 class TestAdjustManualFreeSolar:
-    """Qualifying solar adopts manual cooling, but cannot override an expired timer cap."""
-
-    def test_free_solar_manual_below_start_threshold_stays_uncapped(self):
-        r = adjust(
-            TEST_PARAMS,
-            home(aircon_mode=AirconMode.COOL, have_solar=True, generation=6000, temperature=23, auto=False),
-            CachedState(last=OUT.COOL),
-        )
-        assert r == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
+    """Free solar does not take ownership of manual cooling."""
 
     def test_free_solar_manual_stops_when_timer_expires(self):
         r = adjust(
@@ -1551,67 +1511,6 @@ class TestAdjustManualFreeSolar:
         assert r == AdjustResult(OUT.OFF, R_TIMER_EXPIRED)
 
 
-@pytest.mark.parametrize(
-    ("parameters", "inputs"),
-    [
-        ({}, {"cooling_enabled": False}),
-        ({}, {"enabled": False}),
-        ({}, {"temperature": 23}),
-        ({}, {"temperature_available": False}),
-        ({}, {"have_solar": False}),
-        ({}, {"generation": 3000}),
-        ({}, {"grid_usage": 500}),
-        ({}, {"battery_discharge": 500}),
-        ({"temperature_threshold": 22}, {}),
-        ({"dry_mode_enabled": False}, {"generation": 4000}),
-        ({}, {"generation": 4000, "humidity": 60}),
-    ],
-)
-def test_manual_timer_is_not_adopted_without_automatic_start_eligibility(parameters, inputs):
-    state = CachedState(last=OUT.TIMER)
-    result = adjust(
-        replace(TEST_PARAMS, **parameters),
-        replace(home(aircon_mode=AirconMode.COOL, timer=True, generation=6000), **inputs),
-        state,
-    )
-    assert result.output not in (OUT.COOL, OUT.DRY)
-    assert not state.solar_run_eligible
-
-
-@pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
-@pytest.mark.parametrize("boost", [False, True])
-@pytest.mark.parametrize("stop_at_target", [False, True])
-def test_manual_timer_target_behaviour_overrides_battery_guard(mode, boost, stop_at_target):
-    params = replace(TEST_PARAMS, stop_at_comfort_temperature=stop_at_target)
-    state = CachedState(last=OUT.TIMER, reactivate_at=120)
-    result = adjust(
-        params,
-        home(
-            aircon_mode=mode,
-            auto=False,
-            allow_paid_power=boost,
-            timer=True,
-            have_solar=False,
-            battery_discharge=800,
-            temperature=22,
-        ),
-        state,
-    )
-    expected = OUT.OFF if stop_at_target else OUT.NO_CHANGE
-    assert result.output is expected
-    assert result.reason == (R_TARGET_REACHED if expected is OUT.OFF else R_NO_CHANGE)
-
-
-def test_manual_stop_at_target_requires_available_temperature():
-    params = replace(TEST_PARAMS, stop_at_comfort_temperature=True)
-    result = adjust(
-        params,
-        home(aircon_mode=AirconMode.COOL, timer=True, temperature=20, temperature_available=False),
-        CachedState(last=OUT.TIMER),
-    )
-    assert result == AdjustResult(OUT.NO_CHANGE, R_NO_CHANGE)
-
-
 @pytest.mark.parametrize("auto", [False, True])
 @pytest.mark.parametrize("mode", [AirconMode.COOL, AirconMode.DRY])
 def test_disabling_cooling_stops_only_automatic_runs(auto, mode):
@@ -1620,7 +1519,7 @@ def test_disabling_cooling_stops_only_automatic_runs(auto, mode):
         home(aircon_mode=mode, auto=auto, cooling_enabled=False, generation=6000),
         CachedState(),
     )
-    assert result.output is (OUT.OFF if auto else OUT.NO_CHANGE)
+    assert result.output is (OUT.OFF if auto else OUT.TIMER)
     if auto:
         assert result.reason == R_COOLING_DISABLED
 
@@ -1633,7 +1532,7 @@ def test_disabling_cooling_stops_only_automatic_runs(auto, mode):
         (True, 0, True, 500, True, OUT.OFF),
         (True, 6000, False, 500, True, OUT.OFF),
         (True, 6000, False, 0, False, OUT.OFF),
-        (False, 4000, False, 0, True, OUT.NO_CHANGE),
+        (False, 4000, False, 0, True, OUT.TIMER),
     ],
 )
 def test_disabling_dry_rechecks_cool_eligibility(auto, generation, paid, grid, temperature_available, expected):
@@ -1659,7 +1558,7 @@ def test_disabling_dry_rechecks_cool_eligibility(auto, generation, paid, grid, t
         (True, False, False, OUT.NO_CHANGE),
         (True, False, True, OUT.OFF),
         (True, True, True, OUT.OFF),
-        (False, False, True, OUT.OFF),
+        (False, False, True, OUT.TIMER),
     ],
 )
 def test_target_stop_is_independent_of_power(auto, paid, stop, expected):

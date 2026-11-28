@@ -253,7 +253,7 @@ async def test_off_on_between_polls_starts_new_manual_run_even_with_cooling_disa
     hass.states.async_set("sensor.grid", "500", {"unit_of_measurement": "W"})
     await hass.async_block_till_done()
     await coordinator.async_run_evaluation("poll")
-    assert coordinator.data.adjustment is HomeOutput.TIMER
+    assert coordinator.data.mode is HomeOutput.TIMER
     assert not coordinator.data.auto_mode
     assert coordinator.data.timer_finishes_at is not None
     assert len(stops) == 1

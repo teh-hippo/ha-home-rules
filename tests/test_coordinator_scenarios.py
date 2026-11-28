@@ -180,8 +180,9 @@ async def test_external_climate_start_evaluates_immediately(hass, coord_factory)
     await hass.async_block_till_done()
 
     assert coordinator._last_record["trigger"] == "climate"
-    assert coordinator.data.adjustment is HomeOutput.OFF
-    assert len(turned_off) == 1
+    assert coordinator.data.adjustment is HomeOutput.TIMER
+    assert coordinator.data.timer_finishes_at is not None
+    assert not turned_off
     await coordinator.async_shutdown()
 
 
@@ -274,7 +275,7 @@ async def test_restart_with_stored_elapsed_timer_issues_off_without_rescheduling
     await coordinator.async_run_evaluation("restart")
 
     assert coordinator.data.adjustment is HomeOutput.OFF
-    assert coordinator._aircon_timer_finishes_at is None
+    assert coordinator.data.timer_finishes_at is None
 
 
 async def test_solar_only_cooling_stops_at_target_and_restarts_at_threshold(hass, coord_factory, freezer) -> None:
@@ -338,8 +339,7 @@ async def test_monitor_off_recommendation_does_not_create_manual_timer(coord_fac
     assert coordinator.data.timer_finishes_at is None
 
 
-@pytest.mark.parametrize("climate", ["heat", "cool", "dry"])
-async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factory, freezer, climate) -> None:
+async def test_solar_recovery_does_not_take_over_manual_cooling(hass, coord_factory, freezer) -> None:
     from datetime import timedelta
 
     from pytest_homeassistant.common import async_mock_service
@@ -349,17 +349,23 @@ async def test_automatic_cooling_clears_previous_manual_timer(hass, coord_factor
 
     async_mock_service(hass, "climate", "set_hvac_mode")
     targets = async_mock_service(hass, "climate", "set_temperature")
-    coordinator = await coord_factory(climate=climate, generation="0", options={CONF_SMOOTHING_WINDOW: 1})
+    coordinator = await coord_factory(climate="dry", generation="0", options={CONF_SMOOTHING_WINDOW: 1})
     await coordinator.async_set_mode(ControlMode.AUTOMATIC)
     await coordinator.async_run_evaluation("poll")
     assert coordinator.data.adjustment is HomeOutput.TIMER
-    assert coordinator.data.timer_finishes_at is not None
+    deadline = coordinator.data.timer_finishes_at
+    assert deadline is not None
 
-    if climate == "heat":
-        hass.states.async_set("climate.test", "off")
-        await hass.async_block_till_done()
-        freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
     hass.states.async_set("sensor.generation", "6000", {"unit_of_measurement": "W"})
+    await coordinator.async_run_evaluation("poll")
+    assert coordinator.data.timer_finishes_at == deadline
+    assert not coordinator.data.auto_mode
+    assert not targets
+
+    hass.states.async_set("climate.test", "off")
+    await hass.async_block_till_done()
+    assert coordinator.data.timer_finishes_at is None
+    freezer.tick(timedelta(minutes=coordinator.parameters.reactivate_delay))
     await coordinator.async_run_evaluation("poll")
     automatic = coordinator.data
     assert automatic.adjustment is HomeOutput.COOL

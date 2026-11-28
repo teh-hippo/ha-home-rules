@@ -6,15 +6,14 @@ The engine evaluates environmental inputs and produces adjustment decisions.
 Decision tree (high-level):
   1. Disabled → report DISABLED
   2. Unknown aircon mode → NO_CHANGE
-  3. Automatic cooling disabled, or target-stop enabled at target → OFF
-  4. Expired manual cooling timer → OFF
-  5. Start or adopt cooling when temperature and solar qualify
-  6. Other manual cooling on paid power/timer → apply timer cap
-  7. Battery/grid permitted → finish a solar-started run within its allowance
-  8. Solar only → tolerate brief paid-power use, then stop
+  3. Manual runs → arm or hold the timer; stop on expiry or to protect solar charging after departure
+  4. Automatic cooling disabled, or target-stop enabled at target → OFF
+  5. Start automatic cooling when temperature and power qualify
+  6. Battery/grid permitted → finish a solar-started run within its allowance
+  7. Solar only → tolerate brief paid-power use, then stop
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
 from typing import NamedTuple
@@ -39,6 +38,7 @@ R_DISABLED = "Disabled"
 R_UNKNOWN_MODE = "Unknown aircon mode"
 R_TIMER_EXPIRED = "Timer expired"
 R_MANUAL = "Manual"
+R_MANUAL_SOLAR_CHARGING = "No one home; prioritising solar battery charging"
 R_AUTO_IDLE = "Auto idle"
 R_NO_CHANGE = "No change"
 R_COOLING_DISABLED = "Cooling disabled"
@@ -126,6 +126,8 @@ class HomeInput:
     grid_available: bool = True
     battery_power_available: bool = True
     count_power_tolerance: bool = True
+    timer_expired: bool = False
+    battery_charging: bool = False
 
 
 @dataclass
@@ -187,6 +189,7 @@ class CachedState:
     afternoon_window_start: str | None = None
     afternoon_window_end: str | None = None
     afternoon_window_energy: float = 0.0
+    manual_seen_home: bool = False
 
     def clear_solar_run(self) -> None:
         self.solar_run_eligible = False
@@ -370,6 +373,29 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         return AdjustResult(out, R_DISABLED)
     if h.aircon_mode == AirconMode.UNKNOWN:
         return AdjustResult(HomeOutput.NO_CHANGE, R_UNKNOWN_MODE)
+    if h.aircon_mode is not AirconMode.OFF and (not h.auto or h.aircon_mode not in (AirconMode.COOL, AirconMode.DRY)):
+        if h.timer_expired or (state.last is HomeOutput.TIMER and not h.timer):
+            return _stop(config, h, state, R_TIMER_EXPIRED)
+        state.tolerated = 0
+        if not h.timer:
+            state.manual_seen_home = h.someone_home is True
+            return AdjustResult(HomeOutput.TIMER, R_MANUAL)
+        if h.someone_home is True:
+            state.manual_seen_home = True
+        if (
+            h.only_cool_when_home
+            and state.manual_seen_home
+            and h.someone_home is False
+            and h.have_solar
+            and h.grid_available
+            and h.grid_usage <= 0
+            and h.battery_charging
+            and h.battery_soc is not None
+            and h.battery_soc < config.battery_full_threshold
+        ):
+            return _stop(config, h, state, R_MANUAL_SOLAR_CHARGING)
+        return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
+
     afternoon_planning = h.afternoon_enabled and h.afternoon_planning
     afternoon_running = h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY) and state.afternoon_run_authorized
     if h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY) and afternoon_planning and h.afternoon_window_open:
@@ -407,20 +433,18 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         state.tolerated = 0
         return AdjustResult(HomeOutput.NO_CHANGE, R_AFTERNOON_COOLING)
     if (
-        h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
+        h.auto
+        and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
         and config.stop_at_comfort_temperature
         and h.temperature_available
         and h.temperature is not None
         and h.temperature <= config.temperature_cool
     ):
         return _stop(config, h, state, R_TARGET_REACHED)
-    manual_cooling = not h.auto and h.aircon_mode in (AirconMode.COOL, AirconMode.DRY)
-    if manual_cooling and state.last is HomeOutput.TIMER and not h.timer:
-        return _stop(config, h, state, R_TIMER_EXPIRED)
     if h.aircon_mode is AirconMode.OFF and h.now < state.reactivate_at:
         return AdjustResult(HomeOutput.NO_CHANGE, R_REACTIVATE_WAIT)
 
-    target = _evaluate_target_mode(config, replace(h, aircon_mode=AirconMode.OFF) if manual_cooling else h)
+    target = _evaluate_target_mode(config, h)
     battery_start_allowed = _battery_start_allowed(config, h)
     occupancy_allows_start = not h.only_cool_when_home or h.someone_home is True or battery_start_allowed
     if (
@@ -460,7 +484,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         state.afternoon_run_authorized = state.afternoon_battery_run = True
         return AdjustResult(HomeOutput.COOL, R_AFTERNOON_COOLING)
     if (
-        (h.aircon_mode is AirconMode.OFF or manual_cooling)
+        h.aircon_mode is AirconMode.OFF
         and h.cooling_enabled
         and h.battery_discharge <= 0
         and h.grid_usage <= 0
@@ -479,22 +503,6 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         if afternoon_planning:
             state.afternoon_run_authorized = True
         return AdjustResult(target.output, target.reason)
-
-    if (
-        manual_cooling
-        and not h.allow_paid_power
-        and h.battery_discharge > 0
-        and h.battery_soc is not None
-        and h.battery_soc < config.battery_reserve_threshold
-    ):
-        return _stop(config, h, state, R_BATTERY_RESERVE)
-
-    if manual_cooling:
-        if h.timer or not h.have_solar or h.grid_usage > 0 or h.battery_discharge > 0:
-            state.tolerated = 0
-            if h.timer:
-                return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
-            return AdjustResult(HomeOutput.TIMER, R_MANUAL)
 
     if h.auto and h.aircon_mode is AirconMode.DRY and not config.dry_mode_enabled:
         if (
@@ -571,16 +579,6 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         if state.last is HomeOutput.TIMER and not h.timer:
             return AdjustResult(HomeOutput.RESET, R_TIMER_EXPIRED)
         return AdjustResult(HomeOutput.NO_CHANGE, _idle_reason(config, h, activation, R_NO_CHANGE))
-
-    # --- Aircon is ON in a mode home-rules never commands (heat/heat_cool/fan_only/auto) ---
-    # Such a run is external by definition: cap it and turn it off at expiry, independent of
-    # solar. Only COOL/DRY runs follow the solar economics below.
-    if h.aircon_mode not in (AirconMode.COOL, AirconMode.DRY):
-        if h.timer:
-            return AdjustResult(HomeOutput.NO_CHANGE, R_NO_CHANGE)
-        if state.last is HomeOutput.TIMER:
-            return _stop(config, h, state, R_TIMER_EXPIRED)
-        return AdjustResult(HomeOutput.TIMER, R_MANUAL)
 
     if h.auto and state.battery_run_authorized:
         if not h.allow_away_battery_cooling or not h.only_cool_when_home:

@@ -60,10 +60,10 @@ An unavailable temperature sensor prevents automatic starts and cannot be treate
 
 Two independent device switches control what happens when the house reaches Ideal Temperature:
 
-- **Stop at Ideal Temperature** (`switch.home_rules_stop_at_comfort_temperature`): stops automatic and manual Cool/Dry runs at the target when on.
-  When off, cooling continues under the existing power rules and any manual timer cap.
+- **Stop at Ideal Temperature** (`switch.home_rules_stop_at_comfort_temperature`): stops automatic Cool/Dry runs at the target when on.
+  When off, automatic cooling continues under the power rules.  The switch never shortens a manual timer.
 - **Automatic Target Notifications** (`switch.home_rules_automatic_target_notifications`): enables information-only target-reached alerts for automatic runs, regardless of time.
-  Manual target-reached alerts are always enabled and are not affected by this switch.
+  Manual Cool/Dry runs send a separate information-only alert at Comfort Temperature without shortening the timer.
 
 Automatic target notifications default on and target stopping defaults off.
 Both require the temperature input to be available; notifications require a configured notification service.
@@ -80,7 +80,7 @@ Two independent switches control occupancy-aware starts:
 
 - **Only Cool When Home** requires the optional **Comfort occupancy** entity to be home before an automatic cooling or drying start.
   It defaults to Home Assistant's `zone.home` aggregate, or it can be a person or device tracker so only a specific occupant authorises normal cooling.
-  Home Rules subscribes to the selected entity, so arrivals and departures are evaluated immediately rather than waiting for the next poll.
+  Arrivals and departures are evaluated on the next poll.
   A departure stops an automatic run unless it is covered by the full-battery exception.
   Manual cooling is not blocked.
 - **Allow Away Cooling at Full Battery** permits an automatic cooling start while the house is empty once the configured battery state of charge reaches **Battery Full Threshold** (default 100%).
@@ -116,20 +116,13 @@ The policy is off by default and should be observed in Monitor mode before enabl
 Battery discharge readings up to 100 W are treated as noise.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
-Existing Cool/Dry sessions become automatic when the normal automatic-start temperature, solar and power checks qualify, including sessions with an active manual timer.
-Adoption applies the automatic target temperature and clears the manual timer.
-Otherwise, manually started cooling remains uncapped while free solar is available.
-Once it uses battery/grid power or solar is unavailable, the configured timer cap starts independently of Automatic Power Use.
-Automatic cooling does not receive a manual timer merely because battery/grid use is permitted.
-Manual target alerts offer **Turn off**, **Keep running**, and **5 mins** buttons while cooling remains on; a target-based stop sends an information-only alert.
-Interactive buttons require a Home Assistant Companion `notify.mobile_app_*` service.
-No response or **Keep running** leaves the original deadline unchanged.
-**5 mins** shortens the remaining timer to five minutes from the response, without extending a shorter remaining time.
-If a manual run is still uncapped, **5 mins** explicitly starts a five-minute timer.
-Target prompts and pending responses survive HA restarts, and buttons from completed or replaced timer sessions are ignored.
-An expired manual timer still stops the run if solar generation recovers; only a still-active timer can be replaced by automatic cooling.
-Unavailable temperature readings cannot trigger target prompts or target-based stops.
-Heat and other non-cooling manual modes retain their timer-only behaviour.
+Turning the aircon on manually starts the configured timer, even below the battery reserve or with ample solar.
+Home Rules does not take over a manual run, change its target, or shorten its timer when the mode or setpoint changes.
+Turning the aircon off cancels the timer; otherwise Home Rules turns it off on the first evaluation at or after expiry.
+The deadline survives restarts.
+
+With **Only Cool When Home** enabled, Home Rules may end a manual run early after a confirmed departure if there is live solar, no grid import, and the battery is measurably charging below the configured full threshold.
+An already-away manual start is still honoured.  Missing readings do not trigger this early stop.
 
 Monitor runs the internal timer for the configured duration and exposes its remaining seconds through `sensor.home_rules_timer_countdown`, without controlling the aircon.
 
