@@ -135,3 +135,68 @@ async def test_expired_timer_retries_if_off_not_observed(hass, coord_factory, fr
     assert coordinator.last_evaluation["reason"] == R_TIMER_EXPIRED
     assert coordinator.data.timer_finishes_at is None
     assert hass.states.get("climate.test").state == "off"
+
+
+async def test_automatic_mode_change_becomes_manual_without_restarting_timer(
+    hass, coord_factory, virtual_climates, freezer
+) -> None:
+    from datetime import timedelta
+
+    from homeassistant.components.climate import HVACMode
+    from pytest_homeassistant.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_AIRCON_TIMER_DURATION, CONF_NOTIFICATION_SERVICE, ControlMode
+    from custom_components.home_rules.rules import HomeOutput
+
+    notifications = async_mock_service(hass, "notify", "mobile_app_test")
+    (climate,) = await virtual_climates()
+    coordinator = await coord_factory(
+        climate_entity=climate.entity_id,
+        options={
+            CONF_AIRCON_TIMER_DURATION: 60,
+            CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test",
+        },
+    )
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("startup")
+    started_at = coordinator._aircon_run_started_at
+    assert started_at is not None
+
+    freezer.tick(timedelta(minutes=40))
+    await hass.services.async_call(
+        "climate", "set_hvac_mode", {"entity_id": climate.entity_id, "hvac_mode": HVACMode.DRY}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert not coordinator.data.auto_mode
+    assert coordinator.data.mode is HomeOutput.TIMER
+    assert coordinator.data.timer_finishes_at == started_at + timedelta(minutes=60)
+    assert len([call for call in notifications if call.data["title"] == "⏱ Aircon → Timer"]) == 1
+
+
+async def test_temporary_automatic_setpoint_changes_current_run_only(hass, coord_factory, virtual_climates) -> None:
+    from homeassistant.components.climate import HVACMode
+
+    from custom_components.home_rules.const import ControlMode
+    from custom_components.home_rules.rules import R_TARGET_REACHED
+
+    (climate,) = await virtual_climates()
+    coordinator = await coord_factory(climate_entity=climate.entity_id)
+    coordinator.stop_at_comfort_temperature = True
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("startup")
+
+    await hass.services.async_call(
+        "climate",
+        "set_temperature",
+        {"entity_id": climate.entity_id, "hvac_mode": HVACMode.COOL, "temperature": 23},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.temperature", "23", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    await hass.async_block_till_done()
+
+    assert coordinator.last_evaluation["reason"] == R_TARGET_REACHED
+    assert coordinator.parameters.temperature_cool == 22
+    assert hass.states.get(climate.entity_id).state == HVACMode.OFF

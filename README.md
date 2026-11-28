@@ -63,7 +63,7 @@ Two independent device switches control what happens when the house reaches Idea
 - **Stop at Ideal Temperature** (`switch.home_rules_stop_at_comfort_temperature`): stops automatic Cool/Dry runs at the target when on.
   When off, automatic cooling continues under the power rules.  The switch never shortens a manual timer.
 - **Automatic Target Notifications** (`switch.home_rules_automatic_target_notifications`): enables information-only target-reached alerts for automatic runs, regardless of time.
-  Manual Cool/Dry runs send a separate information-only alert at Comfort Temperature without shortening the timer.
+  Manual Cool/Dry runs send a separate information-only alert after the temperature crosses Comfort Temperature, without shortening the timer.
 
 Automatic target notifications default on and target stopping defaults off.
 Both require the temperature input to be available; notifications require a configured notification service.
@@ -117,9 +117,15 @@ Battery discharge readings up to 100 W are treated as noise.
 Battery power is expected positive when discharging (GoodWe); enable the invert option if yours is the opposite.
 
 Turning the aircon on manually starts the configured timer, even below the battery reserve or with ample solar.
+The timer uses the climate entity's Home Assistant on timestamp, so enabling or reloading Home Rules does not reset elapsed runtime.
 Home Rules does not take over a manual run, change its target, or shorten its timer when the mode or setpoint changes.
 Turning the aircon off cancels the timer; otherwise Home Rules turns it off on the first evaluation at or after expiry.
-The deadline survives restarts.
+The deadline is persisted and survives Home Assistant restarts.  Reloading Home Rules does not send another start notification.
+Manual mode changes keep the original deadline.
+If saved ownership is missing, an active aircon is treated as a manual run rather than silently changing automatic policy.
+
+A setpoint changed during an automatic run applies to that run only; saved temperature settings are unchanged.
+A user-selected HVAC mode transfers an automatic run to manual ownership for the remainder of its one-hour runtime.
 
 With **Only Cool When Home** enabled, Home Rules may end a manual run early after a confirmed departure if there is live solar, no grid import, and the battery is measurably charging below the configured full threshold.
 An already-away manual start is still honoured.  Missing readings do not trigger this early stop.

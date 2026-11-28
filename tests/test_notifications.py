@@ -80,6 +80,50 @@ async def test_failed_manual_comfort_alert_is_retried_without_changing_deadline(
     assert coordinator.data.timer_finishes_at == deadline
 
 
+async def test_manual_comfort_alert_waits_for_crossing(hass, coord_factory) -> None:
+    from pytest_homeassistant.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE, ControlMode
+
+    calls = async_mock_service(hass, "notify", "mobile_app_test")
+    coordinator = await coord_factory(
+        climate="cool", temperature="20", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"}
+    )
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("startup")
+    assert not [call for call in calls if call.data["title"] == "Aircon comfort temperature reached"]
+
+    hass.states.async_set("sensor.temperature", "25", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert not [call for call in calls if call.data["title"] == "Aircon comfort temperature reached"]
+
+    hass.states.async_set("sensor.temperature", "24", {"unit_of_measurement": "°C"})
+    await coordinator.async_run_evaluation("poll")
+    assert len([call for call in calls if call.data["title"] == "Aircon comfort temperature reached"]) == 1
+
+
+async def test_existing_manual_run_restores_without_notification(hass, coord_factory) -> None:
+    from pytest_homeassistant.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_NOTIFICATION_SERVICE, ControlMode
+    from custom_components.home_rules.coordinator import HomeRulesCoordinator
+
+    calls = async_mock_service(hass, "notify", "mobile_app_test")
+    coordinator = await coord_factory(climate="cool", options={CONF_NOTIFICATION_SERVICE: "notify.mobile_app_test"})
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("startup")
+    call_count = len(calls)
+    await coordinator.async_shutdown()
+
+    restored = HomeRulesCoordinator(hass, coordinator.config_entry)
+    try:
+        await restored.async_initialize()
+        await restored.async_run_evaluation("restart")
+        assert len(calls) == call_count
+    finally:
+        await restored.async_shutdown()
+
+
 @pytest.mark.parametrize("notify", [False, True])
 @pytest.mark.parametrize("stop", [False, True])
 async def test_automatic_target_alert_is_optional_information_only(

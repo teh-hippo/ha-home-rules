@@ -200,6 +200,85 @@ async def test_restart_first_eval_uses_live_state_when_no_stored_session(coord_f
     assert coordinator._session.last is not None
 
 
+@pytest.mark.parametrize(("runtime_minutes", "expected_adjustment"), [(20, "Timer"), (61, "Off")])
+async def test_first_manual_run_uses_climate_runtime(
+    hass, coord_factory, freezer, runtime_minutes, expected_adjustment
+) -> None:
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+    from pytest_homeassistant.common import async_mock_service
+
+    from custom_components.home_rules.const import CONF_AIRCON_TIMER_DURATION, ControlMode
+    from custom_components.home_rules.rules import HomeOutput
+
+    turned_off = async_mock_service(hass, "climate", "turn_off")
+    started_at = dt_util.utcnow()
+    hass.states.async_set("climate.test", "cool")
+    freezer.tick(timedelta(minutes=runtime_minutes))
+    coordinator = await coord_factory(options={CONF_AIRCON_TIMER_DURATION: 60})
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+
+    await coordinator.async_run_evaluation("startup")
+
+    assert coordinator._aircon_timer_finishes_at == started_at + timedelta(minutes=60)
+    assert coordinator.data.adjustment is HomeOutput(expected_adjustment)
+    assert len(turned_off) == (expected_adjustment == "Off")
+
+
+async def test_manual_runtime_deadline_survives_reload(hass, coord_factory, freezer) -> None:
+    from datetime import timedelta
+
+    from custom_components.home_rules.const import CONF_AIRCON_TIMER_DURATION, ControlMode
+    from custom_components.home_rules.coordinator import HomeRulesCoordinator
+    from custom_components.home_rules.rules import HomeOutput
+
+    coordinator = await coord_factory(climate="cool", options={CONF_AIRCON_TIMER_DURATION: 60})
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("startup")
+    deadline = coordinator._aircon_timer_finishes_at
+    await coordinator.async_shutdown()
+    freezer.tick(timedelta(minutes=20))
+
+    restored = HomeRulesCoordinator(hass, coordinator.config_entry)
+    try:
+        await restored.async_initialize()
+        await restored.async_run_evaluation("restart")
+        assert restored._aircon_timer_finishes_at == deadline
+        assert restored.data.adjustment is HomeOutput.NO_CHANGE
+    finally:
+        await restored.async_shutdown()
+
+
+async def test_observed_off_state_discards_stale_run_start(hass, coord_factory, freezer) -> None:
+    from datetime import timedelta
+
+    from custom_components.home_rules.const import CONF_AIRCON_TIMER_DURATION, ControlMode
+    from custom_components.home_rules.coordinator import HomeRulesCoordinator
+
+    coordinator = await coord_factory(climate="cool", options={CONF_AIRCON_TIMER_DURATION: 60})
+    await coordinator.async_set_mode(ControlMode.AUTOMATIC)
+    await coordinator.async_run_evaluation("startup")
+    await coordinator.async_shutdown()
+    freezer.tick(timedelta(minutes=10))
+    hass.states.async_set("climate.test", "off")
+
+    restored = HomeRulesCoordinator(hass, coordinator.config_entry)
+    try:
+        await restored.async_initialize()
+        await restored.async_run_evaluation("restart")
+        assert restored._aircon_run_started_at is None
+
+        freezer.tick(timedelta(minutes=5))
+        hass.states.async_set("climate.test", "cool")
+        state = hass.states.get("climate.test")
+        assert state is not None
+        await hass.async_block_till_done()
+        assert restored._aircon_timer_finishes_at == state.last_changed + timedelta(minutes=60)
+    finally:
+        await restored.async_shutdown()
+
+
 async def test_missing_generation_telemetry_arms_overnight_timer(coord_factory) -> None:
     """With no live solar telemetry, a manually run aircon is capped by the overnight timer."""
     from custom_components.home_rules.const import ControlMode
@@ -227,13 +306,17 @@ async def test_live_zero_generation_caps_manual_run(coord_factory) -> None:
     assert coordinator.data.adjustment is HomeOutput.TIMER
 
 
-async def test_restart_with_expired_timer_and_aircon_on_turns_off(coord_factory) -> None:
+async def test_restart_with_expired_timer_and_aircon_on_turns_off(hass, coord_factory, freezer) -> None:
     """M1: HA down when the cap elapsed, aircon still heating -> restart issues OFF, not a re-arm."""
+    from datetime import timedelta
+
     from custom_components.home_rules.rules import HomeOutput
 
+    hass.states.async_set("climate.test", "heat")
+    freezer.tick(timedelta(minutes=61))
     coordinator = await coord_factory(climate="heat", generation="unknown", grid="unknown")
     coordinator._session.last = HomeOutput.TIMER
-    coordinator._aircon_timer_finishes_at = None  # elapsed while HA was down
+    coordinator._aircon_timer_finishes_at = None
     coordinator._initialized = False  # startup sync runs
 
     await coordinator.async_run_evaluation("restart")

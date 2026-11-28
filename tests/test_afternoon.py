@@ -630,7 +630,7 @@ async def test_monitor_records_battery_top_up_without_climate_call(hass, coord_f
 
 
 @pytest.mark.asyncio
-async def test_battery_top_up_preserves_adjusted_target(hass, coord_factory, freezer) -> None:
+async def test_battery_top_up_uses_adjusted_target(hass, coord_factory, freezer) -> None:
     from custom_components.home_rules.const import (
         CONF_AFTERNOON_FORECAST_CONFIG_ENTRY_ID,
         CONF_BATTERY_POWER_ENTITY_ID,
@@ -638,6 +638,7 @@ async def test_battery_top_up_preserves_adjusted_target(hass, coord_factory, fre
         CONF_OCCUPANCY_ENTITY_ID,
         ControlMode,
     )
+    from custom_components.home_rules.rules import R_AFTERNOON_TARGET
 
     async def get_forecast(call) -> dict[str, dict[str, float]]:
         return {
@@ -659,8 +660,15 @@ async def test_battery_top_up_preserves_adjusted_target(hass, coord_factory, fre
     async def set_hvac_mode(call) -> None:
         return None
 
+    stops = 0
+
+    async def turn_off(call) -> None:
+        nonlocal stops
+        stops += 1
+
     hass.services.async_register("climate", "set_temperature", set_temperature)
     hass.services.async_register("climate", "set_hvac_mode", set_hvac_mode)
+    hass.services.async_register("climate", "turn_off", turn_off)
     hass.states.async_set("sensor.battery", "0", {"unit_of_measurement": "W"})
     hass.states.async_set("sensor.battery_soc", "60", {"unit_of_measurement": "%"})
     hass.states.async_set("person.camille", "home")
@@ -691,4 +699,7 @@ async def test_battery_top_up_preserves_adjusted_target(hass, coord_factory, fre
 
     await coordinator.async_run_evaluation()
 
-    assert targets == [26], coordinator.last_evaluation
+    assert coordinator.last_evaluation["reason"] == R_AFTERNOON_TARGET
+    assert coordinator.last_evaluation["adjusted_setpoint"] == 26
+    assert targets == []
+    assert stops == 1

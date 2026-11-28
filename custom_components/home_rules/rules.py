@@ -128,6 +128,7 @@ class HomeInput:
     count_power_tolerance: bool = True
     timer_expired: bool = False
     battery_charging: bool = False
+    automatic_target_temperature: float | None = None
 
 
 @dataclass
@@ -323,6 +324,12 @@ def _stop(config: RuleParameters, home: HomeInput, state: CachedState, reason: s
     return AdjustResult(HomeOutput.OFF, reason)
 
 
+def _automatic_target(config: RuleParameters, home: HomeInput, fallback: float | None = None) -> float:
+    if home.automatic_target_temperature is not None:
+        return home.automatic_target_temperature
+    return fallback if fallback is not None else config.temperature_cool
+
+
 def _solar_run_on(config: RuleParameters, home: HomeInput, state: CachedState) -> AdjustResult | None:
     sufficient = home.have_solar and home.grid_usage <= 0 and home.battery_discharge <= 0
     tolerance = max(1, config.grid_usage_delay) * config.evaluation_interval
@@ -380,6 +387,9 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         if not h.timer:
             state.manual_seen_home = h.someone_home is True
             return AdjustResult(HomeOutput.TIMER, R_MANUAL)
+        if state.last in (HomeOutput.COOL, HomeOutput.DRY, HomeOutput.ON):
+            state.manual_seen_home = h.someone_home is True
+            return AdjustResult(HomeOutput.TIMER, R_MANUAL)
         if h.someone_home is True:
             state.manual_seen_home = True
         if (
@@ -428,7 +438,11 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return _stop(config, h, state, R_AFTERNOON_OCCUPANCY)
         if not h.temperature_available or h.temperature is None:
             return _stop(config, h, state, R_TEMPERATURE_UNAVAILABLE)
-        if h.temperature_available and h.temperature is not None and h.temperature <= config.temperature_threshold:
+        if (
+            h.temperature_available
+            and h.temperature is not None
+            and h.temperature <= _automatic_target(config, h, config.temperature_threshold)
+        ):
             return _stop(config, h, state, R_AFTERNOON_TARGET)
         state.tolerated = 0
         return AdjustResult(HomeOutput.NO_CHANGE, R_AFTERNOON_COOLING)
@@ -438,7 +452,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
         and config.stop_at_comfort_temperature
         and h.temperature_available
         and h.temperature is not None
-        and h.temperature <= config.temperature_cool
+        and h.temperature <= _automatic_target(config, h)
     ):
         return _stop(config, h, state, R_TARGET_REACHED)
     if h.aircon_mode is AirconMode.OFF and h.now < state.reactivate_at:
@@ -589,7 +603,7 @@ def adjust(config: RuleParameters, home: HomeInput, state: CachedState) -> Adjus
             return _stop(config, h, state, R_BATTERY_RESERVE)
         if not h.temperature_available or h.temperature is None:
             return _stop(config, h, state, R_TEMPERATURE_UNAVAILABLE)
-        if h.temperature <= config.temperature_cool:
+        if h.temperature <= _automatic_target(config, h):
             return _stop(config, h, state, R_TARGET_REACHED)
         if h.grid_usage > 0:
             if not h.count_power_tolerance:

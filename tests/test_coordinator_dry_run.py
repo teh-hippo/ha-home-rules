@@ -58,6 +58,9 @@ async def test_monitor_timer_runs_for_configured_duration_without_climate_calls(
 
     coordinator = await coord_factory(climate="cool", grid="100", options={CONF_AIRCON_TIMER_DURATION: 90})
     now = dt_util.utcnow()
+    climate_state = coordinator.hass.states.get("climate.test")
+    assert climate_state is not None
+    started_at = climate_state.last_changed
     with (
         patch.object(coordinator, "_call_service", new_callable=AsyncMock) as call_service,
         patch("custom_components.home_rules.coordinator.dt_util.utcnow", return_value=now) as utcnow,
@@ -66,7 +69,7 @@ async def test_monitor_timer_runs_for_configured_duration_without_climate_calls(
         initial = coordinator.data
         deadline = initial.timer_finishes_at
         assert initial.adjustment is HomeOutput.TIMER
-        assert deadline == now + timedelta(minutes=90)
+        assert deadline == started_at + timedelta(minutes=90)
 
         for minutes in (5, 60, 89):
             utcnow.return_value = now + timedelta(minutes=minutes)
