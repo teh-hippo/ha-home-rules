@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v4.5.4 (2026-11-28)
+
+### Bug Fixes
+
+- Let manual aircon starts run on their own timer
+  ([`70b11a8`](https://github.com/teh-hippo/ha-home-rules/commit/70b11a87e9459834b8b1446955406926022c78cd))
+
+### Additional Release Information
+
+- Manual runs no longer use the automatic ideal-temperature stop or actionable target notifications.
+  With Only Cool When Home enabled, a confirmed departure can end a manual run early to prioritise
+  solar battery charging.
+
+
 ## v4.5.3 (2026-11-28)
 
 ### Bug Fixes
