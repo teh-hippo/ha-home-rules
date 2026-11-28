@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v4.5.5 (2026-11-28)
+
+### Bug Fixes
+
+- Preserve real aircon runtime across overrides
+  ([`35fc960`](https://github.com/teh-hippo/ha-home-rules/commit/35fc96086d7e6442724a23692e7c77014fc34de8))
+
+
 ## v4.5.4 (2026-11-28)
 
 ### Bug Fixes
